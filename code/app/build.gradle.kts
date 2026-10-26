@@ -37,8 +37,8 @@ android {
 }
 
 dependencies {
+    implementation(platform(libs.firebase.bom))
     implementation(platform(libs.androidx.compose.bom))
-    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -46,6 +46,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.analytics)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -53,5 +55,4 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation("com.google.firebase:firebase-analytics")
 }
