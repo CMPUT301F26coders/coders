@@ -257,6 +257,27 @@ class CampsiteRepo {
     private val _campsites = mutableStateListOf<Campsite>()
 
     /**
+     * Returns all campsites currently loaded from Firestore.
+     *
+     * @return A list of campsites.
+     */
+    fun getAllCampsites(): List<Campsite> {
+        return _campsites.toList()
+    }
+
+    /**
+     *Gets all the camp sites for a particular owner.
+     *
+     * @param owner Owner of the campsite.
+     * @returns a list of all campsites owned by the given owner.
+     */
+    fun getCampsitesByOwner(owner: CampOwner): List<Campsite> {
+        return _campsites.filter {
+            it.campOwner == owner
+        }
+    }
+
+    /**
      * Adds a campsite to the repository.
      *
      * @param campsite The campsite to add.
