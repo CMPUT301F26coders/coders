@@ -1,6 +1,7 @@
 package com.example.coders
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -73,5 +74,14 @@ class ProfileTest {
         assertEquals("User1", userList[0].name)
         assertEquals("User2", userList[1].name)
         assertEquals("User3", userList[2].name)
+    }
+
+    @Test
+    fun profile_ids_autoIncrementOnCreation() {
+        val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())
+        val owner: Profile = CampOwner("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
+
+        assertNotEquals(entrant.id, owner.id)
+        assertEquals(entrant.id + 1, owner.id)
     }
 }
