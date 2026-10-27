@@ -1,6 +1,8 @@
 package com.example.coders
 
 import androidx.compose.runtime.mutableStateListOf
+import com.example.coders.Campsite.Companion.nextId
+import com.example.coders.Profile.Companion.nextProfileId
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,6 +20,12 @@ interface Profile {
     val name: String
     val email: String
     val phone: String
+    val id: Int
+        get() = nextProfileId.getAndIncrement()
+
+    companion object {
+        val nextProfileId = AtomicInteger(1)
+    }
 }
 
 /**
@@ -30,9 +38,10 @@ data class Entrant(
     override val name: String,
     override val email: String,
     override val phone: String,
-    val bookings: List<Reservation>,
-    val waitlists: List<Waitlist>
+    val bookings: List<Reservation> = emptyList(),
+    val waitlists: List<Waitlist> = emptyList()
 ) : Profile {
+
 
 }
 
@@ -48,10 +57,10 @@ data class CampOwner(
     override val name: String,
     override val email: String,
     override val phone: String,
-    val campsites : List<Campsite>,
-    val lotteries : List<Lottery>,
-    val reservations : List<Reservation>,
-    val notifications : List<Notification>
+    val campsites : List<Campsite> = emptyList(),
+    val lotteries : List<Lottery> = emptyList(),
+    val reservations : List<Reservation> = emptyList(),
+    val notifications : List<Notification> = emptyList()
 ) : Profile {
 
 }
@@ -70,12 +79,12 @@ data class Admin (
     override val name: String,
     override val email: String,
     override val phone: String,
-    val waitlists: List<Waitlist>,
-    val campsites : List<Campsite>,
-    val lotteries : List<Lottery>,
-    val reservations : List<Reservation>,
-    val notificationLogs : List<Notification>,
-    val messageLogs : List<Message>
+    val waitlists: List<Waitlist> = emptyList(),
+    val campsites : List<Campsite> = emptyList(),
+    val lotteries : List<Lottery> = emptyList(),
+    val reservations : List<Reservation> = emptyList(),
+    val notificationLogs : List<Notification> = emptyList(),
+    val messageLogs : List<Message> = emptyList()
 ) : Profile {
 
 }
@@ -94,12 +103,15 @@ data class Waitlist (
 /**
  * Represents a campsite.
  *
+ * Necessary properties to make a campsite instance:
  * @property name The name of the campsite. Necessary to make a campsite instance.
  * @property location The location of the campsite. Necessary to make a campsite instance
  * @property description A description of the campsite. Necessary to make a campsite instance
  * @property capacity The capacity of the campsite. Necessary to make a campsite instance
  * @property mapLocation The visual map location of the campsite. Necessary to make a campsite instance
  * @property campOwner The camp owner of the campsite. Necessary to make a campsite instance
+ *
+ * Unnecessary properties to make a campsite instance:
  * @property rating The rating of the campsite. UnNecessary to make a campsite instance
  * @property images A list of images associated with the campsite. UnNecessary to make a campsite instance
  * @property tags A list of tags associated with the campsite. UnNecessary to make a campsite instance
@@ -215,7 +227,13 @@ data class Notification (
     val title : String,
     val content : String,
     val date : String,
-)
+    val id : Int = nextId.getAndIncrement()
+
+) {
+    companion object {
+        private val nextId = AtomicInteger(1)
+    }
+}
 
 /**
  * Represents a message.
@@ -237,11 +255,16 @@ data class Message (
  * @property campOwner The camp owner of the chat.
  * @property entrant The entrant of the chat.
  */
-data class MessageChat (
+data class Conversation (
     val messages : List<Message>,
     val campOwner : CampOwner,
     val entrant : Entrant,
-)
+    val id : Int = nextId.getAndIncrement()
+) {
+    companion object {
+        private val nextId = AtomicInteger(1)
+    }
+}
 
 /**
  * Represents a repository of campsites.
@@ -262,7 +285,7 @@ class CampsiteRepo {
      * @param campsite The campsite to add.
      */
     fun addCampsite(campsite: Campsite) {
-        campsiteRef.document(campsite.name).set(campsite)
+        campsiteRef.document(campsite.id.toString()).set(campsite)
     }
 
     /**
@@ -272,10 +295,10 @@ class CampsiteRepo {
      * @param updatedCampsite The updated campsite.
      */
     fun updateCampsite(oldCampsite: Campsite, updatedCampsite: Campsite) {
-        if (oldCampsite.name != updatedCampsite.name) {
-            campsiteRef.document(oldCampsite.name).delete()
+        if (oldCampsite.id.toString() != updatedCampsite.id.toString()) {
+            campsiteRef.document(oldCampsite.id.toString()).delete()
         }
-        campsiteRef.document(updatedCampsite.name).set(updatedCampsite)
+        campsiteRef.document(updatedCampsite.id.toString()).set(updatedCampsite)
     }
 
     /**
@@ -284,14 +307,11 @@ class CampsiteRepo {
      * @param campsite The campsite to delete.
      */
     fun deleteCampsite(campsite: Campsite) {
-        campsiteRef.document(campsite.name).delete()
+        campsiteRef.document(campsite.id.toString()).delete()
     }
 
     /**
      * Initializes the repository.
-     *
-     * @param campsiteRef The reference to the campsites collection in the database.
-     * @param _campsites A list of campsites.
      */
     init{
         campsiteRef.addSnapshotListener { snapshot, error ->
@@ -331,7 +351,7 @@ class ProfileRepo {
      * @param profile The profile to add.
      */
     fun addProfile(profile: Profile) {
-        profileRef.document(profile.name).set(profile)
+        profileRef.document(profile.id.toString()).set(profile)
     }
 
     /**
@@ -341,10 +361,10 @@ class ProfileRepo {
      * @param updatedProfile The updated profile.
      */
     fun updateProfile(oldProfile: Profile, updatedProfile: Profile) {
-        if (oldProfile.name != updatedProfile.name) {
-            profileRef.document(oldProfile.name).delete()
+        if (oldProfile.id.toString() != updatedProfile.id.toString()) {
+            profileRef.document(oldProfile.id.toString()).delete()
         }
-        profileRef.document(updatedProfile.name).set(updatedProfile)
+        profileRef.document(updatedProfile.id.toString()).set(updatedProfile)
     }
 
     /**
@@ -353,14 +373,11 @@ class ProfileRepo {
      * @param profile The profile to delete.
      */
     fun deleteProfile(profile: Profile) {
-        profileRef.document(profile.name).delete()
+        profileRef.document(profile.id.toString()).delete()
     }
 
     /**
      * Initializes the repository.
-     *
-     * @param profileRef The reference to the profiles collection in the database.
-     * @param _profiles A list of profiles.
      */
     init{
         profileRef.addSnapshotListener { snapshot, error ->
@@ -394,7 +411,7 @@ data class Image(
 /**
  * Represents a repository of image.
  *
- * @property _image A list of image.
+ * @property _images A list of image.
  * @property imageRef The reference to the image collection in the database.
  * @property db The database.
  */
@@ -402,7 +419,7 @@ class ImageRepo {
     private val db = Firebase.firestore
     private val imageRef = db.collection("image")
 
-    private val _image = mutableStateListOf<Image>()
+    private val _images = mutableStateListOf<Image>()
 
     /**
      * Adds a image to the repository.
@@ -424,9 +441,6 @@ class ImageRepo {
 
     /**
      * Initializes the repository.
-     *
-     * @param imageRef The reference to the image collection in the database.
-     * @param _image A list of profiles.
      */
     init{
         imageRef.addSnapshotListener { snapshot, error ->
@@ -434,12 +448,101 @@ class ImageRepo {
                 return@addSnapshotListener
             }
 
-            _image.clear()
+            _images.clear()
 
             snapshot?.documents?.forEach { document ->
                 val image = document.toObject(Image::class.java)
                 if (image != null) {
-                    _image.add(image)
+                    _images.add(image)
+                }
+            }
+
+        }
+    }
+}
+
+/**
+ * Represents a repository of notification.
+ *
+ * @property _notifications A list of notification.
+ * @property notificationRef The reference to the notification collection in the database.
+ * @property db The database.
+ */
+class NotificationRepo{
+    private val db = Firebase.firestore
+    private val notificationRef = db.collection("notification")
+
+    private val _notifications = mutableStateListOf<Notification>()
+
+    /**
+     * Adds a notification to the repository.
+     *
+     * @param notification The notification to add.
+     */
+    fun addNotification(notification: Notification) {
+        notificationRef.document(notification.id.toString()).set(notification)
+    }
+
+    /**
+     * Initializes the repository.
+     */
+    init{
+        notificationRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                return@addSnapshotListener
+            }
+
+            _notifications.clear()
+
+            snapshot?.documents?.forEach { document ->
+                val notification = document.toObject(Notification::class.java)
+                if (notification != null) {
+                    _notifications.add(notification)
+                }
+            }
+
+        }
+    }
+}
+
+/**
+ * Represents a repository of conversations.
+ *
+ * @property _conversations A list of conversation.
+ * @property conversationRef The reference to the conversation collection in the database.
+ * @property db The database.
+ */
+class ConversationRepo{
+    private val db = Firebase.firestore
+    private val conversationRef = db.collection("conversation")
+
+    private val _conversations = mutableStateListOf<Conversation>()
+
+    /**
+     * Adds a conversation to the repository.
+     *
+     * @param conversation The conversation to add.
+     */
+    fun addConversation(conversation: Conversation) {
+        conversationRef.document(conversation.id.toString()).set(conversation)
+    }
+
+    /**
+     * Initializes the repository.
+     *
+     */
+    init{
+        conversationRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                return@addSnapshotListener
+            }
+
+            _conversations.clear()
+
+            snapshot?.documents?.forEach { document ->
+                val conversation = document.toObject(Conversation::class.java)
+                if (conversation != null) {
+                    _conversations.add(conversation)
                 }
             }
 
