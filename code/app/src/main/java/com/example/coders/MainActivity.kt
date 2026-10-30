@@ -17,6 +17,9 @@ import com.example.coders.ui.screens.PoliciesScreen
 import com.example.coders.ui.screens.EntrantMessagesScreen
 import com.example.coders.ui.screens.EntrantChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
+import com.example.coders.ui.screens.EntrantMyStuffScreen
+import com.example.coders.ui.screens.MiniMapScreen
+
 
 class MainActivity : ComponentActivity() {
 
@@ -66,6 +69,14 @@ class MainActivity : ComponentActivity() {
 
                     composable("reservations") {
                         EntrantReservationsScreen(navController)
+                    }
+
+                    composable("mystuff") {
+                        EntrantMyStuffScreen(navController)
+                    }
+
+                    composable("minimap") {
+                        MiniMapScreen(navController)
                     }
                 }
             }

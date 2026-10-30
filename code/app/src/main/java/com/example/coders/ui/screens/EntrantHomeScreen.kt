@@ -104,11 +104,14 @@ fun EntrantHomeScreen(navController: NavController) {
     }
 }
 
+
+// NOTIFICATION CARDS
 @Composable
 fun EntrantNotification(
     title: String,
     message: String
 ) {
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -124,11 +127,13 @@ fun EntrantNotification(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
+
             Text(
                 text = title,
                 fontSize = 15.sp,
@@ -147,14 +152,24 @@ fun EntrantNotification(
     }
 }
 
+
+// BOTTOM NAVIGATION BAR
 @Composable
 fun EntrantBottomBar(navController: NavController) {
 
     NavigationBar {
 
+        // HOME
         NavigationBarItem(
-            selected = true,
-            onClick = { },
+            selected = false,
+            onClick = {
+                navController.navigate("entrant") {
+                    popUpTo("entrant") {
+                        inclusive = false
+                    }
+                    launchSingleTop = true
+                }
+            },
             icon = {
                 Icon(
                     Icons.Default.Home,
@@ -163,10 +178,16 @@ fun EntrantBottomBar(navController: NavController) {
             }
         )
 
+        // MESSAGES
         NavigationBarItem(
             selected = false,
             onClick = {
-                navController.navigate("messages")
+                navController.navigate("messages") {
+                    popUpTo("entrant") {
+                        inclusive = false
+                    }
+                    launchSingleTop = true
+                }
             },
             icon = {
                 Icon(
@@ -176,9 +197,17 @@ fun EntrantBottomBar(navController: NavController) {
             }
         )
 
+        // MY STUFF
         NavigationBarItem(
             selected = false,
-            onClick = { },
+            onClick = {
+                navController.navigate("mystuff") {
+                    popUpTo("entrant") {
+                        inclusive = false
+                    }
+                    launchSingleTop = true
+                }
+            },
             icon = {
                 Icon(
                     Icons.Default.Inventory2,
@@ -187,6 +216,7 @@ fun EntrantBottomBar(navController: NavController) {
             }
         )
 
+        // SEARCH
         NavigationBarItem(
             selected = false,
             onClick = { },
@@ -198,6 +228,7 @@ fun EntrantBottomBar(navController: NavController) {
             }
         )
 
+        // PROFILE
         NavigationBarItem(
             selected = false,
             onClick = { },

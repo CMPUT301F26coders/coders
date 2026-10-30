@@ -20,64 +20,72 @@ import com.example.coders.R
 @Composable
 fun EntrantMessagesScreen(navController: NavController) {
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-
-        Button(
-            onClick = {
-                navController.popBackStack()
-            }
-        ) {
-            Text("Back")
+    Scaffold(
+        bottomBar = {
+            EntrantBottomBar(navController)
         }
+    ) { innerPadding ->
 
-        Text(
-            text = "Messages",
-            fontSize = 35.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
 
-        Spacer(modifier = Modifier.height(25.dp))
+            Button(
+                onClick = {
+                    navController.popBackStack()
+                }
+            ) {
+                Text("Back")
+            }
 
-        MessageBox(
-            name = "Pine Lake Campsite",
-            owner = "John Smith",
-            message = "Congratulations!, You won the campsite lottery!",
-            date = "10:30 AM",
-            picture = R.drawable.ic_launcher_foreground,
-            navController = navController
-        )
+            Text(
+                text = "Messages",
+                fontSize = 35.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-        MessageBox(
-            name = "Mountain View Camp",
-            owner = "Sarah Lee",
-            message = "Hello!, Thanks for your interest in this campsite!",
-            date = "Yesterday",
-            picture = R.drawable.ic_launcher_foreground,
-            navController = navController
-        )
+            Spacer(modifier = Modifier.height(25.dp))
 
-        MessageBox(
-            name = "Forest Hill Camp",
-            owner = "Mike Brown",
-            message = "Let me know if you have any questions!",
-            date = "Oct 12",
-            picture = R.drawable.ic_launcher_foreground,
-            navController = navController
-        )
+            MessageBox(
+                name = "Pine Lake Campsite",
+                owner = "John Smith",
+                message = "Congratulations!, You won the campsite lottery!",
+                date = "10:30 AM",
+                picture = R.drawable.ic_launcher_foreground,
+                navController = navController
+            )
 
-        MessageBox(
-            name = "Riverside Campsite",
-            owner = "Emma Wilson",
-            message = "Your reservations details are ready!",
-            date = "Oct 10",
-            picture = R.drawable.ic_launcher_foreground,
-            navController = navController
-        )
+            MessageBox(
+                name = "Mountain View Camp",
+                owner = "Sarah Lee",
+                message = "Hello!, Thanks for your interest in this campsite!",
+                date = "Yesterday",
+                picture = R.drawable.ic_launcher_foreground,
+                navController = navController
+            )
+
+            MessageBox(
+                name = "Forest Hill Camp",
+                owner = "Mike Brown",
+                message = "Let me know if you have any questions!",
+                date = "Oct 12",
+                picture = R.drawable.ic_launcher_foreground,
+                navController = navController
+            )
+
+            MessageBox(
+                name = "Riverside Campsite",
+                owner = "Emma Wilson",
+                message = "Your reservations details are ready!",
+                date = "Oct 10",
+                picture = R.drawable.ic_launcher_foreground,
+                navController = navController
+            )
+        }
     }
 }
 

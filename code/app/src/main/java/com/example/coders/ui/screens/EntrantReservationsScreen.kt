@@ -70,7 +70,7 @@ fun EntrantReservationsScreen(navController: NavController) {
 
                 Button(
                     onClick = {
-                        // Map screen will be added later
+                        navController.navigate("minimap")
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
