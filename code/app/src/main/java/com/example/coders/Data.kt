@@ -279,6 +279,33 @@ class CampsiteRepo {
 
     private val _campsites = mutableStateListOf<Campsite>()
 
+    fun searchCampsites(
+        location: String = "",
+        date: String = "",
+        guests: Int = 0
+    ): List<Campsite> {
+        if (guests < 0) return emptyList()
+
+        return _campsites.filter { campsite ->
+
+            val matchesLocation = location.isBlank() ||
+                    campsite.location.contains(
+                        location.trim(),
+                        ignoreCase = true
+                    )
+
+            val matchesGuests = campsite.capacity >= guests
+
+            val matchesDate = date.isBlank() ||
+                    campsite.reservations.none { reservation ->
+                        reservation.date == date.trim() &&
+                                reservation.status == ReservationStatus.Active
+                    }
+
+            matchesLocation && matchesGuests && matchesDate
+        }
+    }
+
     /**
      * Returns all campsites currently loaded from Firestore.
      *
@@ -365,6 +392,26 @@ class ProfileRepo {
     private val profileRef = db.collection("profiles")
 
     private val _profiles = mutableStateListOf<Profile>()
+
+    fun searchProfiles(
+        name: String = "",
+        type: String = ""
+    ): List<Profile> {
+        return _profiles.filter { profile ->
+            val matchesName = name.isBlank() ||
+                    profile.name.contains(name.trim(), ignoreCase = true)
+
+            val matchesType = when (type.trim().lowercase()) {
+                "" -> true
+                "entrant" -> profile is Entrant
+                "campowner", "camp owner" -> profile is CampOwner
+                "admin" -> profile is Admin
+                else -> false
+            }
+
+            matchesName && matchesType
+        }
+    }
 
     /**
      * Adds a profile to the repository.
