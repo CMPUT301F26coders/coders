@@ -8,9 +8,9 @@
 - Campsite creation — Member C
 
 ### Sprint Review
-- Registration completed
-- Login partially completed
-- Campsite creation carried into Sprint 2
+-
+-
+-
 
 ## Sprint 2 (Oct 29 – Nov 5)
 
@@ -20,10 +20,9 @@
 - Create reservation screen — Member C
 
 ### Sprint Review
-- Login completed
-- Reservation UI implemented
-- Firebase integration still pending
-
+-
+-
+- 
 # Sprint 3 (Nov 6 - Nov 13)
 
 ###
