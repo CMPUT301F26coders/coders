@@ -152,4 +152,70 @@ class RepositorySearchTest {
         assertEquals("Calgary Camp", results[0].name)
     }
 
+    @Test
+    fun searchProfiles_noMatches() {
+        val results = filterProfiles(
+            profiles,
+            name = "Nonexistent"
+        )
+
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun searchProfiles_noFilters() {
+        val results = filterProfiles(profiles)
+
+        assertEquals(3, results.size)
+    }
+
+    @Test
+    fun searchCampsites_noMatches() {
+        val results = filterCampsites(
+            campsites,
+            location = "Vancouver"
+        )
+
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun searchCampsites_noFilters() {
+        val results = filterCampsites(campsites)
+
+        assertEquals(2, results.size)
+    }
+
+    @Test
+    fun searchCampsites_exceedsCapacity() {
+        val results = filterCampsites(
+            campsites,
+            guests = 10
+        )
+
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun searchCampsites_cancelledReservationIsAvailable() {
+        val reservation = Reservation(
+            campsite = edmonton,
+            date = "2026-11-15",
+            guestNumber = 2,
+            status = ReservationStatus.Cancelled
+        )
+
+        val campsiteWithCancelledReservation = edmonton.copy(
+            reservations = listOf(reservation)
+        )
+
+        val results = filterCampsites(
+            listOf(campsiteWithCancelledReservation),
+            date = "2026-11-15"
+        )
+
+        assertEquals(1, results.size)
+        assertEquals("Edmonton Camp", results[0].name)
+    }
+
 }
