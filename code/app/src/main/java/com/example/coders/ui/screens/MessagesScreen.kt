@@ -18,7 +18,7 @@ import androidx.navigation.NavController
 import com.example.coders.R
 
 @Composable
-fun EntrantMessagesScreen(navController: NavController) {
+fun MessagesScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {

@@ -127,14 +127,14 @@ fun SignUpScreen(navController: NavController) {
             onClick = {
 
                 if (accountType == "Admin") {
-                    navController.navigate("admin")
+                    navController.navigate("home")
                 } else if (accountType == "Entrant") {
                     UserSession.isOwner = false
-                    navController.navigate("entrant")
+                    navController.navigate("home")
                 } else {
                     // Enter as Owner
                     UserSession.isOwner = true
-                    navController.navigate("owner")
+                    navController.navigate("home")
                 }
             },
             shape = RoundedCornerShape(30.dp)
