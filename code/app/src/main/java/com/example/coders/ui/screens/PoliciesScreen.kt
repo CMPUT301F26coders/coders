@@ -7,10 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.compose.runtime.*
+
 
 @Composable
 fun PoliciesScreen(navController: NavController) {
-
+    var isNavigating by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -18,7 +20,10 @@ fun PoliciesScreen(navController: NavController) {
     ) {
 
         Button(onClick = {
-            navController.popBackStack()
+            if(!isNavigating) {
+                isNavigating = true
+                navController.popBackStack()
+            }
         }) {
             Text("Back")
         }
