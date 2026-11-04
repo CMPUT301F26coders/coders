@@ -25,7 +25,9 @@ fun EntrantHomeScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            EntrantBottomBar(navController)
+            AppBottomBar(
+                navController = navController
+            )
         }
     ) { innerPadding ->
 
@@ -149,95 +151,5 @@ fun EntrantNotification(
                 lineHeight = 16.sp
             )
         }
-    }
-}
-
-
-// BOTTOM NAVIGATION BAR
-@Composable
-fun EntrantBottomBar(navController: NavController) {
-
-    NavigationBar {
-
-        // HOME
-        NavigationBarItem(
-            selected = false,
-            onClick = {
-                navController.navigate("entrant") {
-                    popUpTo("entrant") {
-                        inclusive = false
-                    }
-                    launchSingleTop = true
-                }
-            },
-            icon = {
-                Icon(
-                    Icons.Default.Home,
-                    contentDescription = "Home"
-                )
-            }
-        )
-
-        // MESSAGES
-        NavigationBarItem(
-            selected = false,
-            onClick = {
-                navController.navigate("messages") {
-                    popUpTo("entrant") {
-                        inclusive = false
-                    }
-                    launchSingleTop = true
-                }
-            },
-            icon = {
-                Icon(
-                    Icons.Default.Email,
-                    contentDescription = "Messages"
-                )
-            }
-        )
-
-        // MY STUFF
-        NavigationBarItem(
-            selected = false,
-            onClick = {
-                navController.navigate("mystuff") {
-                    popUpTo("entrant") {
-                        inclusive = false
-                    }
-                    launchSingleTop = true
-                }
-            },
-            icon = {
-                Icon(
-                    Icons.Default.Inventory2,
-                    contentDescription = "My Stuff"
-                )
-            }
-        )
-
-        // SEARCH
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = "Search"
-                )
-            }
-        )
-
-        // PROFILE
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = "Profile"
-                )
-            }
-        )
     }
 }

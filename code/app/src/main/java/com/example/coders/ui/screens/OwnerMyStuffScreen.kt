@@ -21,7 +21,9 @@ import androidx.navigation.NavController
 fun OwnerMyStuffScreen(navController: NavController) {
     Scaffold(
         bottomBar = {
-            EntrantBottomBar(navController)
+            AppBottomBar(
+                navController = navController
+            )
         }
     ) { innerPadding ->
         Column(

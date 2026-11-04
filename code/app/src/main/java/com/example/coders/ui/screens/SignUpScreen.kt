@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.UserSession
 
 @Composable
 fun SignUpScreen(navController: NavController) {
@@ -124,11 +125,15 @@ fun SignUpScreen(navController: NavController) {
         // Sign Up Button
         Button(
             onClick = {
+
                 if (accountType == "Admin") {
                     navController.navigate("admin")
                 } else if (accountType == "Entrant") {
+                    UserSession.isOwner = false
                     navController.navigate("entrant")
                 } else {
+                    // Enter as Owner
+                    UserSession.isOwner = true
                     navController.navigate("owner")
                 }
             },

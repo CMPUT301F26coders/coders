@@ -23,7 +23,9 @@ fun EntrantMyStuffScreen(navController: NavController) {
     // ADDED: SAME HOTBAR AS HOME SCREEN
     Scaffold(
         bottomBar = {
-            EntrantBottomBar(navController)
+            AppBottomBar(
+                navController = navController
+            )
         }
     ) { innerPadding ->
 
