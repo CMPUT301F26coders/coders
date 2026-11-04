@@ -17,12 +17,10 @@ fun AppBottomBar(navController: NavController) {
 
     val isOwner = UserSession.isOwner
 
-    val homeRoute = if (isOwner) "owner" else "entrant"
-    val myStuffRoute = if (isOwner) "ownermystuff" else "entrantmystuff"
 
     fun navigateTo(route: String) {
         navController.navigate(route) {
-            popUpTo(homeRoute) {
+            popUpTo("home") {
                 inclusive = false
             }
             launchSingleTop = true
@@ -33,7 +31,7 @@ fun AppBottomBar(navController: NavController) {
 
         NavigationBarItem(
             selected = false,
-            onClick = { navigateTo(homeRoute) },
+            onClick = { navigateTo("home") },
             icon = {
                 Icon(Icons.Default.Home, contentDescription = "Home")
             }
@@ -49,7 +47,7 @@ fun AppBottomBar(navController: NavController) {
 
         NavigationBarItem(
             selected = false,
-            onClick = { navigateTo(myStuffRoute) },
+            onClick = { navigateTo("myStuff") },
             icon = {
                 Icon(Icons.Default.Inventory2, contentDescription = "My Stuff")
             }

@@ -142,7 +142,6 @@ fun SignUpScreen(navController: NavController) {
         Button(
             enabled = !isSaving,
             onClick = {
-
                 if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || phone.isBlank()) {
                     errorMessage = buildList {
                         if (firstName.isBlank()) add("First name is empty")
@@ -178,12 +177,7 @@ fun SignUpScreen(navController: NavController) {
                             errorMessage = "Couldn't save your profile. Please try again."
                         } else {
                             UserSession.isOwner = accountType == "Campsite owner"
-                            val destination = when (accountType) {
-                                "Admin" -> "admin"
-                                "Entrant" -> "entrant"
-                                else -> "owner"
-                            }
-                            navController.navigate(destination)
+                            navController.navigate("home")
                         }
                     }
                 }
