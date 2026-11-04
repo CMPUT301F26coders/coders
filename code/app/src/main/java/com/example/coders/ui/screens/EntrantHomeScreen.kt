@@ -219,7 +219,14 @@ fun EntrantBottomBar(navController: NavController) {
         // SEARCH
         NavigationBarItem(
             selected = false,
-            onClick = { },
+            onClick = {
+                navController.navigate("search") {
+                    popUpTo("entrant") {
+                        inclusive = false
+                    }
+                    launchSingleTop = true
+                }
+            },
             icon = {
                 Icon(
                     Icons.Default.Search,

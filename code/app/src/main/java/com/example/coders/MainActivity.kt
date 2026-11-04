@@ -1,4 +1,3 @@
-
 package com.example.coders
 
 import android.os.Bundle
@@ -19,7 +18,7 @@ import com.example.coders.ui.screens.EntrantChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
 import com.example.coders.ui.screens.EntrantMyStuffScreen
 import com.example.coders.ui.screens.MiniMapScreen
-
+import com.example.coders.ui.screens.EntrantSearchScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -45,6 +44,10 @@ class MainActivity : ComponentActivity() {
 
                     composable("entrant") {
                         EntrantHomeScreen(navController)
+                    }
+
+                    composable("search") {
+                        EntrantSearchScreen(navController)
                     }
 
                     composable("owner") {
