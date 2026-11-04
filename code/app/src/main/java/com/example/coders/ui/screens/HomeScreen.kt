@@ -17,7 +17,6 @@ import com.example.coders.UserSession
 
 @Composable
 fun HomeScreen(navController: NavController) {
-
     val isOwner = UserSession.isOwner
 
     Scaffold(

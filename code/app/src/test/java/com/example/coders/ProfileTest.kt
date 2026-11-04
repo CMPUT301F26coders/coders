@@ -33,7 +33,8 @@ class ProfileTest {
             campsites = emptyList(),
             lotteries = emptyList(),
             reservations = emptyList(),
-            notifications = emptyList()
+            notificationsSent = emptyList(),
+            notificationsReceived = emptyList()
         )
 
         assertEquals("Bob Owner", owner.name)
