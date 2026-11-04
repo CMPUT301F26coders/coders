@@ -7,6 +7,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -15,7 +19,7 @@ import androidx.navigation.NavController
 
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
-
+    var isNavigating by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -25,8 +29,12 @@ fun EntrantReservationsScreen(navController: NavController) {
 
         TextButton(
             onClick = {
-                navController.popBackStack()
+                if(!isNavigating){
+                    isNavigating = true
+                    navController.popBackStack()
+                }
             }
+
         ) {
             Text("Back")
         }
