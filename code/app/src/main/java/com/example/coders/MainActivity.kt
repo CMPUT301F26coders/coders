@@ -28,6 +28,7 @@ import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.theme.CodersTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.example.coders.ui.screens.OwnerReservationsScreen
 
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
@@ -111,6 +112,14 @@ class MainActivity : ComponentActivity() {
                     composable("reservations") {
                         EntrantReservationsScreen(navController)
                     }
+
+                    composable("entrantreservations") {
+                        EntrantReservationsScreen(navController)
+                    }
+                    composable("ownerreservations") {
+                        OwnerReservationsScreen(navController)
+                    }
+
                     composable("minimap") {
                         MiniMapScreen(navController)
                     }
