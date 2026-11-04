@@ -11,6 +11,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.runtime.*
+
 
 /**
  * Displays the app's policies and guidelines.
@@ -24,8 +26,7 @@ import androidx.navigation.NavController
  */
 @Composable
 fun PoliciesScreen(navController: NavController) {
-
-    // Creates a vertical layout that can scroll.
+    var isNavigating by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -34,12 +35,12 @@ fun PoliciesScreen(navController: NavController) {
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
 
-        // Returns the user to the previous screen.
-        TextButton(
-            onClick = {
+        TextButton(onClick = {
+            if(!isNavigating) {
+                isNavigating = true
                 navController.popBackStack()
             }
-        ) {
+        }) {
             Text("Back")
         }
 
