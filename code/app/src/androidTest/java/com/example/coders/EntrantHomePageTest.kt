@@ -2,6 +2,7 @@
 package com.example.coders
 
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -35,7 +36,7 @@ class EntrantHomePageTest {
             .performTextInput("7801234567")
     }
 
-    // Sign up as an Entrant
+    /** Signs up as an entrant and waits for the asynchronous Firestore result. */
     private fun openHome() {
 
         enterInformation()
@@ -46,8 +47,14 @@ class EntrantHomePageTest {
         composeTestRule.onNodeWithText("Sign Up")
             .performClick()
 
-        composeTestRule.onNodeWithText("Home")
-            .assertExists()
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Home").fetchSemanticsNodes().isNotEmpty() ||
+                composeTestRule.onAllNodesWithText(
+                    "Couldn't save your profile. Please try again."
+                ).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText("Home").assertExists()
     }
 
     // Open the Messages screen

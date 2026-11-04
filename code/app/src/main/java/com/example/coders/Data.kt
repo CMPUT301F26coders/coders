@@ -1,11 +1,9 @@
 package com.example.coders
 
 import androidx.compose.runtime.mutableStateListOf
-import com.example.coders.Campsite.Companion.nextId
-import com.example.coders.Profile.Companion.nextProfileId
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.UUID
 
 
 
@@ -20,12 +18,9 @@ interface Profile {
     val name: String
     val email: String
     val phone: String
-    val id: Int
-        get() = nextProfileId.getAndIncrement()
+    val id: String
 
-    companion object {
-        val nextProfileId = AtomicInteger(1)
-    }
+    val type: String
 }
 
 /**
@@ -35,13 +30,14 @@ interface Profile {
  * @property waitlists A list of waitlists made by the entrant.
  */
 data class Entrant(
-    override val name: String,
-    override val email: String,
-    override val phone: String,
+    override val name: String = "",
+    override val email: String = "",
+    override val phone: String = "",
     val bookings: List<Reservation> = emptyList(),
-    val waitlists: List<Waitlist> = emptyList()
+    val waitlists: List<Waitlist> = emptyList(),
+    override val type: String = "Entrant",
+    override val id: String = UUID.randomUUID().toString()
 ) : Profile {
-
 
 }
 
@@ -54,13 +50,15 @@ data class Entrant(
  * @property notifications A list of notifications sent to the camp owner.
  */
 data class CampOwner(
-    override val name: String,
-    override val email: String,
-    override val phone: String,
+    override val name: String = "",
+    override val email: String = "",
+    override val phone: String = "",
     val campsites : List<Campsite> = emptyList(),
     val lotteries : List<Lottery> = emptyList(),
     val reservations : List<Reservation> = emptyList(),
-    val notifications : List<Notification> = emptyList()
+    val notifications : List<Notification> = emptyList(),
+    override val type: String = "CampOwner",
+    override val id: String = UUID.randomUUID().toString()
 ) : Profile {
 
 }
@@ -76,15 +74,17 @@ data class CampOwner(
  * @property messageLogs A list of message logs managed by the admin.
  */
 data class Admin (
-    override val name: String,
-    override val email: String,
-    override val phone: String,
+    override val name: String = "",
+    override val email: String = "",
+    override val phone: String = "",
     val waitlists: List<Waitlist> = emptyList(),
     val campsites : List<Campsite> = emptyList(),
     val lotteries : List<Lottery> = emptyList(),
     val reservations : List<Reservation> = emptyList(),
     val notificationLogs : List<Notification> = emptyList(),
-    val messageLogs : List<Message> = emptyList()
+    val messageLogs : List<Message> = emptyList(),
+    override val type: String = "Admin",
+    override val id: String = UUID.randomUUID().toString()
 ) : Profile {
 
 }
@@ -138,11 +138,8 @@ data class Campsite (
     val reservations : List<Reservation> = emptyList(),
     val notifications : List<Notification> = emptyList(),
     val qr : String = "",
-    val id : Int = nextId.getAndIncrement()
+    val id: String = UUID.randomUUID().toString()
 ) {
-    companion object {
-        private val nextId = AtomicInteger(1)
-    }
 }
 
 /**
@@ -227,13 +224,9 @@ data class Notification (
     val title : String,
     val content : String,
     val date : String,
-    val id : Int = nextId.getAndIncrement()
+    val id: String = UUID.randomUUID().toString(),
 
-) {
-    companion object {
-        private val nextId = AtomicInteger(1)
-    }
-}
+)
 
 /**
  * Represents a message.
@@ -259,12 +252,8 @@ data class Conversation (
     val messages : List<Message>,
     val campOwner : CampOwner,
     val entrant : Entrant,
-    val id : Int = nextId.getAndIncrement()
-) {
-    companion object {
-        private val nextId = AtomicInteger(1)
-    }
-}
+    val id: String = UUID.randomUUID().toString(),
+)
 
 /**
  * Represents a repository of campsites.
@@ -386,8 +375,11 @@ class ProfileRepo {
      *
      * @param profile The profile to add.
      */
-    fun addProfile(profile: Profile) {
-        profileRef.document(profile.id.toString()).set(profile)
+    fun addProfile(profile: Profile, onComplete: (Exception?) -> Unit) {
+        profileRef.document(profile.id)
+            .set(profile)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
@@ -397,10 +389,10 @@ class ProfileRepo {
      * @param updatedProfile The updated profile.
      */
     fun updateProfile(oldProfile: Profile, updatedProfile: Profile) {
-        if (oldProfile.id.toString() != updatedProfile.id.toString()) {
-            profileRef.document(oldProfile.id.toString()).delete()
+        if (oldProfile.id != updatedProfile.id) {
+            profileRef.document(oldProfile.id).delete()
         }
-        profileRef.document(updatedProfile.id.toString()).set(updatedProfile)
+        profileRef.document(updatedProfile.id).set(updatedProfile)
     }
 
     /**
@@ -409,7 +401,7 @@ class ProfileRepo {
      * @param profile The profile to delete.
      */
     fun deleteProfile(profile: Profile) {
-        profileRef.document(profile.id.toString()).delete()
+        profileRef.document(profile.id).delete()
     }
 
     /**
@@ -424,7 +416,12 @@ class ProfileRepo {
             _profiles.clear()
 
             snapshot?.documents?.forEach { document ->
-                val profile = document.toObject(Profile::class.java)
+                val profile: Profile? = when (document.getString("type")) {
+                    "Entrant" -> document.toObject(Entrant::class.java)
+                    "CampOwner" -> document.toObject(CampOwner::class.java)
+                    "Admin" -> document.toObject(Admin::class.java)
+                    else -> null
+                }
                 if (profile != null) {
                     _profiles.add(profile)
                 }
@@ -437,12 +434,8 @@ class ProfileRepo {
 data class Image(
     val url: String,
     val description: String,
-    val id : Int = nextId.getAndIncrement()
-) {
-    companion object {
-        private val nextId = AtomicInteger(1)
-    }
-}
+    val id: String = UUID.randomUUID().toString()
+)
 
 /**
  * Represents a repository of image.

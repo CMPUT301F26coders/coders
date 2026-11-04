@@ -2,6 +2,7 @@ package com.example.coders
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ImageTest {
@@ -18,11 +19,12 @@ class ImageTest {
     }
 
     @Test
-    fun image_ids_autoIncrementOnCreation() {
+    fun image_idsAreUniqueAndNonEmpty() {
         val img1 = Image("https://example.com/1.jpg", "Img 1")
         val img2 = Image("https://example.com/2.jpg", "Img 2")
 
         assertNotEquals(img1.id, img2.id)
-        assertEquals(img1.id + 1, img2.id)
+        assertTrue(img1.id.isNotBlank())
+        assertTrue(img2.id.isNotBlank())
     }
 }

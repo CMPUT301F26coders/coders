@@ -3,6 +3,7 @@ package com.example.coders
 import com.example.coders.Notification
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CommunicationTest {
@@ -64,7 +65,8 @@ class CommunicationTest {
             date = "1993-11-03"
         )
         assertNotEquals(notification1.id, notification2.id)
-        assertEquals(notification1.id + 1, notification2.id)
+        assertTrue(notification1.id.isNotBlank())
+        assertTrue(notification2.id.isNotBlank())
     }
 
     @Test
@@ -90,7 +92,8 @@ class CommunicationTest {
         )
 
         assertNotEquals(chat.id, chat2.id)
-        assertEquals(chat.id + 1, chat2.id)
+        assertTrue(chat.id.isNotBlank())
+        assertTrue(chat2.id.isNotBlank())
     }
 
 
