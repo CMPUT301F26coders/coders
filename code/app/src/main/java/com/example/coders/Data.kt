@@ -210,7 +210,8 @@ data class Reservation (
     val campsite : Campsite,
     val date : String,
     val guestNumber : Int,
-    val status : Enum<ReservationStatus>
+    val status : ReservationStatus,
+    val id: String = UUID.randomUUID().toString()
 )
 
 /**
