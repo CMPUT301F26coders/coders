@@ -14,6 +14,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.Admin
+import com.example.coders.CampOwner
+import com.example.coders.Entrant
+import com.example.coders.Profile
+import com.example.coders.ProfileRepo
 import com.example.coders.UserSession
 
 @Composable
@@ -24,6 +29,9 @@ fun SignUpScreen(navController: NavController) {
     var lastName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
+    val profileRepo = remember { ProfileRepo() }
 
     // Remember selected account type
     var accountType by remember { mutableStateOf("Entrant") }
@@ -123,26 +131,60 @@ fun SignUpScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(25.dp))
 
         // Sign Up Button
-        Button(
-            onClick = {
+        if (errorMessage.isNotEmpty()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
-                if (accountType == "Admin") {
-                    navController.navigate("home")
-                } else if (accountType == "Entrant") {
-                    UserSession.isOwner = false
-                    navController.navigate("home")
+        Button(
+            enabled = !isSaving,
+            onClick = {
+                if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || phone.isBlank()) {
+                    errorMessage = buildList {
+                        if (firstName.isBlank()) add("First name is empty")
+                        if (lastName.isBlank()) add("Last name is empty")
+                        if (email.isBlank()) add("Email is empty")
+                        if (phone.isBlank()) add("Phone is empty")
+                    }.joinToString("\n")
                 } else {
-                    // Enter as Owner
-                    UserSession.isOwner = true
-                    navController.navigate("home")
+                    val fullName = "${firstName.trim()} ${lastName.trim()}"
+                    val profile: Profile = when (accountType) {
+                        "Admin" -> Admin(
+                            name = fullName,
+                            email = email.trim(),
+                            phone = phone.trim()
+                        )
+                        "Entrant" -> Entrant(
+                            name = fullName,
+                            email = email.trim(),
+                            phone = phone.trim()
+                        )
+                        else -> CampOwner(
+                            name = fullName,
+                            email = email.trim(),
+                            phone = phone.trim()
+                        )
+                    }
+
+                    errorMessage = ""
+                    isSaving = true
+                    profileRepo.addProfile(profile) { error ->
+                        isSaving = false
+                        if (error != null) {
+                            errorMessage = "Couldn't save your profile. Please try again."
+                        } else {
+                            UserSession.isOwner = accountType == "Campsite owner"
+                            navController.navigate("home")
+                        }
+                    }
                 }
             },
             shape = RoundedCornerShape(30.dp)
         ) {
-            Text(
-                text = "Sign Up",
-                fontSize = 18.sp
-            )
+            Text(text = if (isSaving) "Saving..." else "Sign Up", fontSize = 18.sp)
         }
     }
 }
