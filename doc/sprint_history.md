@@ -3,7 +3,7 @@
 ## Sprint 1 (Oct 21 – Oct 28)
 
 ### Planned User Stories
-- US 01. — Member A
+- US 02.03.01 — Avery Rowley 
 - User login — Member B
 - Campsite creation — Member C
 
@@ -15,6 +15,7 @@
 ## Sprint 2 (Oct 29 – Nov 5)
 
 ### Planned User Stories
+- US 02.07.03, 02.07.02, 02.07.01, 02.03.01 — Avery Rowley
 - Complete user login — Member B
 - Create reservation screen — Member C
 
