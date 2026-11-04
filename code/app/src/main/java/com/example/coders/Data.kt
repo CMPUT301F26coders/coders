@@ -279,6 +279,35 @@ class CampsiteRepo {
 
     private val _campsites = mutableStateListOf<Campsite>()
 
+    fun searchCampsites(
+        location: String = "",
+        date: String = "",
+        guests: Int = 0
+    ): List<Campsite> {
+        return filterCampsites(_campsites, location, date, guests)
+    }
+
+    /**
+     * Returns all campsites currently loaded from Firestore.
+     *
+     * @return A list of campsites.
+     */
+    fun getAllCampsites(): List<Campsite> {
+        return _campsites.toList()
+    }
+
+    /**
+     *Gets all the camp sites for a particular owner.
+     *
+     * @param owner Owner of the campsite.
+     * @returns a list of all campsites owned by the given owner.
+     */
+    fun getCampsitesByOwner(owner: CampOwner): List<Campsite> {
+        return _campsites.filter {
+            it.campOwner == owner
+        }
+    }
+
     /**
      * Adds a campsite to the repository.
      *
@@ -344,6 +373,13 @@ class ProfileRepo {
     private val profileRef = db.collection("profiles")
 
     private val _profiles = mutableStateListOf<Profile>()
+
+    fun searchProfiles(
+        name: String = "",
+        type: String = ""
+    ): List<Profile> {
+        return filterProfiles(_profiles, name, type)
+    }
 
     /**
      * Adds a profile to the repository.
