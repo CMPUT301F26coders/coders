@@ -17,7 +17,9 @@ fun MiniMapScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            EntrantBottomBar(navController)
+            AppBottomBar(
+                navController = navController
+            )
         }
     ) { innerPadding ->
 

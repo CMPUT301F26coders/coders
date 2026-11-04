@@ -10,14 +10,15 @@ import androidx.navigation.compose.rememberNavController
 import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.AdminHomeScreen
-import com.example.coders.ui.screens.EntrantHomeScreen
-import com.example.coders.ui.screens.OwnerHomeScreen
+import com.example.coders.ui.screens.HomeScreen
 import com.example.coders.ui.screens.PoliciesScreen
-import com.example.coders.ui.screens.EntrantMessagesScreen
-import com.example.coders.ui.screens.EntrantChatScreen
+import com.example.coders.ui.screens.MessagesScreen
+import com.example.coders.ui.screens.ChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
-import com.example.coders.ui.screens.EntrantMyStuffScreen
+import com.example.coders.ui.screens.MyStuffScreen
 import com.example.coders.ui.screens.MiniMapScreen
+import com.example.coders.ui.screens.OwnerCampsitesScreen
+import com.example.coders.ui.screens.OwnerReservationsScreen
 import com.example.coders.ui.screens.EntrantSearchScreen
 
 class MainActivity : ComponentActivity() {
@@ -42,16 +43,16 @@ class MainActivity : ComponentActivity() {
                         AdminHomeScreen()
                     }
 
-                    composable("entrant") {
-                        EntrantHomeScreen(navController)
+                    composable("home") {
+                        HomeScreen(navController)
                     }
 
-                    composable("search") {
-                        EntrantSearchScreen(navController)
+                    composable("mystuff") {
+                        MyStuffScreen(navController)
                     }
 
-                    composable("owner") {
-                        OwnerHomeScreen()
+                    composable("ownercampsites") {
+                        OwnerCampsitesScreen(navController)
                     }
 
                     composable("policies") {
@@ -59,27 +60,28 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("messages") {
-                        EntrantMessagesScreen(navController)
-                    }
-
-                    composable("messages") {
-                        EntrantMessagesScreen(navController)
+                        MessagesScreen(navController)
                     }
 
                     composable("chat") {
-                        EntrantChatScreen(navController)
+                        ChatScreen(navController)
                     }
 
-                    composable("reservations") {
+                    composable("entrantreservations") {
                         EntrantReservationsScreen(navController)
                     }
 
-                    composable("mystuff") {
-                        EntrantMyStuffScreen(navController)
+                    composable("ownerreservations") {
+                        OwnerReservationsScreen(navController)
                     }
 
                     composable("minimap") {
                         MiniMapScreen(navController)
+                    }
+
+                    // Campsite Search
+                    composable("search") {
+                        EntrantSearchScreen(navController)
                     }
                 }
             }

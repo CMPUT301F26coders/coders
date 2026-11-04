@@ -47,7 +47,7 @@ fun EntrantSearchScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            EntrantBottomBar(navController)
+            AppBottomBar(navController)
         }
     ) { innerPadding ->
 

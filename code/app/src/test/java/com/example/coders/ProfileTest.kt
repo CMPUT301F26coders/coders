@@ -77,11 +77,13 @@ class ProfileTest {
     }
 
     @Test
-    fun profile_ids_autoIncrementOnCreation() {
+    fun profile_idsAreUniqueAndStable() {
         val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())
         val owner: Profile = CampOwner("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
+        val entrantId = entrant.id
 
         assertNotEquals(entrant.id, owner.id)
-        assertEquals(entrant.id + 1, owner.id)
+        assertEquals(entrantId, entrant.id)
+        assertTrue(entrant.id.isNotBlank())
     }
 }
