@@ -19,7 +19,8 @@ import com.example.coders.ui.screens.EntrantChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
 import com.example.coders.ui.screens.EntrantMyStuffScreen
 import com.example.coders.ui.screens.MiniMapScreen
-
+import com.example.coders.ui.screens.OwnerMyStuffScreen
+import com.example.coders.ui.screens.OwnerCampsitesScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -48,7 +49,13 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("owner") {
-                        OwnerHomeScreen()
+                        OwnerHomeScreen(navController)
+                    }
+                    composable("ownermystuff") {
+                        OwnerMyStuffScreen(navController)
+                    }
+                    composable("ownercampsites") {
+                        OwnerCampsitesScreen(navController)
                     }
 
                     composable("policies") {
@@ -71,7 +78,7 @@ class MainActivity : ComponentActivity() {
                         EntrantReservationsScreen(navController)
                     }
 
-                    composable("mystuff") {
+                    composable("entrantmystuff") {
                         EntrantMyStuffScreen(navController)
                     }
 

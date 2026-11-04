@@ -52,7 +52,11 @@ fun OwnerCampsitesScreen(
     var campsiteToDelete by remember { mutableStateOf<Campsite?>(null) }
 
     Scaffold(
-        bottomBar = { EntrantBottomBar(navController) }
+        bottomBar = {
+            AppBottomBar(
+                navController = navController
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

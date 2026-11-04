@@ -1,3 +1,4 @@
+
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.padding
@@ -14,12 +15,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavController
 
 @Composable
-fun OwnerHomeScreen() {
+fun OwnerHomeScreen(navController: NavController) {
     Scaffold(
         bottomBar = {
-            OwnerBottomBar()
+            AppBottomBar(
+                navController = navController
+            )
         }
     ) { innerPadding ->
         Text(
@@ -29,47 +33,3 @@ fun OwnerHomeScreen() {
     }
 }
 
-@Composable
-fun OwnerBottomBar() {
-    NavigationBar {
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(Icons.Default.Home, contentDescription = "Home")
-            }
-        )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(Icons.Default.Email, contentDescription = "Messages")
-            }
-        )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(Icons.Default.Inventory2, contentDescription = "My Stuff")
-            }
-        )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(Icons.Default.Search, contentDescription = "Search")
-            }
-        )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Icon(Icons.Default.Person, contentDescription = "Profile")
-            }
-        )
-    }
-}
