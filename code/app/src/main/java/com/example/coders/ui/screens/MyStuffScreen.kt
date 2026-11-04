@@ -70,7 +70,7 @@ fun MyStuffScreen(navController: NavController) {
                     subtitle = "View and manage",
                     icon = Icons.Default.Landscape,
                     onClick = {
-                        navController.navigate("campsites")
+                        navController.navigate("ownercampsites")
                     }
                 )
 
