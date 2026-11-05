@@ -143,6 +143,7 @@ data class Campsite(
     val qr: String = "",
     val id: String = UUID.randomUUID().toString()
 ) {
+
 }
 
 /**

@@ -5,6 +5,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -14,13 +18,8 @@ import com.example.coders.R
 
 @Composable
 fun MiniMapScreen(navController: NavController) {
-
+    var isNavigating by remember { mutableStateOf(false) }
     Scaffold(
-        bottomBar = {
-            AppBottomBar(
-                navController = navController
-            )
-        }
     ) { innerPadding ->
 
         Column(
@@ -32,7 +31,10 @@ fun MiniMapScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    navController.popBackStack()
+                    if (!isNavigating) {
+                        isNavigating = true
+                        navController.popBackStack()
+                    }
                 }
             ) {
                 Text("Back")
