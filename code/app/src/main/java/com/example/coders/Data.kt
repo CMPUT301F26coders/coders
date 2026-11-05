@@ -360,13 +360,7 @@ data class Conversation (
     val participantIds: List<String> = emptyList()
 )
 
-/**
- * Represents a repository of campsites.
- *
- * @property _campsites A list of campsites.
- * @property campsiteRef The reference to the campsites collection in the database.
- * @property db The database.
- */
+
 /**
  * Decodes documents from a Firestore listener and forwards results or errors.
  *
