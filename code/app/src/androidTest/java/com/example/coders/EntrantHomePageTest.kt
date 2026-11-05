@@ -2,6 +2,7 @@
 package com.example.coders
 
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -12,16 +13,27 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestRule
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class EntrantHomePageTest {
 
+    private val composeTestRule = createAndroidComposeRule<MainActivity>()
+
     @get:Rule
-    val composeTestRule = createAndroidComposeRule<MainActivity>()
+    val testRule: TestRule = freshSessionRule(composeTestRule)
+
+    /** Waits until startup routing has displayed the sign-up form. */
+    private fun waitForSignUpScreen() {
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithTag("firstNameInput").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 
     // Fill out the sign-up form
     private fun enterInformation() {
+        waitForSignUpScreen()
 
         composeTestRule.onNodeWithTag("firstNameInput")
             .performTextInput("David")
