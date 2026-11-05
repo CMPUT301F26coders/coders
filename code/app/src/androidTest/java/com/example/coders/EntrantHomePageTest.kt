@@ -81,17 +81,26 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // Type a message and click Send
-    private fun sendMessage(text: String) {
+    /** Waits for a newly created entrant's empty conversation list to finish loading. */
+    private fun waitForEmptyMessages() {
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("No conversations yet.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 
-        composeTestRule.onNodeWithText("Type a message...")
-            .performTextInput(text)
-
-        composeTestRule.onNodeWithText("➜")
-            .performClick()
-
-        composeTestRule.onNodeWithText(text)
-            .assertExists()
+    /** Asserts that the removed demo conversations are not displayed. */
+    private fun assertNoDemoConversations() {
+        waitForEmptyMessages()
+        composeTestRule.onNodeWithText("No conversations yet.").assertExists()
+        listOf(
+            "Pine Lake Campsite",
+            "Mountain View Camp",
+            "Forest Hill Camp",
+            "Riverside Campsite"
+        ).forEach { campsite ->
+            composeTestRule.onNodeWithText(campsite).assertDoesNotExist()
+        }
     }
 
     // TEST 1: Enter sign-up information
@@ -179,231 +188,114 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // TEST 6: Open Messages
+    // TEST 6: A new entrant has no conversations
     @Test
     fun test6_OpenMessages() {
-
         openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Mountain View Camp")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Forest Hill Camp")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Riverside Campsite")
-            .assertExists()
+        assertNoDemoConversations()
     }
 
-    // TEST 7: Back from Messages
+    // TEST 7: Navigate from Messages back to Home using the bottom bar
     @Test
     fun test7_BackFromMessages() {
-
         openMessages()
-
-        composeTestRule.onNodeWithText("Back")
+        composeTestRule.onNodeWithContentDescription("Home")
             .performClick()
-
         composeTestRule.onNodeWithText("Home")
             .assertExists()
     }
 
-    // TEST 8: Open John Smith's chat
+    // TEST 8: No hard-coded John Smith chat is shown
     @Test
-    fun test8_OpenJohnChat() {
-
+    fun test8_NoHardCodedJohnChat() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "John Smith (Campsite Owner)"
-        ).assertExists()
-
-        composeTestRule.onNodeWithText(
-            "Hi! Thanks for applying to Pine Lake Campsite."
-        ).assertExists()
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("John Smith").assertDoesNotExist()
     }
 
-    // TEST 9: Send a message to John Smith
+    // TEST 9: No sample chat is available to message John
     @Test
-    fun test9_SendMessageToJohn() {
-
+    fun test9_EmptyListHasNoChatComposer() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .performClick()
-
-        sendMessage("Hello John, I am excited!")
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
     }
 
-    // TEST 10: Send a message to Sarah Lee
+    // TEST 10: No sample chat is available to message Sarah
     @Test
-    fun test10_SendMessageToSarah() {
-
+    fun test10_NoHardCodedSarahChat() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Mountain View Camp")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "Sarah Lee (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello Sarah, is parking available?")
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Sarah Lee").assertDoesNotExist()
     }
 
-    // TEST 11: Send a message to Mike Brown
+    // TEST 11: No sample chat is available to message Mike
     @Test
-    fun test11_SendMessageToMike() {
-
+    fun test11_NoHardCodedMikeChat() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Forest Hill Camp")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "Mike Brown (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello Mike, are pets allowed?")
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Mike Brown").assertDoesNotExist()
     }
 
-    // TEST 12: Send a message to Emma Wilson
+    // TEST 12: No sample chat is available to message Emma
     @Test
-    fun test12_SendMessageToEmma() {
-
+    fun test12_NoHardCodedEmmaChat() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Riverside Campsite")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "Emma Wilson (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello Emma, what time is check-in?")
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Emma Wilson").assertDoesNotExist()
     }
 
-    // TEST 13: Back from Chat
+    // TEST 13: Messages can be reopened after navigating Home
     @Test
-    fun test13_BackFromChat() {
-
+    fun test13_ReopenMessagesAfterHomeNavigation() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
+        composeTestRule.onNodeWithContentDescription("Home")
             .performClick()
-
-        composeTestRule.onNodeWithText("Back")
+        composeTestRule.onNodeWithContentDescription("Messages")
             .performClick()
-
         composeTestRule.onNodeWithText("Messages")
             .assertExists()
+        assertNoDemoConversations()
     }
 
-    // TEST 14: View Application
+    // TEST 14: The list does not show a campsite-name-based application action
     @Test
-    fun test14_ViewApplication() {
-
+    fun test14_NoCampsiteNameBasedApplicationAction() {
         openMessages()
-
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Your Reservations")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Jasper, Alberta")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("September 10 - 12, 2026")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Guests")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("View On Map")
-            .assertExists()
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("View Application →").assertDoesNotExist()
     }
 
-    // TEST 15: Back from Reservations
+    // TEST 15: The Messages screen does not open sample reservation details
     @Test
-    fun test15_BackFromReservations() {
-
+    fun test15_NoSampleReservationDetails() {
         openMessages()
-
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Back")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Messages")
-            .assertExists()
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Your Reservations").assertDoesNotExist()
     }
 
-    // TEST 16: Message John from Reservations
+    // TEST 16: The removed sample application action cannot open a reservation chat
     @Test
-    fun test16_MessageJohnFromReservations() {
-
+    fun test16_NoSampleReservationMessageAction() {
         openMessages()
-
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Message")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "John Smith (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello John, I have a question about my reservation!")
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Message").assertDoesNotExist()
     }
 
-    // TEST 17: Back from John Chat to Reservations
+    // TEST 17: No sample reservation or chat screen is opened from Messages
     @Test
-    fun test17_BackFromJohnChatToReservations() {
-
+    fun test17_NoSampleReservationOrChatScreen() {
         openMessages()
-
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Message")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Back")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Your Reservations")
-            .assertExists()
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Your Reservations").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
     }
 
-    // TEST 18: Send multiple messages in one chat
+    // TEST 18: The empty state has no message composer until a conversation is selected
     @Test
-    fun test18_SendMultipleMessages() {
-
+    fun test18_EmptyListHasNoMessageComposer() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .performClick()
-
-        sendMessage("Hello John!")
-        sendMessage("Can I bring my dog?")
-        sendMessage("Thank you!")
-
-        composeTestRule.onNodeWithText("Hello John!")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Can I bring my dog?")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Thank you!")
-            .assertExists()
+        assertNoDemoConversations()
+        composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
     }
 }
