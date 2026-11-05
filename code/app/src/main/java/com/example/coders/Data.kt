@@ -297,7 +297,7 @@ class CampsiteRepo {
      */
     fun getCampsitesByOwner(owner: CampOwner): List<Campsite> {
         return _campsites.filter {
-            it.campOwner == owner
+            it.campOwner.id == owner.id
         }
     }
 
