@@ -124,23 +124,23 @@ data class Waitlist (
  * @property qr The QR code associated with the campsite. UnNecessary to make a campsite instance
  * @property id The id of the campsite. UnNecessary to make a campsite instance
  */
-data class Campsite (
-    val name : String,
-    val location : String,
-    val description : String,
-    val capacity : Int,
-    val mapLocation : String,
 
-    val campOwner: CampOwner,
+data class Campsite(
+    val name: String = "",
+    val location: String = "",
+    val description: String = "",
+    val capacity: Int = 0,
+    val mapLocation: String = "",
+    val campOwner: CampOwner = CampOwner(),
     val rating: Double? = null,
 
     val images: List<Image> = emptyList(),
     val tags: List<String> = emptyList(),
 
-    val waitlist : List<Waitlist> = emptyList(),
-    val reservations : List<Reservation> = emptyList(),
-    val notifications : List<Notification> = emptyList(),
-    val qr : String = "",
+    val waitlist: List<Waitlist> = emptyList(),
+    val reservations: List<Reservation> = emptyList(),
+    val notifications: List<Notification> = emptyList(),
+    val qr: String = "",
     val id: String = UUID.randomUUID().toString()
 ) {
 }

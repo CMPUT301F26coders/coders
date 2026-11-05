@@ -218,4 +218,105 @@ class RepositorySearchTest {
         assertEquals("Edmonton Camp", results[0].name)
     }
 
+    @Test
+    fun searchCampsites_dateRangeAvailable() {
+        val results = filterCampsites(
+            campsites,
+            startDate = "2026-12-15",
+            endDate = "2026-12-20"
+        )
+
+        assertEquals(2, results.size)
+    }
+
+    @Test
+    fun searchCampsites_dateRangeExcludesBookedCampsite() {
+        val reservation = Reservation(
+            campsite = edmonton,
+            date = "2026-12-17",
+            guestNumber = 2,
+            status = ReservationStatus.Active
+        )
+
+        val bookedCampsite = edmonton.copy(
+            reservations = listOf(reservation)
+        )
+
+        val results = filterCampsites(
+            listOf(bookedCampsite, calgary),
+            startDate = "2026-12-15",
+            endDate = "2026-12-20"
+        )
+
+        assertEquals(1, results.size)
+        assertEquals("Calgary Camp", results[0].name)
+    }
+
+    @Test
+    fun searchCampsites_checkoutDateIsExcluded() {
+        val reservation = Reservation(
+            campsite = edmonton,
+            date = "2026-12-20",
+            guestNumber = 2,
+            status = ReservationStatus.Active
+        )
+
+        val bookedCampsite = edmonton.copy(
+            reservations = listOf(reservation)
+        )
+
+        val results = filterCampsites(
+            listOf(bookedCampsite),
+            startDate = "2026-12-15",
+            endDate = "2026-12-20"
+        )
+
+        assertEquals(1, results.size)
+    }
+
+    @Test
+    fun searchCampsites_invalidDateRange() {
+        val results = filterCampsites(
+            campsites,
+            startDate = "2026-12-20",
+            endDate = "2026-12-15"
+        )
+
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun searchCampsites_invalidDateFormat() {
+        val results = filterCampsites(
+            campsites,
+            startDate = "invalid-date",
+            endDate = "2026-12-20"
+        )
+
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun searchCampsites_cancelledReservationInRange() {
+        val reservation = Reservation(
+            campsite = edmonton,
+            date = "2026-12-17",
+            guestNumber = 2,
+            status = ReservationStatus.Cancelled
+        )
+
+        val campsiteWithCancelledReservation = edmonton.copy(
+            reservations = listOf(reservation)
+        )
+
+        val results = filterCampsites(
+            listOf(campsiteWithCancelledReservation),
+            startDate = "2026-12-15",
+            endDate = "2026-12-20"
+        )
+
+        assertEquals(1, results.size)
+        assertEquals("Edmonton Camp", results[0].name)
+    }
+
 }

@@ -1,4 +1,3 @@
-
 package com.example.coders.ui.screens
 
 import androidx.compose.material.icons.Icons
@@ -56,7 +55,7 @@ fun AppBottomBar(navController: NavController) {
         if (!isOwner) {
             NavigationBarItem(
                 selected = false,
-                onClick = { navigateTo("entrantsearch") },
+                onClick = { navigateTo("search") },
                 icon = {
                     Icon(Icons.Default.Search, contentDescription = "Search")
                 }

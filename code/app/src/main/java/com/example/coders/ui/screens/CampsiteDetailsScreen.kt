@@ -1,11 +1,10 @@
-
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,8 +18,6 @@ import com.example.coders.Campsite
  * Receives a Campsite object from Data.kt and displays
  * its information using Jetpack Compose.
  *
- * This screen only handles the user interface.
- *
  * @param navController Used to return to the previous screen.
  * @param campsite The selected campsite to display.
  */
@@ -29,63 +26,57 @@ fun CampsiteDetailsScreen(
     navController: NavController,
     campsite: Campsite
 ) {
+    // Prevent multiple back navigation requests from this screen.
+    var backClicked by remember { mutableStateOf(false) }
 
-    /**
-     * Main layout of the screen.
-     *
-     * Column places everything vertically.
-     * fillMaxSize makes the layout fill the screen.
-     * verticalScroll allows the user to scroll.
-     * padding adds space around the content.
-     */
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
 
-        /**
-         * Back button.
-         *
-         * Returns the user to the previous screen.
-         */
+        // Back button
         TextButton(
-            onClick = { navController.popBackStack() }
+            onClick = {
+                if (!backClicked) {
+                    backClicked = true
+                    navController.popBackStack()
+                }
+            },
+            enabled = !backClicked,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
         ) {
             Text("Back")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        /**
-         * Campsite name and location.
-         *
-         * Displays the name and location of the
-         * selected campsite.
-         */
+        // Campsite name and location
         Text(
             text = campsite.name,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold
         )
 
+        Spacer(modifier = Modifier.height(4.dp))
+
         Text(campsite.location)
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        /**
-         * About This Campsite section.
-         *
-         * Displays the campsite description
-         * inside a Card.
-         */
-        Card(modifier = Modifier.fillMaxWidth()) {
-
-            Column(modifier = Modifier.padding(16.dp)) {
-
+        // About This Campsite
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
                 Text(
-                    "About This Campsite",
+                    text = "About This Campsite",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -98,60 +89,56 @@ fun CampsiteDetailsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        /**
-         * Campsite Information section.
-         *
-         * Displays the campsite's maximum occupancy,
-         * rating, map location, and owner.
-         *
-         * If the rating is null, the screen
-         * displays "Not rated yet".
-         */
-        Card(modifier = Modifier.fillMaxWidth()) {
-
-            Column(modifier = Modifier.padding(16.dp)) {
-
+        // Campsite Information
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
                 Text(
-                    "Campsite Information",
+                    text = "Campsite Information",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("Maximum Occupancy: ${campsite.capacity} guests")
+                Text(
+                    text = "Maximum Occupancy: ${campsite.capacity} guests"
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("Rating: ${campsite.rating ?: "Not rated yet"}")
+                Text(
+                    text = "Rating: ${campsite.rating ?: "Not rated yet"}"
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("Map Location: ${campsite.mapLocation}")
+                Text(
+                    text = "Map Location: ${campsite.mapLocation}"
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("Campsite Owner: ${campsite.campOwner.name}")
+                Text(
+                    text = "Campsite Owner: ${campsite.campOwner.name}"
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        /**
-         * Amenities and Features section.
-         *
-         * Checks whether the campsite has any tags.
-         *
-         * If the list is empty, displays a message.
-         * Otherwise, loops through the tags and
-         * displays each amenity on a separate line.
-         */
-        Card(modifier = Modifier.fillMaxWidth()) {
-
-            Column(modifier = Modifier.padding(16.dp)) {
-
+        // Amenities & Features
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
                 Text(
-                    "Amenities & Features",
+                    text = "Amenities & Features",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
