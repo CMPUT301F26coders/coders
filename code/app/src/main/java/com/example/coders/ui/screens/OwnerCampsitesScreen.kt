@@ -34,20 +34,8 @@ fun OwnerCampsitesScreen(
     campOwner: CampOwner? = null,
     campsiteRepo: CampsiteRepo? = null
 ) {
-    val defaultOwner = remember {
-        CampOwner(name = "John Smith", email = "john@gmail.com", phone = "780-555-0199")
-    }
 
-    var campsites by remember {
-        mutableStateOf(
-            listOf(
-                Campsite("Pine Lake Campsite", "Jasper, Alberta", "Lakeside", 6, "52.8,-118.0", defaultOwner),
-                Campsite("Mountain View Campsite", "Banff, Alberta", "Views", 4, "51.1,-115.5", defaultOwner),
-                Campsite("Emerald Falls Campsite", "Revelstoke, BC", "Falls", 8, "50.9,-118.1", defaultOwner),
-                Campsite("Glacier Ridge Campsite", "Kootenay, BC", "Ridge", 3, "50.9,-116.0", defaultOwner)
-            )
-        )
-    }
+    val campsites = campsiteRepo?.getAllCampsites() ?: emptyList()
 
     var campsiteToDelete by remember { mutableStateOf<Campsite?>(null) }
     var isNavigating by remember { mutableStateOf(false) }
@@ -86,7 +74,7 @@ fun OwnerCampsitesScreen(
             campsites.forEach { campsite ->
                 OwnerCampsiteCard(
                     campsite = campsite,
-                    onDetailsClick = { navController.navigate("owner_campsite_details/${campsite.id}") },
+                    onDetailsClick = { navController.navigate("campsiteDetails/${campsite.id}") },
                     onDeleteClick = { campsiteToDelete = campsite }
                 )
                 Spacer(modifier = Modifier.height(25.dp))
@@ -94,7 +82,7 @@ fun OwnerCampsitesScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            Button(
+            /*Button(
                 onClick = { navController.navigate("create_campsite") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -104,7 +92,7 @@ fun OwnerCampsitesScreen(
                 Icon(Icons.Default.Add, contentDescription = "Create", modifier = Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(18.dp))
                 Text("Create Campsite", fontSize = 11.sp, fontWeight = FontWeight.Normal)
-            }
+            }*/
         }
 
         campsiteToDelete?.let { target ->
@@ -115,7 +103,6 @@ fun OwnerCampsitesScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         campsiteRepo?.deleteCampsite(target)
-                        campsites = campsites.filter { it.id != target.id }
                         campsiteToDelete = null
                     }) { Text("Delete", fontSize = 10.sp) }
                 },

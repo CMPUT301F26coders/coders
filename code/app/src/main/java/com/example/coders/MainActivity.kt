@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 val authManager = remember {
                     AuthManager(applicationContext)
                 }
+                val campsiteRepo = remember { CampsiteRepo() }
                 val profileRepo = remember { ProfileRepo() }
                 val mainScope = rememberCoroutineScope()
 
@@ -118,7 +119,10 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("ownercampsites") {
-                        OwnerCampsitesScreen(navController)
+                        OwnerCampsitesScreen(
+                            navController = navController,
+                            campsiteRepo = campsiteRepo
+                        )
                     }
 
                     composable("policies") {
@@ -168,7 +172,6 @@ class MainActivity : ComponentActivity() {
                             ?.getString("campsiteId")
                             .orEmpty()
 
-                        val campsiteRepo = remember { CampsiteRepo() }
 
                         val campsite = campsiteRepo
                             .getAllCampsites()
@@ -184,7 +187,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator()
+                                Text("Campsite not found")
                             }
                         }
                     }
