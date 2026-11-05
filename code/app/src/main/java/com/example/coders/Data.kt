@@ -25,7 +25,7 @@ interface Profile {
 /**
  * Represents a user who is an Entrant.
  *
- * @property bookings A list of bookings made by the entrant.
+ * @property reservations A list of bookings made by the entrant.
  * @property waitlists A list of waitlists made by the entrant.
  * @property notifications A list of notifications made by the entrant.
  * @property conversations Conversations associated with this entrant.
@@ -34,7 +34,7 @@ data class Entrant(
     override val name: String = "",
     override val email: String = "",
     override val phone: String = "",
-    val bookings: List<Reservation> = emptyList(),
+    val reservations: List<Reservation> = emptyList(),
     val waitlists: List<Waitlist> = emptyList(),
     val notifications: List<Notification> = emptyList(),
     override val type: String = "Entrant",
@@ -215,17 +215,17 @@ data class Lottery (
  * Represents a reservation for a campsite.
  *
  * @property campsite The campsite being reserved.
- * @property date The date of the reservation.
+ * @property dates The dates of the reservation.
  * @property guestNumber The number of guests for the reservation.
  * @property status The status of the reservation.
  */
 data class Reservation (
-    val campsite : Campsite,
-    val date : String,
-    val guestNumber : Int,
-    val status : Enum<ReservationStatus>,
-    val campOwner : CampOwner,
-    val entrants : List<Entrant>,
+    val campsite : Campsite = Campsite(),
+    val dates : String = "",
+    val guestNumber : Int = 0,
+    val status : ReservationStatus = ReservationStatus.Active,
+    val campOwner : CampOwner = CampOwner(),
+    val entrants : List<Entrant> = emptyList(),
 )
 
 /**
@@ -265,11 +265,11 @@ data class Message (
  * @property campsite The campsite associated with the chat.
  */
 data class Conversation (
-    val messages : List<Message>,
-    val campOwner : CampOwner,
-    val entrant : Entrant,
+    val messages : List<Message> = emptyList(),
+    val campOwner : CampOwner = CampOwner(),
+    val entrant : Entrant = Entrant(),
     val id: String = UUID.randomUUID().toString(),
-    val campsite: Campsite
+    val campsite: Campsite = Campsite()
 )
 
 /**
