@@ -119,7 +119,9 @@ fun EntrantSearchScreen(navController: NavController) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
-                                // TODO: Open campsite details
+                                navController.navigate(
+                                    "campsiteDetails/${android.net.Uri.encode(campsite.id)}"
+                                )
                             }
                         ) {
 

@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-
 import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.AdminHomeScreen
@@ -20,6 +19,9 @@ import com.example.coders.ui.screens.MiniMapScreen
 import com.example.coders.ui.screens.OwnerCampsitesScreen
 import com.example.coders.ui.screens.OwnerReservationsScreen
 import com.example.coders.ui.screens.EntrantSearchScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.example.coders.ui.screens.CampsiteDetailsScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -83,6 +85,29 @@ class MainActivity : ComponentActivity() {
                     composable("search") {
                         EntrantSearchScreen(navController)
                     }
+
+
+                    composable(
+                        route = "campsiteDetails/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+
+                        val campsiteId =
+                            backStackEntry.arguments
+                                ?.getString("campsiteId")
+                                .orEmpty()
+
+                        CampsiteDetailsScreen(
+                            navController = navController,
+                            campsiteId = campsiteId
+                        )
+                    }
+
+
                 }
             }
         }
