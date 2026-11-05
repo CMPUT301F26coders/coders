@@ -1,28 +1,59 @@
 
 package com.example.coders
 
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
 import org.junit.runner.RunWith
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class EntrantHomePageTest {
 
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
+    private val testEmail = "entrant-test-${UUID.randomUUID()}@example.com"
+    private val firestore = Firebase.firestore
+    private val createdOwnerIds = mutableSetOf<String>()
+    private val createdCampsiteIds = mutableSetOf<String>()
 
     @get:Rule
     val testRule: TestRule = freshSessionRule(composeTestRule)
+
+    @After
+    fun cleanUpFirebaseTestRecords() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantProfiles = await(
+            firestore.collection("profiles").whereEqualTo("email", testEmail).get()
+        )
+        entrantProfiles.documents.forEach { document ->
+            await(document.reference.delete())
+        }
+        createdOwnerIds.forEach { await(firestore.collection("profiles").document(it).delete()) }
+        createdCampsiteIds.forEach { await(firestore.collection("campsites").document(it).delete()) }
+        runBlocking { AuthManager(context).clearUserId() }
+    }
+
+    private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
 
     /** Waits until startup routing has displayed the sign-up form. */
     private fun waitForSignUpScreen() {
@@ -42,7 +73,7 @@ class EntrantHomePageTest {
             .performTextInput("Test")
 
         composeTestRule.onNodeWithTag("emailInput")
-            .performTextInput("test@example.com")
+            .performTextInput(testEmail)
 
         composeTestRule.onNodeWithTag("phoneInput")
             .performTextInput("7801234567")
@@ -74,10 +105,23 @@ class EntrantHomePageTest {
 
         openHome()
 
+        clickMessages()
+    }
+
+    private fun clickMessages() {
         composeTestRule.onNodeWithContentDescription("Messages")
             .performClick()
 
         composeTestRule.onNodeWithText("Messages")
+            .assertExists()
+    }
+
+    private fun openEntrantReservations() {
+        composeTestRule.onNodeWithContentDescription("My Stuff")
+            .performClick()
+        composeTestRule.onNodeWithText("My Bookings")
+            .performClick()
+        composeTestRule.onNodeWithText("Your Reservations")
             .assertExists()
     }
 
@@ -89,10 +133,97 @@ class EntrantHomePageTest {
         }
     }
 
-    /** Asserts that the removed demo conversations are not displayed. */
+    /** Seeds one minimal conversation as Firestore profile and campsite records. */
+    private fun seedConversationForSignedInEntrant() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
+            ?: error("The sign-up flow did not save the entrant profile ID")
+
+        val entrantDocument = firestore.collection("profiles").document(entrantId)
+        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
+            ?: error("The signed-in entrant profile was not saved to Firestore")
+
+        val owner = CampOwner(
+            name = "John Smith",
+            email = "owner-test-${UUID.randomUUID()}@example.com",
+            phone = "7805550100"
+        )
+        createdOwnerIds.add(owner.id)
+
+        val campsite = Campsite(
+            name = "Pine Lake Campsite",
+            location = "Jasper, Alberta",
+            description = "A test campsite stored in Firestore.",
+            capacity = 4,
+            mapLocation = "53.6015, -112.8683",
+            campOwner = owner,
+            id = UUID.randomUUID().toString()
+        )
+        createdCampsiteIds.add(campsite.id)
+
+        val conversation = Conversation(
+            campOwner = owner,
+            entrant = entrant,
+            campsite = campsite
+        )
+
+        await(firestore.collection("profiles").document(owner.id).set(
+            owner.copy(conversations = mutableListOf(conversation))
+        ))
+        await(firestore.collection("campsites").document(campsite.id).set(campsite))
+        await(entrantDocument.set(entrant.copy(conversations = mutableListOf(conversation))))
+    }
+
+    /** Writes two real reservation records onto the signed-in entrant profile in Firestore. */
+    private fun seedReservationsForSignedInEntrant(): List<Reservation> {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
+            ?: error("The sign-up flow did not save the entrant profile ID")
+        val entrantDocument = firestore.collection("profiles").document(entrantId)
+        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
+            ?: error("The signed-in entrant profile was not saved to Firestore")
+
+        val reservations = listOf(
+            Triple("North Lake Reservation", "Jasper, Alberta", "2026-09-10 - 2026-09-12"),
+            Triple("South Ridge Reservation", "Banff, Alberta", "2026-10-05 - 2026-10-07")
+        ).mapIndexed { index, (campsiteName, location, dates) ->
+            val owner = CampOwner(
+                name = if (index == 0) "Owner North" else "Owner South",
+                email = "reservation-owner-${UUID.randomUUID()}@example.com",
+                phone = "78055501${index}"
+            )
+            createdOwnerIds.add(owner.id)
+
+            val campsite = Campsite(
+                name = campsiteName,
+                location = location,
+                description = "Reservation test campsite $index.",
+                capacity = 4,
+                mapLocation = location,
+                campOwner = owner,
+                id = UUID.randomUUID().toString()
+            )
+            createdCampsiteIds.add(campsite.id)
+
+            await(firestore.collection("profiles").document(owner.id).set(owner))
+            await(firestore.collection("campsites").document(campsite.id).set(campsite))
+
+            Reservation(
+                campsite = campsite,
+                dates = dates,
+                guestNumber = if (index == 0) 2 else 4,
+                status = ReservationStatus.Active,
+                campOwner = owner,
+                entrants = emptyList()
+            )
+        }
+
+        await(entrantDocument.set(entrant.copy(reservations = reservations)))
+        return reservations
+    }
+
     private fun assertNoDemoConversations() {
         waitForEmptyMessages()
-        composeTestRule.onNodeWithText("No conversations yet.").assertExists()
         listOf(
             "Pine Lake Campsite",
             "Mountain View Camp",
@@ -101,6 +232,15 @@ class EntrantHomePageTest {
         ).forEach { campsite ->
             composeTestRule.onNodeWithText(campsite).assertDoesNotExist()
         }
+    }
+
+    private fun sendMessage(text: String) {
+        composeTestRule.onNodeWithText("Type a message...")
+            .performTextInput(text)
+        composeTestRule.onNodeWithText("➜")
+            .performClick()
+        composeTestRule.onNodeWithText(text)
+            .assertExists()
     }
 
     // TEST 1: Enter sign-up information
@@ -116,7 +256,7 @@ class EntrantHomePageTest {
             .assertTextContains("Test")
 
         composeTestRule.onNodeWithTag("emailInput")
-            .assertTextContains("test@example.com")
+            .assertTextContains(testEmail)
 
         composeTestRule.onNodeWithTag("phoneInput")
             .assertTextContains("7801234567")
@@ -188,13 +328,6 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // TEST 6: A new entrant has no conversations
-    @Test
-    fun test6_OpenMessages() {
-        openMessages()
-        assertNoDemoConversations()
-    }
-
     // TEST 7: Navigate from Messages back to Home using the bottom bar
     @Test
     fun test7_BackFromMessages() {
@@ -205,44 +338,23 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // TEST 8: No hard-coded John Smith chat is shown
+    // TEST 8: Open a Firestore-backed conversation and send a message
     @Test
-    fun test8_NoHardCodedJohnChat() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("John Smith").assertDoesNotExist()
-    }
+    fun test8_SendMessageInFirestoreBackedConversation() {
+        openHome()
+        seedConversationForSignedInEntrant()
+        clickMessages()
 
-    // TEST 9: No sample chat is available to message John
-    @Test
-    fun test9_EmptyListHasNoChatComposer() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
-    }
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Pine Lake Campsite")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Pine Lake Campsite")
+            .performClick()
+        composeTestRule.onNodeWithText("John Smith (Campsite Owner)")
+            .assertExists()
 
-    // TEST 10: No sample chat is available to message Sarah
-    @Test
-    fun test10_NoHardCodedSarahChat() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("Sarah Lee").assertDoesNotExist()
-    }
-
-    // TEST 11: No sample chat is available to message Mike
-    @Test
-    fun test11_NoHardCodedMikeChat() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("Mike Brown").assertDoesNotExist()
-    }
-
-    // TEST 12: No sample chat is available to message Emma
-    @Test
-    fun test12_NoHardCodedEmmaChat() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("Emma Wilson").assertDoesNotExist()
+        sendMessage("Hello John, I am excited!")
     }
 
     // TEST 13: Messages can be reopened after navigating Home
@@ -258,44 +370,79 @@ class EntrantHomePageTest {
         assertNoDemoConversations()
     }
 
-    // TEST 14: The list does not show a campsite-name-based application action
+    // TEST 14: An empty messages list shows no conversation or reservation actions
     @Test
-    fun test14_NoCampsiteNameBasedApplicationAction() {
+    fun test14_EmptyMessagesListHasNoConversationOrReservationActions() {
         openMessages()
         assertNoDemoConversations()
+
+        composeTestRule.onNodeWithText("No conversations yet.").assertExists()
         composeTestRule.onNodeWithText("View Application →").assertDoesNotExist()
-    }
-
-    // TEST 15: The Messages screen does not open sample reservation details
-    @Test
-    fun test15_NoSampleReservationDetails() {
-        openMessages()
-        assertNoDemoConversations()
         composeTestRule.onNodeWithText("Your Reservations").assertDoesNotExist()
-    }
-
-    // TEST 16: The removed sample application action cannot open a reservation chat
-    @Test
-    fun test16_NoSampleReservationMessageAction() {
-        openMessages()
-        assertNoDemoConversations()
         composeTestRule.onNodeWithText("Message").assertDoesNotExist()
-    }
-
-    // TEST 17: No sample reservation or chat screen is opened from Messages
-    @Test
-    fun test17_NoSampleReservationOrChatScreen() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("Your Reservations").assertDoesNotExist()
         composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
     }
 
-    // TEST 18: The empty state has no message composer until a conversation is selected
+    // TEST 15: Render all reservations saved on the signed-in entrant's Firestore profile
     @Test
-    fun test18_EmptyListHasNoMessageComposer() {
-        openMessages()
-        assertNoDemoConversations()
-        composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
+    fun test15_ShowsReservationFieldsFromSignedInEntrantProfile() {
+        openHome()
+        seedReservationsForSignedInEntrant()
+        openEntrantReservations()
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("North Lake Reservation")
+                .fetchSemanticsNodes().isNotEmpty() &&
+                    composeTestRule.onAllNodesWithText("South Ridge Reservation")
+                        .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText("North Lake Reservation").assertExists()
+        composeTestRule.onNodeWithText("Jasper, Alberta").assertExists()
+        composeTestRule.onNodeWithText("2026-09-10 - 2026-09-12").assertExists()
+        composeTestRule.onNodeWithText("2").assertExists()
+        composeTestRule.onNodeWithText("Owner North").assertExists()
+
+        composeTestRule.onNodeWithText("South Ridge Reservation").assertExists()
+        composeTestRule.onNodeWithText("Banff, Alberta").assertExists()
+        composeTestRule.onNodeWithText("2026-10-05 - 2026-10-07").assertExists()
+        composeTestRule.onNodeWithText("4").assertExists()
+        composeTestRule.onNodeWithText("Owner South").assertExists()
+        composeTestRule.onAllNodesWithText("Campsite Name").assertCountEquals(2)
+    }
+
+    // TEST 16: Open the owner associated with the selected reservation
+    @Test
+    fun test16_MessageButtonOpensSelectedReservationOwner() {
+        openHome()
+        seedReservationsForSignedInEntrant()
+        openEntrantReservations()
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("South Ridge Reservation")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithContentDescription("Message Owner South")
+            .performScrollTo()
+            .performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Owner South (Campsite Owner)")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Owner South (Campsite Owner)").assertExists()
+    }
+
+    // TEST 17: Show an empty state when the signed-in entrant has no reservations
+    @Test
+    fun test17_ShowsNoReservationsForEmptyEntrantProfile() {
+        openHome()
+        openEntrantReservations()
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("No reservations yet.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("No reservations yet.").assertExists()
     }
 }

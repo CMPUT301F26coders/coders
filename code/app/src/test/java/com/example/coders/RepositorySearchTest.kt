@@ -133,7 +133,7 @@ class RepositorySearchTest {
     fun searchCampsites_excludesBookedDate() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-11-15",
+            dates = "2026-11-15",
             guestNumber = 2,
             status = ReservationStatus.Active,
             campOwner = owner,
@@ -202,7 +202,7 @@ class RepositorySearchTest {
     fun searchCampsites_cancelledReservationIsAvailable() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-11-15",
+            dates = "2026-11-15",
             guestNumber = 2,
             status = ReservationStatus.Cancelled,
             campOwner = owner,
@@ -237,7 +237,7 @@ class RepositorySearchTest {
     fun searchCampsites_dateRangeExcludesBookedCampsite() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-12-17",
+            dates = "2026-12-17",
             guestNumber = 2,
             status = ReservationStatus.Active,
             campOwner = owner,
@@ -262,7 +262,7 @@ class RepositorySearchTest {
     fun searchCampsites_checkoutDateIsExcluded() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-12-20",
+            dates = "2026-12-20",
             guestNumber = 2,
             status = ReservationStatus.Active,
             campOwner = owner,
@@ -308,7 +308,7 @@ class RepositorySearchTest {
     fun searchCampsites_cancelledReservationInRange() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-12-17",
+            dates = "2026-12-17",
             guestNumber = 2,
             status = ReservationStatus.Cancelled,
             campOwner = owner,
