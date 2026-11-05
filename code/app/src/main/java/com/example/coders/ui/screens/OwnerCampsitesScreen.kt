@@ -82,7 +82,7 @@ fun OwnerCampsitesScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            /*Button(
+            Button(
                 onClick = { navController.navigate("create_campsite") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -92,7 +92,7 @@ fun OwnerCampsitesScreen(
                 Icon(Icons.Default.Add, contentDescription = "Create", modifier = Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(18.dp))
                 Text("Create Campsite", fontSize = 11.sp, fontWeight = FontWeight.Normal)
-            }*/
+            }
         }
 
         campsiteToDelete?.let { target ->
