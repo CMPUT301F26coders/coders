@@ -1,4 +1,3 @@
-
 package com.example.coders.ui.screens
 
 import androidx.compose.material.icons.Icons
@@ -47,7 +46,7 @@ fun AppBottomBar(navController: NavController) {
 
         NavigationBarItem(
             selected = false,
-            onClick = { navigateTo("myStuff") },
+            onClick = { navigateTo("mystuff") },
             icon = {
                 Icon(Icons.Default.Inventory2, contentDescription = "My Stuff")
             }
@@ -56,7 +55,7 @@ fun AppBottomBar(navController: NavController) {
         if (!isOwner) {
             NavigationBarItem(
                 selected = false,
-                onClick = { navigateTo("entrantsearch") },
+                onClick = { navigateTo("search") },
                 icon = {
                     Icon(Icons.Default.Search, contentDescription = "Search")
                 }

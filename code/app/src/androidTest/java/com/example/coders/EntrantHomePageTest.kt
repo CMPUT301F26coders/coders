@@ -1,27 +1,70 @@
 
 package com.example.coders
 
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestRule
 import org.junit.runner.RunWith
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class EntrantHomePageTest {
 
+    private val composeTestRule = createAndroidComposeRule<MainActivity>()
+    private val testEmail = "entrant-test-${UUID.randomUUID()}@example.com"
+    private val firestore = Firebase.firestore
+    private val createdOwnerIds = mutableSetOf<String>()
+    private val createdCampsiteIds = mutableSetOf<String>()
+
     @get:Rule
-    val composeTestRule = createAndroidComposeRule<MainActivity>()
+    val testRule: TestRule = freshSessionRule(composeTestRule)
+
+    @After
+    fun cleanUpFirebaseTestRecords() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantProfiles = await(
+            firestore.collection("profiles").whereEqualTo("email", testEmail).get()
+        )
+        entrantProfiles.documents.forEach { document ->
+            await(document.reference.delete())
+        }
+        createdOwnerIds.forEach { await(firestore.collection("profiles").document(it).delete()) }
+        createdCampsiteIds.forEach { await(firestore.collection("campsites").document(it).delete()) }
+        runBlocking { AuthManager(context).clearUserId() }
+    }
+
+    private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
+
+    /** Waits until startup routing has displayed the sign-up form. */
+    private fun waitForSignUpScreen() {
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithTag("firstNameInput").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 
     // Fill out the sign-up form
     private fun enterInformation() {
+        waitForSignUpScreen()
 
         composeTestRule.onNodeWithTag("firstNameInput")
             .performTextInput("David")
@@ -30,7 +73,7 @@ class EntrantHomePageTest {
             .performTextInput("Test")
 
         composeTestRule.onNodeWithTag("emailInput")
-            .performTextInput("test@example.com")
+            .performTextInput(testEmail)
 
         composeTestRule.onNodeWithTag("phoneInput")
             .performTextInput("7801234567")
@@ -62,6 +105,10 @@ class EntrantHomePageTest {
 
         openHome()
 
+        clickMessages()
+    }
+
+    private fun clickMessages() {
         composeTestRule.onNodeWithContentDescription("Messages")
             .performClick()
 
@@ -69,15 +116,129 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // Type a message and click Send
-    private fun sendMessage(text: String) {
+    private fun openEntrantReservations() {
+        composeTestRule.onNodeWithContentDescription("My Stuff")
+            .performClick()
+        composeTestRule.onNodeWithText("My Bookings")
+            .performClick()
+        composeTestRule.onNodeWithText("Your Reservations")
+            .assertExists()
+    }
 
+    /** Waits for a newly created entrant's empty conversation list to finish loading. */
+    private fun waitForEmptyMessages() {
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("No conversations yet.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /** Seeds one minimal conversation as Firestore profile and campsite records. */
+    private fun seedConversationForSignedInEntrant() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
+            ?: error("The sign-up flow did not save the entrant profile ID")
+
+        val entrantDocument = firestore.collection("profiles").document(entrantId)
+        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
+            ?: error("The signed-in entrant profile was not saved to Firestore")
+
+        val owner = CampOwner(
+            name = "John Smith",
+            email = "owner-test-${UUID.randomUUID()}@example.com",
+            phone = "7805550100"
+        )
+        createdOwnerIds.add(owner.id)
+
+        val campsite = Campsite(
+            name = "Pine Lake Campsite",
+            location = "Jasper, Alberta",
+            description = "A test campsite stored in Firestore.",
+            capacity = 4,
+            mapLocation = "53.6015, -112.8683",
+            campOwner = owner,
+            id = UUID.randomUUID().toString()
+        )
+        createdCampsiteIds.add(campsite.id)
+
+        val conversation = Conversation(
+            campOwner = owner,
+            entrant = entrant,
+            campsite = campsite
+        )
+
+        await(firestore.collection("profiles").document(owner.id).set(
+            owner.copy(conversations = mutableListOf(conversation))
+        ))
+        await(firestore.collection("campsites").document(campsite.id).set(campsite))
+        await(entrantDocument.set(entrant.copy(conversations = mutableListOf(conversation))))
+    }
+
+    /** Writes two real reservation records onto the signed-in entrant profile in Firestore. */
+    private fun seedReservationsForSignedInEntrant(): List<Reservation> {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
+            ?: error("The sign-up flow did not save the entrant profile ID")
+        val entrantDocument = firestore.collection("profiles").document(entrantId)
+        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
+            ?: error("The signed-in entrant profile was not saved to Firestore")
+
+        val reservations = listOf(
+            Triple("North Lake Reservation", "Jasper, Alberta", "2026-09-10 - 2026-09-12"),
+            Triple("South Ridge Reservation", "Banff, Alberta", "2026-10-05 - 2026-10-07")
+        ).mapIndexed { index, (campsiteName, location, dates) ->
+            val owner = CampOwner(
+                name = if (index == 0) "Owner North" else "Owner South",
+                email = "reservation-owner-${UUID.randomUUID()}@example.com",
+                phone = "78055501${index}"
+            )
+            createdOwnerIds.add(owner.id)
+
+            val campsite = Campsite(
+                name = campsiteName,
+                location = location,
+                description = "Reservation test campsite $index.",
+                capacity = 4,
+                mapLocation = location,
+                campOwner = owner,
+                id = UUID.randomUUID().toString()
+            )
+            createdCampsiteIds.add(campsite.id)
+
+            await(firestore.collection("profiles").document(owner.id).set(owner))
+            await(firestore.collection("campsites").document(campsite.id).set(campsite))
+
+            Reservation(
+                campsite = campsite,
+                dates = dates,
+                guestNumber = if (index == 0) 2 else 4,
+                status = ReservationStatus.Active,
+                campOwner = owner,
+                entrants = emptyList()
+            )
+        }
+
+        await(entrantDocument.set(entrant.copy(reservations = reservations)))
+        return reservations
+    }
+
+    private fun assertNoDemoConversations() {
+        waitForEmptyMessages()
+        listOf(
+            "Pine Lake Campsite",
+            "Mountain View Camp",
+            "Forest Hill Camp",
+            "Riverside Campsite"
+        ).forEach { campsite ->
+            composeTestRule.onNodeWithText(campsite).assertDoesNotExist()
+        }
+    }
+
+    private fun sendMessage(text: String) {
         composeTestRule.onNodeWithText("Type a message...")
             .performTextInput(text)
-
         composeTestRule.onNodeWithText("➜")
             .performClick()
-
         composeTestRule.onNodeWithText(text)
             .assertExists()
     }
@@ -95,7 +256,7 @@ class EntrantHomePageTest {
             .assertTextContains("Test")
 
         composeTestRule.onNodeWithTag("emailInput")
-            .assertTextContains("test@example.com")
+            .assertTextContains(testEmail)
 
         composeTestRule.onNodeWithTag("phoneInput")
             .assertTextContains("7801234567")
@@ -167,231 +328,121 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // TEST 6: Open Messages
-    @Test
-    fun test6_OpenMessages() {
-
-        openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Mountain View Camp")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Forest Hill Camp")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Riverside Campsite")
-            .assertExists()
-    }
-
-    // TEST 7: Back from Messages
+    // TEST 7: Navigate from Messages back to Home using the bottom bar
     @Test
     fun test7_BackFromMessages() {
-
         openMessages()
-
-        composeTestRule.onNodeWithText("Back")
+        composeTestRule.onNodeWithContentDescription("Home")
             .performClick()
-
         composeTestRule.onNodeWithText("Home")
             .assertExists()
     }
 
-    // TEST 8: Open John Smith's chat
+    // TEST 8: Open a Firestore-backed conversation and send a message
     @Test
-    fun test8_OpenJohnChat() {
+    fun test8_SendMessageInFirestoreBackedConversation() {
+        openHome()
+        seedConversationForSignedInEntrant()
+        clickMessages()
 
-        openMessages()
-
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Pine Lake Campsite")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithText("Pine Lake Campsite")
             .performClick()
-
-        composeTestRule.onNodeWithText(
-            "John Smith (Campsite Owner)"
-        ).assertExists()
-
-        composeTestRule.onNodeWithText(
-            "Hi! Thanks for applying to Pine Lake Campsite."
-        ).assertExists()
-    }
-
-    // TEST 9: Send a message to John Smith
-    @Test
-    fun test9_SendMessageToJohn() {
-
-        openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .performClick()
+        composeTestRule.onNodeWithText("John Smith (Campsite Owner)")
+            .assertExists()
 
         sendMessage("Hello John, I am excited!")
     }
 
-    // TEST 10: Send a message to Sarah Lee
+    // TEST 13: Messages can be reopened after navigating Home
     @Test
-    fun test10_SendMessageToSarah() {
-
+    fun test13_ReopenMessagesAfterHomeNavigation() {
         openMessages()
-
-        composeTestRule.onNodeWithText("Mountain View Camp")
+        composeTestRule.onNodeWithContentDescription("Home")
             .performClick()
-
-        composeTestRule.onNodeWithText(
-            "Sarah Lee (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello Sarah, is parking available?")
-    }
-
-    // TEST 11: Send a message to Mike Brown
-    @Test
-    fun test11_SendMessageToMike() {
-
-        openMessages()
-
-        composeTestRule.onNodeWithText("Forest Hill Camp")
+        composeTestRule.onNodeWithContentDescription("Messages")
             .performClick()
-
-        composeTestRule.onNodeWithText(
-            "Mike Brown (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello Mike, are pets allowed?")
-    }
-
-    // TEST 12: Send a message to Emma Wilson
-    @Test
-    fun test12_SendMessageToEmma() {
-
-        openMessages()
-
-        composeTestRule.onNodeWithText("Riverside Campsite")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "Emma Wilson (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello Emma, what time is check-in?")
-    }
-
-    // TEST 13: Back from Chat
-    @Test
-    fun test13_BackFromChat() {
-
-        openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Back")
-            .performClick()
-
         composeTestRule.onNodeWithText("Messages")
             .assertExists()
+        assertNoDemoConversations()
     }
 
-    // TEST 14: View Application
+    // TEST 14: An empty messages list shows no conversation or reservation actions
     @Test
-    fun test14_ViewApplication() {
-
+    fun test14_EmptyMessagesListHasNoConversationOrReservationActions() {
         openMessages()
+        assertNoDemoConversations()
 
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Your Reservations")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Jasper, Alberta")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("September 10 - 12, 2026")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Guests")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("View On Map")
-            .assertExists()
+        composeTestRule.onNodeWithText("No conversations yet.").assertExists()
+        composeTestRule.onNodeWithText("View Application →").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Your Reservations").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Message").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Type a message...").assertDoesNotExist()
     }
 
-    // TEST 15: Back from Reservations
+    // TEST 15: Render all reservations saved on the signed-in entrant's Firestore profile
     @Test
-    fun test15_BackFromReservations() {
+    fun test15_ShowsReservationFieldsFromSignedInEntrantProfile() {
+        openHome()
+        seedReservationsForSignedInEntrant()
+        openEntrantReservations()
 
-        openMessages()
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("North Lake Reservation")
+                .fetchSemanticsNodes().isNotEmpty() &&
+                    composeTestRule.onAllNodesWithText("South Ridge Reservation")
+                        .fetchSemanticsNodes().isNotEmpty()
+        }
 
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
+        composeTestRule.onNodeWithText("North Lake Reservation").assertExists()
+        composeTestRule.onNodeWithText("Jasper, Alberta").assertExists()
+        composeTestRule.onNodeWithText("2026-09-10 - 2026-09-12").assertExists()
+        composeTestRule.onNodeWithText("2").assertExists()
+        composeTestRule.onNodeWithText("Owner North").assertExists()
 
-        composeTestRule.onNodeWithText("Back")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Messages")
-            .assertExists()
+        composeTestRule.onNodeWithText("South Ridge Reservation").assertExists()
+        composeTestRule.onNodeWithText("Banff, Alberta").assertExists()
+        composeTestRule.onNodeWithText("2026-10-05 - 2026-10-07").assertExists()
+        composeTestRule.onNodeWithText("4").assertExists()
+        composeTestRule.onNodeWithText("Owner South").assertExists()
+        composeTestRule.onAllNodesWithText("Campsite Name").assertCountEquals(2)
     }
 
-    // TEST 16: Message John from Reservations
+    // TEST 16: Open the owner associated with the selected reservation
     @Test
-    fun test16_MessageJohnFromReservations() {
+    fun test16_MessageButtonOpensSelectedReservationOwner() {
+        openHome()
+        seedReservationsForSignedInEntrant()
+        openEntrantReservations()
 
-        openMessages()
-
-        composeTestRule.onNodeWithText("View Application →")
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("South Ridge Reservation")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithContentDescription("Message Owner South")
+            .performScrollTo()
             .performClick()
 
-        composeTestRule.onNodeWithText("Message")
-            .performClick()
-
-        composeTestRule.onNodeWithText(
-            "John Smith (Campsite Owner)"
-        ).assertExists()
-
-        sendMessage("Hello John, I have a question about my reservation!")
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Owner South (Campsite Owner)")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Owner South (Campsite Owner)").assertExists()
     }
 
-    // TEST 17: Back from John Chat to Reservations
+    // TEST 17: Show an empty state when the signed-in entrant has no reservations
     @Test
-    fun test17_BackFromJohnChatToReservations() {
+    fun test17_ShowsNoReservationsForEmptyEntrantProfile() {
+        openHome()
+        openEntrantReservations()
 
-        openMessages()
-
-        composeTestRule.onNodeWithText("View Application →")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Message")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Back")
-            .performClick()
-
-        composeTestRule.onNodeWithText("Your Reservations")
-            .assertExists()
-    }
-
-    // TEST 18: Send multiple messages in one chat
-    @Test
-    fun test18_SendMultipleMessages() {
-
-        openMessages()
-
-        composeTestRule.onNodeWithText("Pine Lake Campsite")
-            .performClick()
-
-        sendMessage("Hello John!")
-        sendMessage("Can I bring my dog?")
-        sendMessage("Thank you!")
-
-        composeTestRule.onNodeWithText("Hello John!")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Can I bring my dog?")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Thank you!")
-            .assertExists()
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("No reservations yet.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("No reservations yet.").assertExists()
     }
 }

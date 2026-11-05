@@ -9,18 +9,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.Admin
+import com.example.coders.AuthManager
 import com.example.coders.CampOwner
 import com.example.coders.Entrant
 import com.example.coders.Profile
 import com.example.coders.ProfileRepo
 import com.example.coders.UserSession
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
+
+/** Collects profile details, saves the profile, then remembers its ID on this device. */
 @Composable
 fun SignUpScreen(navController: NavController) {
 
@@ -32,6 +39,8 @@ fun SignUpScreen(navController: NavController) {
     var errorMessage by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
     val profileRepo = remember { ProfileRepo() }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Remember selected account type
     var accountType by remember { mutableStateOf("Entrant") }
@@ -172,12 +181,31 @@ fun SignUpScreen(navController: NavController) {
                     errorMessage = ""
                     isSaving = true
                     profileRepo.addProfile(profile) { error ->
-                        isSaving = false
-                        if (error != null) {
-                            errorMessage = "Couldn't save your profile. Please try again."
-                        } else {
-                            UserSession.isOwner = accountType == "Campsite owner"
-                            navController.navigate("home")
+                        coroutineScope.launch(Dispatchers.Main.immediate) {
+                            isSaving = false
+                            if (error != null) {
+                                errorMessage = "Couldn't save your profile. Please try again."
+                            } else {
+                                try {
+                                    AuthManager(context.applicationContext).saveUserId(profile.id)
+                                    when (profile) {
+                                        is Admin -> {
+                                            UserSession.isOwner = false
+                                            navController.navigate("admin")
+                                        }
+                                        is CampOwner -> {
+                                            UserSession.isOwner = true
+                                            navController.navigate("home")
+                                        }
+                                        is Entrant -> {
+                                            UserSession.isOwner = false
+                                            navController.navigate("home")
+                                        }
+                                    }
+                                } catch (error: Exception) {
+                                    errorMessage = "Profile saved, but this device couldn't remember the sign-in."
+                                }
+                            }
                         }
                     }
                 }

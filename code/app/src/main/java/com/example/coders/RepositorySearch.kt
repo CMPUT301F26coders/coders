@@ -27,11 +27,47 @@ fun filterCampsites(
     campsites: List<Campsite>,
     location: String = "",
     date: String = "",
-    guests: Int = 0
+    guests: Int = 0,
+    startDate: String = "",
+    endDate: String = ""
 ): List<Campsite> {
+
     if (guests < 0) return emptyList()
 
+    val hasDateRange =
+        startDate.isNotBlank() || endDate.isNotBlank()
+
+    // A date range needs both check-in and check-out.
+    if (hasDateRange &&
+        (startDate.isBlank() || endDate.isBlank())
+    ) {
+        return emptyList()
+    }
+
+    val checkIn = if (hasDateRange) {
+        runCatching {
+            java.time.LocalDate.parse(startDate.trim())
+        }.getOrNull() ?: return emptyList()
+    } else {
+        null
+    }
+
+    val checkOut = if (hasDateRange) {
+        runCatching {
+            java.time.LocalDate.parse(endDate.trim())
+        }.getOrNull() ?: return emptyList()
+    } else {
+        null
+    }
+
+    if (checkIn != null && checkOut != null &&
+        !checkOut.isAfter(checkIn)
+    ) {
+        return emptyList()
+    }
+
     return campsites.filter { campsite ->
+
         val matchesLocation = location.isBlank() ||
                 campsite.location.contains(
                     location.trim(),
@@ -40,12 +76,25 @@ fun filterCampsites(
 
         val matchesGuests = campsite.capacity >= guests
 
-        val matchesDate = date.isBlank() ||
-                campsite.reservations.none { reservation ->
-                    reservation.date == date.trim() &&
-                            reservation.status == ReservationStatus.Active
-                }
+        val matchesDate = campsite.reservations.none { reservation ->
 
+            if (reservation.status != ReservationStatus.Active) {
+                false
+            } else if (checkIn != null && checkOut != null) {
+
+                val reservedDate = runCatching {
+                    java.time.LocalDate.parse(reservation.dates.trim())
+                }.getOrNull()
+
+                reservedDate != null &&
+                        !reservedDate.isBefore(checkIn) &&
+                        reservedDate.isBefore(checkOut)
+
+            } else {
+                date.isNotBlank() &&
+                        reservation.dates == date.trim()
+            }
+        }
         matchesLocation && matchesGuests && matchesDate
     }
 }
