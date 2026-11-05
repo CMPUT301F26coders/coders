@@ -36,13 +36,6 @@ fun MessagesScreen(navController: NavController) {
                 .padding(16.dp)
         ) {
 
-            Button(
-                onClick = {
-                    navController.popBackStack()
-                }
-            ) {
-                Text("Back")
-            }
 
             Text(
                 text = "Messages",

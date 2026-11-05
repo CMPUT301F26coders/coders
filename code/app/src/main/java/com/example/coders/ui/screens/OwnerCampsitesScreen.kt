@@ -50,6 +50,7 @@ fun OwnerCampsitesScreen(
     }
 
     var campsiteToDelete by remember { mutableStateOf<Campsite?>(null) }
+    var isNavigating by remember { mutableStateOf(false) }
 
     Scaffold(
         bottomBar = {
@@ -65,7 +66,12 @@ fun OwnerCampsitesScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 2.dp)
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(
+                onClick = {
+                    if(!isNavigating) {
+                        navController.popBackStack()
+                }
+                }) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
 
