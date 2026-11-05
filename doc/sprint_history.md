@@ -20,7 +20,7 @@
 - Not completed:
   - US 01.09.01: Local session ID saving and automatic profile restoration were not completed in Sprint 1.
   - US 03.11.01: Admin profiles could not yet act as campsite owners and/or entrants.
-  - US 01.01.01–01.01.05, US 01.12.01, US 01.13.01, US 02.02.01: Search, QR scanning/generation, and rating behavior were not implemented in this backend sprint.
+  - US 01.01.01–01.01.05, US 01.12.01, US 01.13.01, US 02.02.01: Search, QR scanning/generation, and rating behaviour were not implemented in this backend sprint.
 
 ## Sprint 2 (Oct 29 – Nov 5)
 
