@@ -20,7 +20,8 @@ class CampsiteTest {
             campsites = emptyList(),
             lotteries = emptyList(),
             reservations = emptyList(),
-            notifications = emptyList()
+            notificationsSent = emptyList(),
+            notificationsReceived = emptyList()
         )
     }
 
@@ -47,11 +48,12 @@ class CampsiteTest {
     }
 
     @Test
-    fun campsite_ids_autoIncrementOnCreation() {
+    fun campsite_idsAreUniqueAndNonEmpty() {
         val site1 = Campsite("Site 1", "Loc 1", "Desc 1", 2, "0,0", owner)
         val site2 = Campsite("Site 2", "Loc 2", "Desc 2", 4, "0,0", owner)
 
         assertNotEquals(site1.id, site2.id)
-        assertEquals(site1.id + 1, site2.id)
+        assertTrue(site1.id.isNotBlank())
+        assertTrue(site2.id.isNotBlank())
     }
 }

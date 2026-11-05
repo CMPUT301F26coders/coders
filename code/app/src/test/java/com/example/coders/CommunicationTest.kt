@@ -3,6 +3,7 @@ package com.example.coders
 import com.example.coders.Notification
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CommunicationTest {
@@ -42,7 +43,8 @@ class CommunicationTest {
         val chat = Conversation(
             messages = listOf(message),
             campOwner = owner,
-            entrant = entrant
+            entrant = entrant,
+            campsite = Campsite(name = "Pine Lake")
         )
 
         assertEquals("Bob", chat.campOwner.name)
@@ -64,7 +66,8 @@ class CommunicationTest {
             date = "1993-11-03"
         )
         assertNotEquals(notification1.id, notification2.id)
-        assertEquals(notification1.id + 1, notification2.id)
+        assertTrue(notification1.id.isNotBlank())
+        assertTrue(notification2.id.isNotBlank())
     }
 
     @Test
@@ -76,7 +79,8 @@ class CommunicationTest {
         val chat = Conversation(
             messages = listOf(message),
             campOwner = owner,
-            entrant = entrant
+            entrant = entrant,
+            campsite = Campsite(name = "Pine Lake")
         )
 
         val owner2 = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
@@ -86,11 +90,13 @@ class CommunicationTest {
         val chat2 = Conversation(
             messages = listOf(message2),
             campOwner = owner2,
-            entrant = entrant2
+            entrant = entrant2,
+            campsite = Campsite(name = "Pine Lake")
         )
 
         assertNotEquals(chat.id, chat2.id)
-        assertEquals(chat.id + 1, chat2.id)
+        assertTrue(chat.id.isNotBlank())
+        assertTrue(chat2.id.isNotBlank())
     }
 
 

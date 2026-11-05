@@ -13,14 +13,14 @@ class ProfileTest {
             name = "Alice",
             email = "alice@example.com",
             phone = "780-111-2222",
-            bookings = emptyList(),
+            reservations = emptyList(),
             waitlists = emptyList()
         )
 
         assertEquals("Alice", entrant.name)
         assertEquals("alice@example.com", entrant.email)
         assertEquals("780-111-2222", entrant.phone)
-        assertTrue(entrant.bookings.isEmpty())
+        assertTrue(entrant.reservations.isEmpty())
         assertTrue(entrant.waitlists.isEmpty())
     }
 
@@ -33,7 +33,8 @@ class ProfileTest {
             campsites = emptyList(),
             lotteries = emptyList(),
             reservations = emptyList(),
-            notifications = emptyList()
+            notificationsSent = emptyList(),
+            notificationsReceived = emptyList()
         )
 
         assertEquals("Bob Owner", owner.name)
@@ -77,11 +78,13 @@ class ProfileTest {
     }
 
     @Test
-    fun profile_ids_autoIncrementOnCreation() {
+    fun profile_idsAreUniqueAndStable() {
         val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())
         val owner: Profile = CampOwner("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
+        val entrantId = entrant.id
 
         assertNotEquals(entrant.id, owner.id)
-        assertEquals(entrant.id + 1, owner.id)
+        assertEquals(entrantId, entrant.id)
+        assertTrue(entrant.id.isNotBlank())
     }
 }

@@ -46,9 +46,11 @@ class LotteryAndReservationTest {
     fun reservation_creation_storesCampsiteAndStatus() {
         val reservation = Reservation(
             campsite = campsite,
-            date = "2026-08-15",
+            dates = "2026-08-15",
             guestNumber = 3,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         assertEquals("Jasper Spot", reservation.campsite.name)

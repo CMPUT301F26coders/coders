@@ -20,7 +20,9 @@ object ChatData {
 }
 
 @Composable
-fun EntrantChatScreen(navController: NavController) {
+fun ChatScreen(navController: NavController) {
+
+    var isNavigating by remember { mutableStateOf(false) }
 
     var message by remember { mutableStateOf("") }
 
@@ -65,7 +67,10 @@ fun EntrantChatScreen(navController: NavController) {
         // Back button
         TextButton(
             onClick = {
-                navController.popBackStack()
+                if(!isNavigating) {
+                    isNavigating = true
+                    navController.popBackStack()
+                }
             }
         ) {
             Text("Back", fontSize = 20.sp)

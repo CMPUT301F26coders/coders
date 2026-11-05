@@ -9,12 +9,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.Admin
+import com.example.coders.AuthManager
+import com.example.coders.CampOwner
+import com.example.coders.Entrant
+import com.example.coders.Profile
+import com.example.coders.ProfileRepo
+import com.example.coders.UserSession
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
+
+/** Collects profile details, saves the profile, then remembers its ID on this device. */
 @Composable
 fun SignUpScreen(navController: NavController) {
 
@@ -23,6 +36,11 @@ fun SignUpScreen(navController: NavController) {
     var lastName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
+    val profileRepo = remember { ProfileRepo() }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Remember selected account type
     var accountType by remember { mutableStateOf("Entrant") }
@@ -122,22 +140,79 @@ fun SignUpScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(25.dp))
 
         // Sign Up Button
+        if (errorMessage.isNotEmpty()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         Button(
+            enabled = !isSaving,
             onClick = {
-                if (accountType == "Admin") {
-                    navController.navigate("admin")
-                } else if (accountType == "Entrant") {
-                    navController.navigate("entrant")
+                if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || phone.isBlank()) {
+                    errorMessage = buildList {
+                        if (firstName.isBlank()) add("First name is empty")
+                        if (lastName.isBlank()) add("Last name is empty")
+                        if (email.isBlank()) add("Email is empty")
+                        if (phone.isBlank()) add("Phone is empty")
+                    }.joinToString("\n")
                 } else {
-                    navController.navigate("owner")
+                    val fullName = "${firstName.trim()} ${lastName.trim()}"
+                    val profile: Profile = when (accountType) {
+                        "Admin" -> Admin(
+                            name = fullName,
+                            email = email.trim(),
+                            phone = phone.trim()
+                        )
+                        "Entrant" -> Entrant(
+                            name = fullName,
+                            email = email.trim(),
+                            phone = phone.trim()
+                        )
+                        else -> CampOwner(
+                            name = fullName,
+                            email = email.trim(),
+                            phone = phone.trim()
+                        )
+                    }
+
+                    errorMessage = ""
+                    isSaving = true
+                    profileRepo.addProfile(profile) { error ->
+                        coroutineScope.launch(Dispatchers.Main.immediate) {
+                            isSaving = false
+                            if (error != null) {
+                                errorMessage = "Couldn't save your profile. Please try again."
+                            } else {
+                                try {
+                                    AuthManager(context.applicationContext).saveUserId(profile.id)
+                                    when (profile) {
+                                        is Admin -> {
+                                            UserSession.isOwner = false
+                                            navController.navigate("admin")
+                                        }
+                                        is CampOwner -> {
+                                            UserSession.isOwner = true
+                                            navController.navigate("home")
+                                        }
+                                        is Entrant -> {
+                                            UserSession.isOwner = false
+                                            navController.navigate("home")
+                                        }
+                                    }
+                                } catch (error: Exception) {
+                                    errorMessage = "Profile saved, but this device couldn't remember the sign-in."
+                                }
+                            }
+                        }
+                    }
                 }
             },
             shape = RoundedCornerShape(30.dp)
         ) {
-            Text(
-                text = "Sign Up",
-                fontSize = 18.sp
-            )
+            Text(text = if (isSaving) "Saving..." else "Sign Up", fontSize = 18.sp)
         }
     }
 }

@@ -7,14 +7,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.Entrant
+import com.example.coders.SignedInProfile
 
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
+    var isNavigating by remember { mutableStateOf(false) }
+
+    val profile by SignedInProfile().rememberSignedInProfile()
+    val entrant = profile as? Entrant
 
     Column(
         modifier = Modifier
@@ -25,8 +37,12 @@ fun EntrantReservationsScreen(navController: NavController) {
 
         TextButton(
             onClick = {
-                navController.popBackStack()
+                if(!isNavigating){
+                    isNavigating = true
+                    navController.popBackStack()
+                }
             }
+
         ) {
             Text("Back")
         }
@@ -39,66 +55,76 @@ fun EntrantReservationsScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        OutlinedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp)
-        ) {
-
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-
-                Text("Campsite Name", fontWeight = FontWeight.Bold)
-                Text("Pine Lake Campsite")
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text("Location", fontWeight = FontWeight.Bold)
-                Text("Jasper, Alberta")
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text("Dates", fontWeight = FontWeight.Bold)
-                Text("September 10 - 12, 2026")
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text("Guests", fontWeight = FontWeight.Bold)
-                Text("2")
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = {
-                        navController.navigate("minimap")
-                    },
-                    modifier = Modifier.fillMaxWidth()
+        when {
+            profile == null -> CircularProgressIndicator()
+            entrant == null -> Text("Reservations are available to entrant profiles only.")
+            entrant.reservations.isEmpty() -> Text("No reservations yet.")
+            else -> entrant.reservations.forEach { summary ->
+                OutlinedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Text("View On Map")
+
+                    Column(
+                        modifier = Modifier.padding(20.dp)
+                    ) {
+
+                        Text("Campsite Name", fontWeight = FontWeight.Bold)
+                        Text(summary.campsite.name)
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Text("Location", fontWeight = FontWeight.Bold)
+                        Text(summary.campsite.location)
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Text("Dates", fontWeight = FontWeight.Bold)
+                        Text(summary.dates)
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Text("Guests", fontWeight = FontWeight.Bold)
+                        Text(summary.guestNumber.toString())
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = {
+                                navController.navigate("minimap")
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("View On Map")
+                        }
+
+                        Spacer(modifier = Modifier.height(25.dp))
+
+                        Text(
+                            text = "Campsite Owner",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = summary.campOwner.name,
+                            fontSize = 20.sp
+                        )
+
+                        Button(
+                            onClick = {
+                                ChatData.owner = summary.campOwner.name
+                                navController.navigate("chat")
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Message ${summary.campOwner.name}"
+                            }
+                        ) {
+                            Text("Message")
+                        }
+                    }
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(25.dp))
-
-        Text(
-            text = "Campsite Owner",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "John Smith",
-            fontSize = 20.sp
-        )
-
-        Button(
-            onClick = {
-                ChatData.owner = "John Smith"
-                navController.navigate("chat")
-            }
-        ) {
-            Text("Message")
         }
     }
 }
