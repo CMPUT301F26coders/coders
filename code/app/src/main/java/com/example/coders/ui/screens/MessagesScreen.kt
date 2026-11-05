@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -16,9 +17,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.R
+import com.example.coders.SignedInProfile
+import com.example.coders.toMessageSummaries
 
+/**
+ * Displays the messages screen. Allows users to navigate to the chat screen.
+ *
+ * @param navController The navigation controller.
+ * @return The messages screen.
+ */
 @Composable
 fun MessagesScreen(navController: NavController) {
+
+    val profile by SignedInProfile().rememberSignedInProfile()
+    val messageSummaries = profile.toMessageSummaries()
 
     Scaffold(
         bottomBar = {
@@ -45,45 +57,25 @@ fun MessagesScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(25.dp))
 
-            MessageBox(
-                name = "Pine Lake Campsite",
-                owner = "John Smith",
-                message = "Congratulations!, You won the campsite lottery!",
-                date = "10:30 AM",
-                picture = R.drawable.ic_launcher_foreground,
-                navController = navController
-            )
-
-            MessageBox(
-                name = "Mountain View Camp",
-                owner = "Sarah Lee",
-                message = "Hello!, Thanks for your interest in this campsite!",
-                date = "Yesterday",
-                picture = R.drawable.ic_launcher_foreground,
-                navController = navController
-            )
-
-            MessageBox(
-                name = "Forest Hill Camp",
-                owner = "Mike Brown",
-                message = "Let me know if you have any questions!",
-                date = "Oct 12",
-                picture = R.drawable.ic_launcher_foreground,
-                navController = navController
-            )
-
-            MessageBox(
-                name = "Riverside Campsite",
-                owner = "Emma Wilson",
-                message = "Your reservations details are ready!",
-                date = "Oct 10",
-                picture = R.drawable.ic_launcher_foreground,
-                navController = navController
-            )
+            when {
+                profile == null -> CircularProgressIndicator()
+                messageSummaries.isEmpty() -> Text("No conversations yet.")
+                else -> messageSummaries.forEach { summary ->
+                    MessageBox(
+                        name = summary.campsiteName,
+                        owner = summary.otherPersonName,
+                        message = summary.latestMessage,
+                        date = summary.latestDate,
+                        picture = R.drawable.ic_launcher_foreground,
+                        navController = navController
+                    )
+                }
+            }
         }
     }
 }
 
+/** Displays one campsite conversation preview and opens its chat when selected. */
 @Composable
 fun MessageBox(
     name: String,
@@ -132,16 +124,5 @@ fun MessageBox(
             }
         }
 
-        if (name == "Pine Lake Campsite") {
-
-            Button(
-                onClick = {
-                    navController.navigate("reservations")
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("View Application →")
-            }
-        }
     }
 }

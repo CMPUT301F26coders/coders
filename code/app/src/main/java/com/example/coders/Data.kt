@@ -28,6 +28,7 @@ interface Profile {
  * @property bookings A list of bookings made by the entrant.
  * @property waitlists A list of waitlists made by the entrant.
  * @property notifications A list of notifications made by the entrant.
+ * @property conversations Conversations associated with this entrant.
  */
 data class Entrant(
     override val name: String = "",
@@ -37,7 +38,8 @@ data class Entrant(
     val waitlists: List<Waitlist> = emptyList(),
     val notifications: List<Notification> = emptyList(),
     override val type: String = "Entrant",
-    override val id: String = UUID.randomUUID().toString()
+    override val id: String = UUID.randomUUID().toString(),
+    val conversations: MutableList<Conversation> = mutableListOf()
 ) : Profile {
 
 }
@@ -50,6 +52,7 @@ data class Entrant(
  * @property reservations A list of reservations made by the camp owner.
  * @property notificationsSent A list of notifications sent by the camp owner.
  * @property notificationsReceived A list of notifications received by the camp owner.
+ * @property conversations Conversations associated with this camp owner.
  */
 data class CampOwner(
     override val name: String = "",
@@ -60,6 +63,7 @@ data class CampOwner(
     val reservations : List<Reservation> = emptyList(),
     val notificationsSent : List<Notification> = emptyList(),
     val notificationsReceived : List<Notification> = emptyList(),
+    val conversations: MutableList<Conversation> = mutableListOf(),
     override val type: String = "CampOwner",
     override val id: String = UUID.randomUUID().toString()
 ) : Profile {
@@ -126,13 +130,13 @@ data class Waitlist (
  */
 
 data class Campsite(
-    val name: String = "",
-    val location: String = "",
-    val description: String = "",
-    val capacity: Int = 0,
-    val mapLocation: String = "",
+    var name: String = "",
+    var location: String = "",
+    var description: String = "",
+    var capacity: Int = 0,
+    var mapLocation: String = "",
     val campOwner: CampOwner = CampOwner(),
-    val rating: Double? = null,
+    var rating: Double? = null,
 
     val images: List<Image> = emptyList(),
     val tags: List<String> = emptyList(),
@@ -143,6 +147,11 @@ data class Campsite(
     val qr: String = "",
     val id: String = UUID.randomUUID().toString()
 ) {
+    /** Returns the campsite's map location. */
+    fun mapLocation() : String { return mapLocation }
+
+    /** Returns the campsite rating, or `null` when it has not been rated. */
+    fun rating() : Double? { return rating }
 
 }
 
@@ -253,12 +262,14 @@ data class Message (
  * @property messages A list of messages in the chat.
  * @property campOwner The camp owner of the chat.
  * @property entrant The entrant of the chat.
+ * @property campsite The campsite associated with the chat.
  */
 data class Conversation (
     val messages : List<Message>,
     val campOwner : CampOwner,
     val entrant : Entrant,
     val id: String = UUID.randomUUID().toString(),
+    val campsite: Campsite
 )
 
 /**

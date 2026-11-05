@@ -135,7 +135,10 @@ class RepositorySearchTest {
             campsite = edmonton,
             date = "2026-11-15",
             guestNumber = 2,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
+
         )
 
         val bookedCampsite = edmonton.copy(
@@ -201,7 +204,9 @@ class RepositorySearchTest {
             campsite = edmonton,
             date = "2026-11-15",
             guestNumber = 2,
-            status = ReservationStatus.Cancelled
+            status = ReservationStatus.Cancelled,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val campsiteWithCancelledReservation = edmonton.copy(
@@ -234,7 +239,9 @@ class RepositorySearchTest {
             campsite = edmonton,
             date = "2026-12-17",
             guestNumber = 2,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val bookedCampsite = edmonton.copy(
@@ -257,7 +264,9 @@ class RepositorySearchTest {
             campsite = edmonton,
             date = "2026-12-20",
             guestNumber = 2,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val bookedCampsite = edmonton.copy(
@@ -301,7 +310,9 @@ class RepositorySearchTest {
             campsite = edmonton,
             date = "2026-12-17",
             guestNumber = 2,
-            status = ReservationStatus.Cancelled
+            status = ReservationStatus.Cancelled,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val campsiteWithCancelledReservation = edmonton.copy(

@@ -48,7 +48,9 @@ class LotteryAndReservationTest {
             campsite = campsite,
             date = "2026-08-15",
             guestNumber = 3,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         assertEquals("Jasper Spot", reservation.campsite.name)
