@@ -1,6 +1,7 @@
 package com.example.coders
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -14,6 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
 import org.junit.runner.RunWith
+import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class CreateCampsiteTest {
@@ -151,10 +153,11 @@ class CreateCampsiteTest {
     @Test
     fun test5_SuccessfulCampsiteRegistration() {
         navigateToCreateCampsite()
+        val campsiteName = "Bear Creek Site ${UUID.randomUUID().toString().take(8)}"
 
 
         composeTestRule.onNodeWithTag("input_Name")
-            .performTextInput("Bear Creek Site")
+            .performTextInput(campsiteName)
 
         composeTestRule.onNodeWithTag("input_Location")
             .performTextInput("Banff, Alberta")
@@ -170,14 +173,19 @@ class CreateCampsiteTest {
 
 
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("My Campsites:").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("My Campsites:").fetchSemanticsNodes().isNotEmpty() &&
+                composeTestRule.onAllNodesWithTag("input_Name").fetchSemanticsNodes().isEmpty() &&
+                composeTestRule.onAllNodesWithText(campsiteName, substring = false)
+                    .fetchSemanticsNodes().isNotEmpty()
         }
 
         composeTestRule.onNodeWithText("My Campsites:")
             .assertIsDisplayed()
 
 
-        composeTestRule.onNodeWithText("Bear Creek Site")
+        composeTestRule.onAllNodesWithText(campsiteName, substring = false)
+            .assertCountEquals(1)
+        composeTestRule.onNodeWithText(campsiteName, substring = false)
             .assertIsDisplayed()
     }
 }
