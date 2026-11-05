@@ -143,6 +143,7 @@ data class Campsite (
     val qr : String = "",
     val id: String = UUID.randomUUID().toString()
 ) {
+
 }
 
 /**
@@ -213,7 +214,9 @@ data class Reservation (
     val campsite : Campsite,
     val date : String,
     val guestNumber : Int,
-    val status : Enum<ReservationStatus>
+    val status : Enum<ReservationStatus>,
+    val campOwner : CampOwner,
+    val entrants : List<Entrant>,
 )
 
 /**

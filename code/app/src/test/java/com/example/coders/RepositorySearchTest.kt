@@ -11,7 +11,6 @@ class RepositorySearchTest {
         email = "alice@test.com",
         phone = "111"
     )
-
     private val owner = CampOwner(
         name = "Bob Owner",
         email = "bob@test.com",
