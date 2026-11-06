@@ -1,3 +1,12 @@
+/**
+ * Contains unit tests for the application's Image model.
+ *
+ * Tests that images correctly store their URL and description
+ * when created. Also verifies that each image receives a
+ * unique and non-empty ID.
+ *
+ * Outstanding issues: None known.
+ */
 
 package com.example.coders
 
