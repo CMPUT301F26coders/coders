@@ -37,6 +37,7 @@ import com.example.coders.CampOwner
 import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
 import com.example.coders.ui.screens.EntrantPastReservationsScreen
+import com.example.coders.ui.screens.RateCampsiteScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -156,6 +157,21 @@ class MainActivity : ComponentActivity() {
 
                     composable("entrantreservations") {
                         EntrantReservationsScreen(navController)
+                    }
+
+                    //routed the rate campsite screen
+                    composable(
+                        route = "rate_campsite/{reservationId}",
+                        arguments = listOf(
+                            navArgument("reservationId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        RateCampsiteScreen(
+                            navController = navController,
+                            reservationId = backStackEntry.arguments
+                                ?.getString("reservationId")
+                                .orEmpty()
+                        )
                     }
 
                     composable("entrantpastreservations") {
