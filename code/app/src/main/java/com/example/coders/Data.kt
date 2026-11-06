@@ -9,6 +9,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import java.util.UUID
+import com.google.android.gms.tasks.Tasks
+import android.util.Log
 
 /**
  * Common interface for all profiles.
@@ -1241,6 +1243,67 @@ class ConversationRepo {
      */
     private fun conversationFromDocument(document: DocumentSnapshot): Conversation? =
         document.toObject(Conversation::class.java)?.copy(id = document.id)
+
+
+    /**
+     * @param reservation The reservation to create a conversation for
+     */
+    fun createConversationsForReservation(
+        reservation: Reservation,
+    ) {
+        val owner = reservation.campOwner
+        val campsite = reservation.campsite
+
+        // Use actual participants, not placeholder profiles.
+        if (reservation.campOwnerId.isBlank() ||
+            reservation.campsiteId.isBlank() ||
+            reservation.entrants.isEmpty()
+        ) {
+            return
+        }
+
+        val tasks = reservation.entrants.distinctBy { it.id }.map { entrant ->
+
+            // Stable ID prevents duplicate conversations if retried.
+            val conversationId = "${reservation.id}_${entrant.id}"
+
+            val conversation = Conversation(
+                id = conversationId,
+                campOwner = owner,
+                entrant = entrant,
+                campsite = campsite,
+                messages = emptyList(),
+                campOwnerId = reservation.campOwnerId,
+                entrantId = entrant.id,
+                campsiteId = reservation.campsiteId,
+                participantIds = listOf(
+                    reservation.campOwnerId,
+                    entrant.id
+                )
+            )
+
+            val document = conversationRef.document(conversationId)
+
+            // Create only if it doesn't already exist.
+            db.runTransaction { transaction ->
+                val existing = transaction.get(document)
+
+                if (!existing.exists()) {
+                    transaction.set(document, conversation)
+                }
+            }
+        }
+
+        Tasks.whenAll(tasks)
+            .addOnFailureListener { error ->
+                Log.e(
+                    "ConversationRepo",
+                    "Failed to create conversations",
+                    error
+                )
+            }
+    }
+
 }
 
 /**
@@ -1441,12 +1504,21 @@ class ReservationRepo {
      * @param reservation The reservation record to save or add.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun addReservation(reservation: Reservation, onComplete: (Exception?) -> Unit = {}) {
+    fun addReservation(
+        reservation: Reservation,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
         val record = withRelationshipIds(reservation)
+
         reservationRef.document(record.id)
             .set(record)
-            .addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+            .addOnSuccessListener {
+                ConversationRepo().createConversationsForReservation(record)
+                onComplete(null)
+            }
+            .addOnFailureListener { error ->
+                onComplete(error)
+            }
     }
 
     /**
