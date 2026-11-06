@@ -11,7 +11,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.coders.ui.screens.EntrantPastReservationsScreen
 import com.example.coders.ui.screens.RateCampsiteScreen
 import com.example.coders.ui.theme.CodersTheme
 import com.google.android.gms.tasks.Task
@@ -99,9 +104,11 @@ class EntrantCampsiteRatingTest {
             campOwnerId = ownerId
         )
         val reservation = Reservation(
+            campsite = campsite,
             dates = "2026-10-10 - 2026-10-12",
             guestNumber = 2,
             status = ReservationStatus.Past,
+            campOwner = owner,
             campsiteId = campsiteId,
             campOwnerId = ownerId,
             entrantIds = listOf(entrantId)
@@ -114,14 +121,35 @@ class EntrantCampsiteRatingTest {
         return reservation
     }
 
-    private fun showRatingScreen(reservationId: String) {
+    private fun showPastReservationsScreen(reservation: Reservation) {
         composeTestRule.runOnUiThread {
             composeTestRule.activity.setContent {
                 CodersTheme {
-                    RateCampsiteScreen(
-                        navController = rememberNavController(),
-                        reservationId = reservationId
-                    )
+                    val navController = rememberNavController()
+                    NavHost(
+                        navController = navController,
+                        startDestination = "entrantpastreservations"
+                    ) {
+                        composable("entrantpastreservations") {
+                            EntrantPastReservationsScreen(
+                                navController = navController,
+                                testEntrant = Entrant(reservations = listOf(reservation))
+                            )
+                        }
+                        composable(
+                            route = "rate_campsite/{reservationId}",
+                            arguments = listOf(
+                                navArgument("reservationId") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            RateCampsiteScreen(
+                                navController = navController,
+                                reservationId = backStackEntry.arguments
+                                    ?.getString("reservationId")
+                                    .orEmpty()
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -140,7 +168,12 @@ class EntrantCampsiteRatingTest {
     fun entrantCanRateOnePastReservationAndCampsiteAverageIsSaved() {
         openHome()
         val reservation = seedPastReservation()
-        showRatingScreen(reservation.id)
+        showPastReservationsScreen(reservation)
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Rate").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Rate").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithText("Choose a rating from 1 to 5")
