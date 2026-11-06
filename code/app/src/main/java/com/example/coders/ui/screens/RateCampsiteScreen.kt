@@ -1,3 +1,4 @@
+/** Provides the entrant-facing screen for submitting a one-time campsite rating. */
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +39,12 @@ import com.example.coders.SignedInProfile
 
 // The following composable was added using OpenAI, Codex, "Implement US 01.13.01: add a
 // one-to-five rating screen for a past campsite reservation", 2026-11-06.
-/** Displays the one-time rating form for the past reservation identified by [reservationId]. */
+/**
+ * Displays the one-time rating form for a past reservation.
+ *
+ * @param navController Navigates back to Past Reservations after a successful submission.
+ * @param reservationId Identifies the past reservation to rate.
+ */
 @Composable
 fun RateCampsiteScreen(
     navController: NavController,

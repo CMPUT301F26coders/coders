@@ -1,3 +1,4 @@
+/** Provides the entrant's live Pending and Active reservation management screen. */
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import com.example.coders.Profile
 
 // The following enum was added using OpenAI, Codex, "Implement US 01.04.03: add Pending and
 // Active reservation tabs for entrant lottery offers", 2026-11-06.
+/** Identifies each reservation status that can be displayed on this screen. */
 private enum class EntrantReservationTab(
     val label: String,
     val status: ReservationStatus
@@ -58,9 +60,6 @@ fun EntrantReservationsScreen(navController: NavController) {
     var reservationToDecline by remember { mutableStateOf<Reservation?>(null) }
     var isUpdatingOffer by remember { mutableStateOf(false) }
     var offerUpdateError by remember { mutableStateOf<String?>(null) }
-
-    // The signed-in profile is loaded once. Keep successful changes visible until the next load.
-    var locallyUpdatedStatuses by remember { mutableStateOf(emptyMap<String, ReservationStatus>()) }
 
     val profileRepo = remember { ProfileRepo() }
 
@@ -169,27 +168,49 @@ fun EntrantReservationsScreen(navController: NavController) {
 
     val visibleReservations = reservations.filter { it.status == selectedTab.status }
 
+    /** Resolves a reservation's campsite name from the campsite document loaded by ID. */
+    fun campsiteName(reservation: Reservation): String =
+        campsites[reservation.campsiteId]?.name ?: "this campsite"
+
+    /**
+     * Updates the matching reservation in both the entrant profile and reservation document.
+     *
+     * @param reservation Reservation whose status should change.
+     * @param status Target status to save.
+     * @param onComplete Receives `null` when both updates succeed, or the first error.
+     */
     fun updateReservationStatus(
         reservation: Reservation,
         status: ReservationStatus,
-        onSuccess: () -> Unit
+        onComplete: (Exception?) -> Unit
     ) {
-        val currentEntrant = entrant ?: return
+        val currentEntrant = entrant
+        if (currentEntrant == null) {
+            onComplete(IllegalStateException("An entrant profile is required to update a reservation."))
+            return
+        }
+
+        if (currentEntrant.reservations.none { it.id == reservation.id }) {
+            onComplete(IllegalStateException("Reservation was not found in the entrant profile."))
+            return
+        }
+
         val updatedEntrant = currentEntrant.copy(
             reservations = currentEntrant.reservations.map {
                 if (it.id == reservation.id) it.copy(status = status) else it
             }
         )
 
-        profileRepo.updateProfile(currentEntrant, updatedEntrant) { error ->
-            isUpdatingOffer = false
-
-            if (error == null) {
-                locallyUpdatedStatuses = locallyUpdatedStatuses + (reservation.id to status)
-                onSuccess()
-            } else {
-                offerUpdateError = error.message ?: "Unable to update the lottery offer."
+        // Keep the entrant's profile history and the reservation document in sync. The active
+        // screen is driven by the reservation document; the profile retains the entrant-facing
+        // reservation history required by the user story.
+        profileRepo.updateProfile(currentEntrant, updatedEntrant) { profileError ->
+            if (profileError != null) {
+                onComplete(profileError)
+                return@updateProfile
             }
+
+            reservationRepo.updateReservationStatus(reservation.id, status, onComplete)
         }
     }
 
@@ -256,7 +277,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                 Text("Reservations are available to entrant profiles only.")
             }
 
-            reservations.isEmpty() -> {
+            visibleReservations.isEmpty() -> {
                 Text("No reservations in this tab.")
             }
 
@@ -301,8 +322,14 @@ fun EntrantReservationsScreen(navController: NavController) {
                                     updateReservationStatus(
                                         reservation = summary,
                                         status = ReservationStatus.Active,
-                                        onSuccess = {
-                                            selectedTab = EntrantReservationTab.Active
+                                        onComplete = { error ->
+                                            isUpdatingOffer = false
+                                            if (error == null) {
+                                                selectedTab = EntrantReservationTab.Active
+                                            } else {
+                                                offerUpdateError =
+                                                    error.message ?: "Unable to update the lottery offer."
+                                            }
                                         }
                                     )
                                 },
@@ -310,7 +337,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                                     .fillMaxWidth()
                                     .semantics {
                                         contentDescription =
-                                            "Accept offer for ${summary.campsite.name}"
+                                            "Accept offer for ${campsiteName(summary)}"
                                     }
                             ) {
                                 Text(if (isUpdatingOffer) "Accepting…" else "Accept Offer")
@@ -328,7 +355,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                                     .fillMaxWidth()
                                     .semantics {
                                         contentDescription =
-                                            "Decline offer for ${summary.campsite.name}"
+                                            "Decline offer for ${campsiteName(summary)}"
                                     }
                             ) {
                                 Text("Decline Offer")
@@ -345,7 +372,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                                     reservationToCancel = summary
                                 },
                                 modifier = Modifier.fillMaxWidth().semantics {
-                                    contentDescription = "Cancel reservation for ${summary.campsite.name}"
+                                    contentDescription = "Cancel reservation for ${campsiteName(summary)}"
                                 }
                             ) {
                                 Text("Cancel Reservation")
@@ -390,7 +417,7 @@ fun EntrantReservationsScreen(navController: NavController) {
             text = {
                 Column {
                     Text(
-                        "Cancel your reservation for ${reservation.campsite.name}? " +
+                        "Cancel your reservation for ${campsiteName(reservation)}? " +
                             "This action cannot be undone."
                     )
 
@@ -404,32 +431,21 @@ fun EntrantReservationsScreen(navController: NavController) {
                 TextButton(
                     enabled = !isCancelling,
                     onClick = {
-                        entrant?.let { currentEntrant ->
-                            isCancelling = true
-
-                            val updatedEntrant = currentEntrant.copy(
-                                reservations = currentEntrant.reservations.map {
-                                    if (it.id == reservation.id) {
-                                        it.copy(status = ReservationStatus.Cancelled)
-                                    } else {
-                                        it
-                                    }
-                                }
-                            )
-
-                            profileRepo.updateProfile(currentEntrant, updatedEntrant) { error ->
+                        isCancelling = true
+                        updateReservationStatus(
+                            reservation = reservation,
+                            status = ReservationStatus.Cancelled,
+                            onComplete = { error ->
                                 isCancelling = false
 
                                 if (error == null) {
-                                    locallyUpdatedStatuses = locallyUpdatedStatuses +
-                                        (reservation.id to ReservationStatus.Cancelled)
                                     reservationToCancel = null
                                 } else {
                                     cancellationError =
                                         error.message ?: "Unable to cancel reservation."
                                 }
                             }
-                        }
+                        )
                     }
                 ) {
                     Text(if (isCancelling) "Cancelling…" else "Confirm cancellation")
@@ -455,7 +471,7 @@ fun EntrantReservationsScreen(navController: NavController) {
             text = {
                 Column {
                     Text(
-                        "Decline your reservation offer for ${reservation.campsite.name}? " +
+                        "Decline your reservation offer for ${campsiteName(reservation)}? " +
                             "This action cannot be undone."
                     )
 
@@ -474,8 +490,14 @@ fun EntrantReservationsScreen(navController: NavController) {
                         updateReservationStatus(
                             reservation = reservation,
                             status = ReservationStatus.Rejected,
-                            onSuccess = {
-                                reservationToDecline = null
+                            onComplete = { error ->
+                                isUpdatingOffer = false
+                                if (error == null) {
+                                    reservationToDecline = null
+                                } else {
+                                    offerUpdateError =
+                                        error.message ?: "Unable to update the lottery offer."
+                                }
                             }
                         )
                     }

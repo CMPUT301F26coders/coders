@@ -1,3 +1,4 @@
+/** Exercises an entrant's ID-based Firestore reservation-cancellation workflow. */
 package com.example.coders
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -26,16 +28,20 @@ import java.util.concurrent.TimeUnit
 
 // The following test class was added using OpenAI, Codex, "Add a separate instrumented test for
 // US 01.07.01: cancelling an entrant reservation", 2026-11-06.
+/** Verifies cancellation synchronizes profile and canonical reservation records. */
 @RunWith(AndroidJUnit4::class)
 class EntrantReservationCancellationTest {
 
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
     private val testEmail = "reservation-cancellation-${UUID.randomUUID()}@example.com"
     private val firestore = Firebase.firestore
+    private val createdDocuments = mutableListOf<DocumentReference>()
+    private val campsiteName = "Cancellation Test Campsite"
 
     @get:Rule
     val testRule: TestRule = freshSessionRule(composeTestRule)
 
+    /** Removes the Firestore records and local session created for the current test. */
     @After
     fun cleanUpFirebaseTestRecords() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -43,11 +49,14 @@ class EntrantReservationCancellationTest {
             firestore.collection("profiles").whereEqualTo("email", testEmail).get()
         )
         entrantProfiles.documents.forEach { document -> await(document.reference.delete()) }
+        createdDocuments.forEach { document -> await(document.delete()) }
         runBlocking { AuthManager(context).clearUserId() }
     }
 
+    /** Waits for a Firebase task or fails after the test timeout. */
     private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
 
+    /** Signs up a fresh entrant and waits until the Home screen is visible. */
     private fun openHome() {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithTag("firstNameInput")
@@ -65,47 +74,72 @@ class EntrantReservationCancellationTest {
         }
     }
 
+    /** Opens the signed-in entrant's reservation screen. */
     private fun openEntrantReservations() {
         composeTestRule.onNodeWithContentDescription("My Stuff").performClick()
         composeTestRule.onNodeWithText("My Bookings").performClick()
         composeTestRule.onNodeWithText("Your Reservations").assertExists()
     }
 
-    private fun seedActiveReservationForSignedInEntrant(): Reservation {
+    /** Creates ID-only owner, campsite, profile, and Active reservation documents. */
+    private fun seedActiveReservationForSignedInEntrant(): String {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
             ?: error("The sign-up flow did not save the entrant profile ID")
         val entrantDocument = firestore.collection("profiles").document(entrantId)
-        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
-        val owner = CampOwner(
-            name = "Cancellation Camp Owner",
-            email = "cancellation-owner-${UUID.randomUUID()}@example.com",
-            phone = "7805550199"
+        val ownerId = UUID.randomUUID().toString()
+        val campsiteId = UUID.randomUUID().toString()
+        val reservationId = UUID.randomUUID().toString()
+        val ownerDocument = firestore.collection("profiles").document(ownerId)
+        val campsiteDocument = firestore.collection("campsites").document(campsiteId)
+        val reservationDocument = firestore.collection("reservation").document(reservationId)
+        createdDocuments += listOf(ownerDocument, campsiteDocument, reservationDocument)
+
+        await(
+            ownerDocument.set(
+                mapOf(
+                    "id" to ownerId,
+                    "name" to "Cancellation Camp Owner",
+                    "email" to "cancellation-owner-${UUID.randomUUID()}@example.com",
+                    "phone" to "7805550199",
+                    "type" to "CampOwner"
+                )
+            )
         )
-        val campsite = Campsite(
-            name = "Cancellation Test Campsite",
-            location = "Jasper, Alberta",
-            description = "A campsite used to test reservation cancellation.",
-            capacity = 4,
-            mapLocation = "Jasper, Alberta",
-            campOwner = owner,
-            id = UUID.randomUUID().toString()
+        await(
+            campsiteDocument.set(
+                mapOf(
+                    "id" to campsiteId,
+                    "name" to campsiteName,
+                    "location" to "Jasper, Alberta",
+                    "description" to "A campsite used to test reservation cancellation.",
+                    "capacity" to 4,
+                    "mapLocation" to "Jasper, Alberta",
+                    "campOwnerId" to ownerId
+                )
+            )
         )
-        val reservation = Reservation(
-            campsite = campsite,
-            dates = "2026-11-15 - 2026-11-17",
-            guestNumber = 2,
-            status = ReservationStatus.Active,
-            campOwner = owner,
-            entrants = listOf(entrant),
-            entrantIds = listOf(entrantId)
+        val reservationData = mapOf(
+            "id" to reservationId,
+            "campsiteId" to campsiteId,
+            "campOwnerId" to ownerId,
+            "entrantIds" to listOf(entrantId),
+            "dates" to "2026-11-15 - 2026-11-17",
+            "guestNumber" to 2,
+            "status" to ReservationStatus.Active.name
         )
 
-        await(entrantDocument.set(entrant.copy(reservations = entrant.reservations + reservation)))
-        return reservation
+        await(reservationDocument.set(reservationData))
+        await(
+            entrantDocument.update(
+                "reservations",
+                listOf(reservationData)
+            )
+        )
+        return reservationId
     }
 
+    /** Returns the signed-in entrant profile's current status for [reservationId]. */
     private fun reservationStatusOnSignedInEntrant(reservationId: String): ReservationStatus {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
@@ -118,19 +152,27 @@ class EntrantReservationCancellationTest {
         return entrant.reservations.first { it.id == reservationId }.status
     }
 
+    /** Returns the canonical reservation document's current status for [reservationId]. */
+    private fun reservationStatusInFirestore(reservationId: String): ReservationStatus =
+        ReservationStatus.valueOf(
+            await(firestore.collection("reservation").document(reservationId).get())
+                .getString("status") ?: error("Reservation status was not saved")
+        )
+
+    /** Confirms cancellation persists in Firestore and removes the booking from Active. */
     @Test
     fun test20_CancelReservationUpdatesFirestoreAndRemovesItFromActiveReservations() {
         openHome()
-        val reservationToCancel = seedActiveReservationForSignedInEntrant()
+        val reservationId = seedActiveReservationForSignedInEntrant()
         openEntrantReservations()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithText(reservationToCancel.campsite.name)
+            composeTestRule.onAllNodesWithText(campsiteName)
                 .fetchSemanticsNodes().isNotEmpty()
         }
 
         composeTestRule.onNodeWithContentDescription(
-            "Cancel reservation for ${reservationToCancel.campsite.name}"
+            "Cancel reservation for $campsiteName"
         ).performScrollTo().performClick()
         composeTestRule.onNodeWithText("Cancel reservation?").assertExists()
         composeTestRule.onNodeWithText(
@@ -139,12 +181,14 @@ class EntrantReservationCancellationTest {
         ).performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            reservationStatusOnSignedInEntrant(reservationToCancel.id) ==
+            reservationStatusOnSignedInEntrant(reservationId) ==
                 ReservationStatus.Cancelled &&
-                composeTestRule.onAllNodesWithText(reservationToCancel.campsite.name)
+                reservationStatusInFirestore(reservationId) ==
+                    ReservationStatus.Cancelled &&
+                composeTestRule.onAllNodesWithText(campsiteName)
                     .fetchSemanticsNodes().isEmpty()
         }
 
-        composeTestRule.onNodeWithText(reservationToCancel.campsite.name).assertDoesNotExist()
+        composeTestRule.onNodeWithText(campsiteName).assertDoesNotExist()
     }
 }
