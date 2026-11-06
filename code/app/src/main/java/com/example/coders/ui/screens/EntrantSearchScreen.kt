@@ -11,6 +11,16 @@ import androidx.navigation.NavController
 import com.example.coders.CampsiteRepo
 import com.example.coders.filterCampsites
 
+
+/**
+ * Displays searchable and filterable list of all available campsites for entrants
+ *
+ * The screen combines a direct text search (matching against campsite names and locations)
+ * with a detailed filter dialog (location, dates, guests). Result dataset is
+ * displayed in a lis. Allows the user to tap a campsite for more details.
+ *
+ * @param navController Navigation controller used to route to the campsite details screen
+ */
 @Composable
 fun EntrantSearchScreen(navController: NavController) {
 

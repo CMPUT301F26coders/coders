@@ -11,6 +11,22 @@ import androidx.compose.ui.window.Dialog
 import java.time.Instant
 import java.time.ZoneOffset
 
+
+/**
+ * Displays dialog that allows users to apply filters for campsite searches
+ *
+ * filter by location, check-in/check-out dates,
+ * and number of guests.
+ * also has validation to ensure checkout date is after checkin date
+ *
+ * @param initialLocation  current location filter string
+ * @param initialStartDate current start date filter string
+ * @param initialEndDate current end date filter string
+ * @param initialGuests current guest count filter
+ * @param onDismiss triggered when the user closes the dialog without applying
+ * @param onApply triggered with the selected filter values when applied.
+ * @param onClear triggered when the user chooses to reset all filters
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CampsiteFilterDialog(
