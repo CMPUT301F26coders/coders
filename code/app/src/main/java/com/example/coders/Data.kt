@@ -193,6 +193,7 @@ enum class EntrantLotteryStatus {
 /**
  * Represents the status of a reservation.
  *
+ * @property Pending The reservation is a lottery offer awaiting the entrant's decision.
  * @property Active The reservation is currently active.
  * @property Past The reservation has already passed.
  * @property Cancelled The reservation has been cancelled.
@@ -202,7 +203,8 @@ enum class ReservationStatus {
     Active,
     Past,
     Cancelled,
-    Rejected
+    Rejected,
+    Pending
 }
 
 /**
@@ -667,6 +669,47 @@ class ProfileRepo : AutoCloseable {
         val record = withProfileId(updatedProfile, oldProfile.id)
         profileRef.document(oldProfile.id).set(record)
             .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.04.03: create a
+    // pending reservation offer in a lottery winner's profile", 2026-11-06.
+    /**
+     * Adds a lottery offer to the winner's profile. The supplied reservation is always stored as
+     * [ReservationStatus.Pending], because a lottery win is not an accepted reservation yet.
+     * Replacing an offer with the same ID makes retrying a completed draw safe.
+     *
+     * @param winnerId The entrant profile document ID selected by the lottery draw.
+     * @param reservation The reservation details offered to that entrant.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun addPendingLotteryOffer(
+        winnerId: String,
+        reservation: Reservation,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val winnerDocument = profileRef.document(winnerId)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(winnerDocument)
+            val winner = profileFromDocument(snapshot) as? Entrant
+                ?: throw IllegalArgumentException("Lottery winner must be an entrant profile.")
+
+            val pendingOffer = reservation.copy(
+                status = ReservationStatus.Pending,
+                entrants = (reservation.entrants + winner)
+                    .distinctBy { it.id },
+                entrantIds = (reservation.entrantIds + winner.id)
+                    .filter(String::isNotBlank)
+                    .distinct()
+            )
+            val updatedWinner = winner.copy(
+                reservations = winner.reservations
+                    .filterNot { it.id == pendingOffer.id } + pendingOffer
+            )
+
+            transaction.set(winnerDocument, withProfileId(updatedWinner, winnerId))
+        }.addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
 

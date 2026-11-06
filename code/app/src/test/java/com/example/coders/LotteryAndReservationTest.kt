@@ -62,6 +62,7 @@ class LotteryAndReservationTest {
     fun reservationStatus_values_areCorrect() {
         assertEquals(3, CampOwnerLotteryStatus.values().size)
         assertEquals(4, EntrantLotteryStatus.values().size)
-        assertEquals(4, ReservationStatus.values().size)
+        assertEquals(5, ReservationStatus.values().size)
+        assertEquals(ReservationStatus.Pending, ReservationStatus.values().last())
     }
 }
