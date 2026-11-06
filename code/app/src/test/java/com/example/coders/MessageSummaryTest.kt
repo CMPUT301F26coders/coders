@@ -21,7 +21,15 @@ class MessageSummaryTest {
         val summaries = entrant.copy(conversations = mutableListOf(conversation)).toMessageSummaries()
 
         assertEquals(
-            listOf(MessageSummary("Pine Lake", "Casey Owner", "Latest message", "Today")),
+            listOf(
+                MessageSummary(
+                    campsiteName = "Pine Lake",
+                    otherPersonName = "Casey Owner",
+                    latestMessage = "Latest message",
+                    latestDate = "Today",
+                    conversationId = conversation.id
+                )
+            ),
             summaries
         )
     }
