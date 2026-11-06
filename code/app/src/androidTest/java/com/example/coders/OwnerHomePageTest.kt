@@ -31,7 +31,7 @@ import androidx.navigation.compose.composable
 import com.example.coders.ui.screens.MessagesScreen
 import androidx.compose.ui.test.performTextInput
 import com.example.coders.ui.screens.ChatScreen
-
+import android.util.Log
 
 @RunWith(AndroidJUnit4::class)
 class OwnerHomePageTest {
@@ -612,6 +612,81 @@ class OwnerHomePageTest {
             "Sent message was not saved in Firestore",
             messageWasSaved
         )
+    }
+
+    @Test
+    fun test9_ReservationCreatesEmptyConversation() {
+
+        val owner = CampOwner(
+            id = ownerId,
+            name = "Test Camp Owner"
+        )
+
+        val entrant = Entrant(
+            name = "New Test Entrant"
+        )
+
+        val campsite = Campsite(
+            name = "Conversation Test Campsite",
+            campOwner = owner,
+            campOwnerId = owner.id
+        )
+
+        val reservation = Reservation(
+            campsite = campsite,
+            campOwner = owner,
+            entrants = listOf(entrant),
+            campsiteId = campsite.id,
+            campOwnerId = owner.id,
+            entrantIds = listOf(entrant.id)
+        )
+
+        createdReservationIds.add(reservation.id)
+        createdConversationIds.add("${reservation.id}_${entrant.id}")
+
+        composeTestRule.setContent {
+            val navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = "messages"
+            ) {
+                composable("messages") {
+                    MessagesScreen(navController)
+                }
+                composable("chat") {
+                    ChatScreen(navController)
+                }
+            }
+        }
+
+        ReservationRepo().addReservation(reservation) { error ->
+            if (error != null) {
+                Log.e("Test", "Failed to create reservation", error)
+            }
+        }
+
+        composeTestRule.waitUntil(10_000) {
+            composeTestRule.onAllNodesWithText(
+                "Conversation Test Campsite"
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText(
+            "New Test Entrant"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "No messages yet"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "Conversation Test Campsite"
+        ).performClick()
+
+        composeTestRule.onNodeWithText(
+            "Type a message..."
+        ).assertExists()
     }
 
 
