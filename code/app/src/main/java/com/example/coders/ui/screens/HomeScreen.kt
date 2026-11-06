@@ -4,6 +4,7 @@
  *
  * Outstanding issues: Notifications are currently hardcoded,
  * and the campsite owner's home screen is a placeholder.
+ * Some tests regarding this page may be outdated, OwnerHomePageTest & EntrantHomePageTest
  */
 
 package com.example.coders.ui.screens
