@@ -36,6 +36,7 @@ import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.CampOwner
 import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
+import com.example.coders.ui.screens.EntrantPastReservationsScreen
 import com.example.coders.ui.screens.RateCampsiteScreen
 
 import kotlinx.coroutines.Dispatchers
@@ -132,17 +133,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("create_campsite") {
-                        // so that we dont get access denied error
-                        // change this after, this is just for the frontend for the createcampsitetest to work
-                        val currentOwner = CampOwner(
-                            name = "John Smith",
-                            email = "john@gmail.com",
-                            phone = "7805550199"
-                        )
-
                         CreateCampsiteScreen(
                             navController = navController,
-                            campOwner = currentOwner,
                             campsiteRepo = campsiteRepo
                         )
                     }
@@ -180,6 +172,10 @@ class MainActivity : ComponentActivity() {
                                 ?.getString("reservationId")
                                 .orEmpty()
                         )
+                    }
+
+                    composable("entrantpastreservations") {
+                        EntrantPastReservationsScreen(navController)
                     }
 
                     composable("ownerreservations") {
