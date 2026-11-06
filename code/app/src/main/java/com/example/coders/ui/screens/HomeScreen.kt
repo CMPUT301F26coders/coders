@@ -1,3 +1,10 @@
+/**
+ * Defines the home screen for entrants and campsite owners.
+ *
+ *
+ * Outstanding issues: Notifications are currently hardcoded,
+ * and the campsite owner's home screen is a placeholder.
+ */
 
 package com.example.coders.ui.screens
 
@@ -15,6 +22,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.UserSession
 
+/**
+ * Displays the appropriate home screen based on the current user's role.
+ *
+ * @param navController Used to navigate between screens.
+ */
 @Composable
 fun HomeScreen(navController: NavController) {
     val isOwner = UserSession.isOwner
@@ -38,6 +50,11 @@ fun HomeScreen(navController: NavController) {
     }
 }
 
+/**
+ * Displays the campsite owner's home screen content.
+ *
+ * @param modifier Modifier used to customize the layout.
+ */
 @Composable
 fun OwnerHomeContent(modifier: Modifier = Modifier) {
     Text(
@@ -46,6 +63,13 @@ fun OwnerHomeContent(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Displays the entrant's home screen with notifications and
+ * a navigation option for policies and guidelines.
+ *
+ * @param navController Used to navigate to other screens.
+ * @param modifier Modifier used to customize the layout.
+ */
 @Composable
 fun EntrantHomeContent(
     navController: NavController,
@@ -120,6 +144,13 @@ fun EntrantHomeContent(
         )
     }
 }
+
+/**
+ * Displays a notification card containing a title and message.
+ *
+ * @param title The notification title.
+ * @param message The notification content.
+ */
 @Composable
 fun EntrantNotification(
     title: String,
