@@ -36,6 +36,7 @@ import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.CampOwner
 import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
+import com.example.coders.ui.screens.EntrantPastReservationsScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -155,6 +156,10 @@ class MainActivity : ComponentActivity() {
 
                     composable("entrantreservations") {
                         EntrantReservationsScreen(navController)
+                    }
+
+                    composable("entrantpastreservations") {
+                        EntrantPastReservationsScreen(navController)
                     }
 
                     composable("ownerreservations") {
