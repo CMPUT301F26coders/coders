@@ -22,9 +22,20 @@ import org.junit.runner.RunWith
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import com.example.coders.ui.screens.OwnerCampsitesScreen
+import androidx.compose.material3.Text
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import com.example.coders.ui.screens.MessagesScreen
+import androidx.compose.ui.test.performTextInput
+import com.example.coders.ui.screens.ChatScreen
+
 
 @RunWith(AndroidJUnit4::class)
-class CampOwnerReservationsTest {
+class OwnerHomePageTest {
+
 
     @get:Rule
     val composeTestRule = createComposeRule()
@@ -33,10 +44,15 @@ class CampOwnerReservationsTest {
     private val ownerId = UUID.randomUUID().toString()
     private val otherOwnerId = UUID.randomUUID().toString()
 
+    private val createdCampsiteIds = mutableListOf<String>()
     private val createdReservationIds = mutableListOf<String>()
+    private val createdConversationIds = mutableListOf<String>()
 
     private fun <T> await(task: Task<T>): T =
         Tasks.await(task, 20, TimeUnit.SECONDS)
+
+    private val createdEntrantIds = mutableListOf<String>()
+
 
     @Before
     fun setUp() {
@@ -74,6 +90,30 @@ class CampOwnerReservationsTest {
             )
         }
 
+        createdCampsiteIds.forEach { id ->
+            await(
+                firestore.collection("campsites")
+                    .document(id)
+                    .delete()
+            )
+        }
+
+        createdEntrantIds.forEach { id ->
+            await(
+                firestore.collection("profiles")
+                    .document(id)
+                    .delete()
+            )
+        }
+
+        createdConversationIds.forEach { id ->
+            await(
+                firestore.collection("conversation")
+                    .document(id)
+                    .delete()
+            )
+        }
+
         await(
             firestore.collection("profiles")
                 .document(ownerId)
@@ -85,6 +125,108 @@ class CampOwnerReservationsTest {
                 InstrumentationRegistry.getInstrumentation().targetContext
             ).clearUserId()
         }
+    }
+
+    private fun seedConversationForSignedInOwner() {
+
+
+        val entrant = Entrant(
+            name = "Alice Smith",
+            email = "test-entrant-${UUID.randomUUID()}@example.com",
+            phone = "7805550100"
+        )
+
+        createdEntrantIds.add(entrant.id)
+
+        val owner = CampOwner(
+            id = ownerId,
+            name = "Test Camp Owner",
+            email = "owner@test.com",
+            phone = "7801234567"
+        )
+
+        val campsite = Campsite(
+            name = "Pine Lake Campsite",
+            location = "Jasper, Alberta",
+            description = "Test campsite",
+            capacity = 123,
+            mapLocation = "Jasper",
+            campOwner = owner,
+            campOwnerId = ownerId
+        )
+
+        val conversation = Conversation(
+            campOwner = owner,
+            entrant = entrant,
+            campsite = campsite,
+            messages = listOf(
+                Message(
+                    sender = entrant,
+                    content = "Hello, is this campsite available?",
+                    date = "2026-11-05"
+                )
+            ),
+            campOwnerId = ownerId,
+            entrantId = entrant.id,
+            campsiteId = campsite.id,
+            participantIds = listOf(ownerId, entrant.id)
+        )
+
+        createdConversationIds.add(conversation.id)
+
+
+        await(
+            firestore.collection("conversation")
+                .document(conversation.id)
+                .set(conversation)
+        )
+
+        await(
+            firestore.collection("profiles")
+                .document(entrant.id)
+                .set(entrant)
+        )
+
+
+
+        await(
+            firestore.collection("profiles")
+                .document(ownerId)
+                .set(
+                    owner.copy(
+                        conversations = mutableListOf(conversation)
+                    )
+                )
+        )
+    }
+
+    private fun seedCampsite(
+        name: String,
+        location: String,
+        capacity: Int,
+        campOwnerId: String = ownerId
+    ): String {
+
+        val campsiteId = UUID.randomUUID().toString()
+        createdCampsiteIds.add(campsiteId)
+
+        await(
+            firestore.collection("campsites")
+                .document(campsiteId)
+                .set(
+                    mapOf(
+                        "id" to campsiteId,
+                        "name" to name,
+                        "location" to location,
+                        "description" to "Test campsite",
+                        "capacity" to capacity,
+                        "mapLocation" to location,
+                        "campOwnerId" to campOwnerId
+                    )
+                )
+        )
+
+        return campsiteId
     }
 
     // Create a test reservation in Firestore
@@ -108,7 +250,7 @@ class CampOwnerReservationsTest {
                             "name" to name
                         ),
                         "dates" to "2026-11-15",
-                        "guestNumber" to 4,
+                        "guestNumber" to 123,
                         "status" to status.name
                     )
                 )
@@ -151,7 +293,7 @@ class CampOwnerReservationsTest {
         ).assertExists()
 
         composeTestRule.onNodeWithText(
-            "Guests: 4"
+            "Guests: 123"
         ).assertExists()
 
         composeTestRule.onNodeWithText(
@@ -302,4 +444,175 @@ class CampOwnerReservationsTest {
             "No cancelled reservations found."
         ).assertExists()
     }
+
+    @Test
+    fun test7_ShowsOwnerCampsites() {
+
+        seedCampsite(
+            name = "Edmonton Test Camp",
+            location = "Edmonton",
+            capacity = 123
+        )
+
+        seedCampsite(
+            name = "Calgary Test Camp",
+            location = "Calgary",
+            capacity = 8
+        )
+
+        composeTestRule.setContent {
+            val campsiteRepo = remember { CampsiteRepo() }
+
+            DisposableEffect(campsiteRepo) {
+                onDispose {
+                    campsiteRepo.close()
+                }
+            }
+
+            OwnerCampsitesScreen(
+                navController = rememberNavController(),
+                campsiteRepo = campsiteRepo
+            )
+        }
+
+        // Verify page opened
+        composeTestRule.onNodeWithText(
+            "My Campsites:"
+        ).assertExists()
+
+        // Wait for Firestore to load campsites
+        composeTestRule.waitUntil(10_000) {
+            composeTestRule.onAllNodesWithText(
+                "Edmonton Test Camp"
+            ).fetchSemanticsNodes().isNotEmpty() &&
+                    composeTestRule.onAllNodesWithText(
+                        "Calgary Test Camp"
+                    ).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify Edmonton campsite
+        composeTestRule.onNodeWithText(
+            "Edmonton Test Camp"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "Edmonton"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "123 guests"
+        ).assertExists()
+
+        // Verify Calgary campsite
+        composeTestRule.onNodeWithText(
+            "Calgary Test Camp"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "Calgary"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "8 guests"
+        ).assertExists()
+    }
+
+
+    @Test
+    fun test8_OwnerCanSendMessage() {
+
+        // Create a conversation in Firestore
+        seedConversationForSignedInOwner()
+
+        composeTestRule.setContent {
+            val navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = "messages"
+            ) {
+                composable("messages") {
+                    MessagesScreen(navController)
+                }
+
+                composable("chat") {
+                    ChatScreen(navController)
+                }
+            }
+        }
+
+        // Wait for conversation preview
+        composeTestRule.waitUntil(10_000) {
+            composeTestRule.onAllNodesWithText(
+                "Pine Lake Campsite"
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify conversation information
+        composeTestRule.onNodeWithText(
+            "Alice Smith"
+        ).assertExists()
+
+        composeTestRule.onNodeWithText(
+            "Hello, is this campsite available?"
+        ).assertExists()
+
+        // Open the conversation
+        composeTestRule.onNodeWithText(
+            "Pine Lake Campsite"
+        ).performClick()
+
+        // Verify the chat has loaded its saved message
+        composeTestRule.waitUntil(10_000) {
+            composeTestRule.onAllNodesWithText(
+                "Hello, is this campsite available?"
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Type a response
+        composeTestRule.onNodeWithText(
+            "Type a message..."
+        ).performTextInput(
+            "Yes Alice, the campsite is available!"
+        )
+
+        // Send it
+        composeTestRule.onNodeWithText(
+            "➜"
+        ).performClick()
+
+        // Wait for Firestore listener to display it
+        composeTestRule.waitUntil(10_000) {
+            composeTestRule.onAllNodesWithText(
+                "Yes Alice, the campsite is available!"
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify the message was saved in Firestore
+        val conversationId = createdConversationIds.first()
+
+        val document = await(
+            firestore.collection("conversation")
+                .document(conversationId)
+                .get()
+        )
+
+        val savedMessages =
+            document.get("messages") as? List<*>
+                ?: emptyList<Any>()
+
+        val messageWasSaved = savedMessages.any { item ->
+            val data = item as? Map<*, *>
+            data?.get("content") ==
+                    "Yes Alice, the campsite is available!" &&
+                    data["senderId"] == ownerId
+        }
+
+        org.junit.Assert.assertTrue(
+            "Sent message was not saved in Firestore",
+            messageWasSaved
+        )
+    }
+
+
 }

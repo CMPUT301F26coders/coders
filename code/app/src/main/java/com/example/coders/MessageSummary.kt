@@ -12,7 +12,8 @@ data class MessageSummary(
     val campsiteName: String,
     val otherPersonName: String,
     val latestMessage: String,
-    val latestDate: String
+    val latestDate: String,
+    val conversationId: String
 )
 
 /**
@@ -35,7 +36,8 @@ fun Profile?.toMessageSummaries(): List<MessageSummary> {
             campsiteName = conversation.campsite.name,
             otherPersonName = otherPersonName,
             latestMessage = latestMessage?.content ?: "No messages yet",
-            latestDate = latestMessage?.date ?: ""
+            latestDate = latestMessage?.date ?: "",
+            conversationId = conversation.id
         )
     }
 }
