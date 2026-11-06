@@ -1,3 +1,4 @@
+/** Exercises an entrant's ID-based Firestore campsite-rating workflow. */
 package com.example.coders
 
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ import com.example.coders.ui.theme.CodersTheme
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -35,6 +37,7 @@ import java.util.concurrent.TimeUnit
 
 // The following test was added using OpenAI, Codex, "Implement US 01.13.01: verify an entrant
 // can rate one past campsite reservation and update its average", 2026-11-06.
+/** Verifies rating navigation, persistence, and campsite-average updates for an entrant. */
 @RunWith(AndroidJUnit4::class)
 class EntrantCampsiteRatingTest {
 
@@ -44,10 +47,12 @@ class EntrantCampsiteRatingTest {
     private val ownerId = UUID.randomUUID().toString()
     private val campsiteId = UUID.randomUUID().toString()
     private var ratingReservationId: String? = null
+    private val createdDocuments = mutableListOf<DocumentReference>()
 
     @get:Rule
     val testRule: TestRule = freshSessionRule(composeTestRule)
 
+    /** Removes the Firestore records and local session created for the current test. */
     @After
     fun cleanUpFirebaseTestRecords() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -55,16 +60,17 @@ class EntrantCampsiteRatingTest {
             firestore.collection("profiles").whereEqualTo("email", testEmail).get()
         )
         entrantProfiles.documents.forEach { document -> await(document.reference.delete()) }
-        await(firestore.collection("profiles").document(ownerId).delete())
-        await(firestore.collection("campsites").document(campsiteId).delete())
+        createdDocuments.forEach { document -> await(document.delete()) }
         ratingReservationId?.let { reservationId ->
             await(firestore.collection("reservationRatings").document(reservationId).delete())
         }
         runBlocking { AuthManager(context).clearUserId() }
     }
 
+    /** Waits for a Firebase task or fails after the test timeout. */
     private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
 
+    /** Signs up a fresh entrant and waits until the Home screen is visible. */
     private fun openHome() {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithTag("firstNameInput").fetchSemanticsNodes().isNotEmpty()
@@ -81,46 +87,70 @@ class EntrantCampsiteRatingTest {
         }
     }
 
+    /** Creates ID-only owner, campsite, profile, and reservation documents for a past stay. */
     private fun seedPastReservation(): Reservation {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
             ?: error("The sign-up flow did not save the entrant profile ID")
         val entrantDocument = firestore.collection("profiles").document(entrantId)
-        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
-        val owner = CampOwner(
-            name = "Rating Camp Owner",
-            email = "rating-owner-${UUID.randomUUID()}@example.com",
-            phone = "7805550199",
-            id = ownerId
+        val reservationId = UUID.randomUUID().toString()
+        val ownerDocument = firestore.collection("profiles").document(ownerId)
+        val campsiteDocument = firestore.collection("campsites").document(campsiteId)
+        val reservationDocument = firestore.collection("reservation").document(reservationId)
+        createdDocuments += listOf(ownerDocument, campsiteDocument, reservationDocument)
+
+        await(
+            ownerDocument.set(
+                mapOf(
+                    "id" to ownerId,
+                    "name" to "Rating Camp Owner",
+                    "email" to "rating-owner-${UUID.randomUUID()}@example.com",
+                    "phone" to "7805550199",
+                    "type" to "CampOwner"
+                )
+            )
         )
-        val campsite = Campsite(
-            name = "Rating Test Campsite",
-            location = "Jasper, Alberta",
-            description = "A campsite used to test reservation ratings.",
-            capacity = 4,
-            mapLocation = "Jasper, Alberta",
-            id = campsiteId,
-            campOwnerId = ownerId
+        await(
+            campsiteDocument.set(
+                mapOf(
+                    "id" to campsiteId,
+                    "name" to "Rating Test Campsite",
+                    "location" to "Jasper, Alberta",
+                    "description" to "A campsite used to test reservation ratings.",
+                    "capacity" to 4,
+                    "mapLocation" to "Jasper, Alberta",
+                    "campOwnerId" to ownerId,
+                    "ratingTotal" to 0,
+                    "ratingCount" to 0
+                )
+            )
+        )
+        val reservationData = mapOf(
+            "id" to reservationId,
+            "campsiteId" to campsiteId,
+            "campOwnerId" to ownerId,
+            "entrantIds" to listOf(entrantId),
+            "dates" to "2026-10-10 - 2026-10-12",
+            "guestNumber" to 2,
+            "status" to ReservationStatus.Past.name
         )
         val reservation = Reservation(
-            campsite = campsite,
             dates = "2026-10-10 - 2026-10-12",
             guestNumber = 2,
             status = ReservationStatus.Past,
-            campOwner = owner,
+            id = reservationId,
             campsiteId = campsiteId,
             campOwnerId = ownerId,
             entrantIds = listOf(entrantId)
         )
 
-        await(firestore.collection("profiles").document(ownerId).set(owner))
-        await(firestore.collection("campsites").document(campsiteId).set(campsite))
-        await(entrantDocument.set(entrant.copy(reservations = entrant.reservations + reservation)))
+        await(reservationDocument.set(reservationData))
+        await(entrantDocument.update("reservations", listOf(reservationData)))
         ratingReservationId = reservation.id
         return reservation
     }
 
+    /** Renders a navigation graph that starts on Past Reservations for [reservation]. */
     private fun showPastReservationsScreen(reservation: Reservation) {
         composeTestRule.runOnUiThread {
             composeTestRule.activity.setContent {
@@ -155,6 +185,7 @@ class EntrantCampsiteRatingTest {
         }
     }
 
+    /** Returns the score saved in the signed-in entrant's profile for [reservationId]. */
     private fun ratingForSignedInEntrant(reservationId: String): Int? {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entrantId = runBlocking { AuthManager(context).getCurrentUserId() } ?: return null
@@ -164,6 +195,7 @@ class EntrantCampsiteRatingTest {
         return entrant.reservations.firstOrNull { it.id == reservationId }?.rating
     }
 
+    /** Confirms one submitted rating updates every required Firestore record. */
     @Test
     fun entrantCanRateOnePastReservationAndCampsiteAverageIsSaved() {
         openHome()
@@ -198,11 +230,15 @@ class EntrantCampsiteRatingTest {
         val savedRating = await(
             firestore.collection("reservationRatings").document(reservation.id).get()
         )
+        val savedReservation = await(
+            firestore.collection("reservation").document(reservation.id).get()
+        )
 
         assertEquals(4, savedEntrant.reservations.first { it.id == reservation.id }.rating)
         assertEquals(4.0, savedCampsite.rating)
         assertEquals(4, savedCampsite.ratingTotal)
         assertEquals(1, savedCampsite.ratingCount)
         assertEquals(4L, savedRating.getLong("score"))
+        assertEquals(4L, savedReservation.getLong("rating"))
     }
 }

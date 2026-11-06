@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.Campsite
+import com.example.coders.CampsiteRepo
 import com.example.coders.Entrant
 import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
@@ -45,6 +48,31 @@ fun EntrantPastReservationsScreen(
     val pastReservations = entrant?.reservations.orEmpty().filter {
         it.status == ReservationStatus.Past
     }
+    val campsiteRepo = remember { CampsiteRepo() }
+    var campsites by remember { mutableStateOf<Map<String, Campsite>>(emptyMap()) }
+
+    DisposableEffect(pastReservations, campsiteRepo) {
+        var disposed = false
+        campsites = emptyMap()
+
+        pastReservations.map { it.campsiteId }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .forEach { campsiteId ->
+                campsiteRepo.getCampsiteById(campsiteId) { campsite, _ ->
+                    if (!disposed && campsite != null) {
+                        campsites = campsites + (campsiteId to campsite)
+                    }
+                }
+            }
+
+        onDispose { disposed = true }
+    }
+
+    DisposableEffect(campsiteRepo) {
+        onDispose { campsiteRepo.close() }
+    }
+
     val context = LocalContext.current
     var reservationToExport by remember { mutableStateOf<Reservation?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
@@ -55,7 +83,7 @@ fun EntrantPastReservationsScreen(
         if (uri != null && reservation != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use {
-                    it.write(reservation.asCsv())
+                    it.write(reservation.asCsv(campsites[reservation.campsiteId]))
                 } ?: error("Unable to open the selected file.")
             }.onSuccess {
                 Toast.makeText(context, "Reservation CSV exported", Toast.LENGTH_SHORT).show()
@@ -109,6 +137,7 @@ fun EntrantPastReservationsScreen(
                 pastReservations.forEach { reservation ->
                     PastReservationCard(
                         reservation = reservation,
+                        campsite = campsites[reservation.campsiteId],
                         onRate = {
                             navController.navigate("rate_campsite/${Uri.encode(reservation.id)}")
                         },
@@ -137,6 +166,7 @@ fun EntrantPastReservationsScreen(
 @Composable
 fun PastReservationCard(
     reservation: Reservation,
+    campsite: Campsite?,
     onRate: () -> Unit,
     onExportCsv: () -> Unit
 ) {
@@ -167,8 +197,16 @@ fun PastReservationCard(
 
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = reservation.campsite.name, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(text = reservation.campsite.location, fontSize = 12.sp, color = Color.DarkGray)
+                Text(
+                    text = campsite?.name ?: "Loading campsite…",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = campsite?.location ?: "",
+                    fontSize = 12.sp,
+                    color = Color.DarkGray
+                )
                 Text(text = "${reservation.guestNumber} guests", fontSize = 12.sp, color = Color.DarkGray)
             }
 
@@ -198,15 +236,15 @@ fun PastReservationCard(
     }
 }
 
-private fun Reservation.asCsv(): String = buildString {
+private fun Reservation.asCsv(campsite: Campsite?): String = buildString {
     appendLine("reservation_id,campsite_id,campsite_name,location,dates,guests,status,rating")
     appendCsvValue(id)
     append(',')
     appendCsvValue(campsiteId)
     append(',')
-    appendCsvValue(campsite.name)
+    appendCsvValue(campsite?.name.orEmpty())
     append(',')
-    appendCsvValue(campsite.location)
+    appendCsvValue(campsite?.location.orEmpty())
     append(',')
     appendCsvValue(dates)
     append(',')

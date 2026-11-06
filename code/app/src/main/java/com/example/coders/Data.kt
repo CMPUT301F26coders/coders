@@ -635,6 +635,7 @@ class CampsiteRepo : AutoCloseable {
 class ProfileRepo : AutoCloseable {
     private val db = Firebase.firestore
     private val profileRef = db.collection("profiles")
+    private val reservationRef = db.collection("reservation")
 
     private val _profiles = mutableStateListOf<Profile>()
 
@@ -683,9 +684,10 @@ class ProfileRepo : AutoCloseable {
     // The following function was added using OpenAI, Codex, "Implement US 01.04.03: create a
     // pending reservation offer in a lottery winner's profile", 2026-11-06.
     /**
-     * Adds a lottery offer to the winner's profile. The supplied reservation is always stored as
-     * [ReservationStatus.Pending], because a lottery win is not an accepted reservation yet.
-     * Replacing an offer with the same ID makes retrying a completed draw safe.
+     * Creates a lottery offer for the winner. The supplied reservation is stored in both the
+     * winner's profile history and the reservation collection as [ReservationStatus.Pending],
+     * because a lottery win is not an accepted reservation yet. Both writes occur in one
+     * transaction, and relationships are represented by their document IDs.
      *
      * @param winnerId The entrant profile document ID selected by the lottery draw.
      * @param reservation The reservation details offered to that entrant.
@@ -696,7 +698,13 @@ class ProfileRepo : AutoCloseable {
         reservation: Reservation,
         onComplete: (Exception?) -> Unit = {}
     ) {
+        require(winnerId.isNotBlank()) { "Lottery winner ID is required." }
+        require(reservation.id.isNotBlank()) { "Reservation ID is required." }
+        require(reservation.campsiteId.isNotBlank()) { "Campsite ID is required." }
+        require(reservation.campOwnerId.isNotBlank()) { "Camp owner ID is required." }
+
         val winnerDocument = profileRef.document(winnerId)
+        val reservationDocument = reservationRef.document(reservation.id)
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(winnerDocument)
@@ -705,8 +713,6 @@ class ProfileRepo : AutoCloseable {
 
             val pendingOffer = reservation.copy(
                 status = ReservationStatus.Pending,
-                entrants = (reservation.entrants + winner)
-                    .distinctBy { it.id },
                 entrantIds = (reservation.entrantIds + winner.id)
                     .filter(String::isNotBlank)
                     .distinct()
@@ -716,9 +722,26 @@ class ProfileRepo : AutoCloseable {
                     .filterNot { it.id == pendingOffer.id } + pendingOffer
             )
 
-            transaction.set(winnerDocument, withProfileId(updatedWinner, winnerId))
+            transaction.update(
+                winnerDocument,
+                "reservations",
+                updatedWinner.reservations.map(::reservationStorageRecord)
+            )
+            transaction.set(reservationDocument, reservationStorageRecord(pendingOffer))
         }.addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /** Serializes reservation relationships by ID rather than embedded Firestore objects. */
+    private fun reservationStorageRecord(reservation: Reservation): Map<String, Any> = buildMap {
+        put("id", reservation.id)
+        put("campsiteId", reservation.campsiteId)
+        put("campOwnerId", reservation.campOwnerId)
+        put("entrantIds", reservation.entrantIds)
+        put("dates", reservation.dates)
+        put("guestNumber", reservation.guestNumber)
+        put("status", reservation.status.name)
+        reservation.rating?.let { put("rating", it) }
     }
 
     /**
@@ -841,6 +864,7 @@ class ProfileRepo : AutoCloseable {
 class ReservationRatingRepo {
     private val db = Firebase.firestore
     private val profileRef = db.collection("profiles")
+    private val reservationRef = db.collection("reservation")
     private val campsiteRef = db.collection("campsites")
     private val ratingRef = db.collection("reservationRatings")
 
@@ -892,21 +916,27 @@ class ReservationRatingRepo {
             val campsite = campsiteSnapshot.toObject(Campsite::class.java)
                 ?.copy(id = campsiteDocument.id)
                 ?: throw IllegalArgumentException("Campsite was not found.")
+            val reservationDocument = reservationRef.document(reservationId)
+            check(transaction.get(reservationDocument).exists()) {
+                "Reservation record was not found."
+            }
             val ratingDocument = ratingRef.document(reservationId)
             check(!transaction.get(ratingDocument).exists()) {
                 "This reservation has already been rated."
             }
 
-            val updatedEntrant = entrant.copy(
-                reservations = entrant.reservations.map {
-                    if (it.id == reservationId) it.copy(rating = score) else it
-                }
-            )
+            val updatedReservations = entrant.reservations.map {
+                if (it.id == reservationId) it.copy(rating = score) else it
+            }
             val updatedTotal = campsite.ratingTotal + score
             val updatedCount = campsite.ratingCount + 1
             val updatedAverage = updatedTotal.toDouble() / updatedCount
 
-            transaction.set(entrantDocument, updatedEntrant)
+            transaction.update(
+                entrantDocument,
+                "reservations",
+                updatedReservations.map(::reservationStorageRecord)
+            )
             transaction.set(
                 ratingDocument,
                 mapOf(
@@ -924,8 +954,21 @@ class ReservationRatingRepo {
                     "rating" to updatedAverage
                 )
             )
+            transaction.update(reservationDocument, "rating", score)
         }.addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /** Serializes reservation relationships by ID rather than embedded Firestore objects. */
+    private fun reservationStorageRecord(reservation: Reservation): Map<String, Any> = buildMap {
+        put("id", reservation.id)
+        put("campsiteId", reservation.campsiteId)
+        put("campOwnerId", reservation.campOwnerId)
+        put("entrantIds", reservation.entrantIds)
+        put("dates", reservation.dates)
+        put("guestNumber", reservation.guestNumber)
+        put("status", reservation.status.name)
+        reservation.rating?.let { put("rating", it) }
     }
 }
 

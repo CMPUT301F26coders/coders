@@ -1,3 +1,4 @@
+/** Exercises the Past Reservations screen's filtering and empty-state behavior. */
 package com.example.coders
 
 
@@ -11,22 +12,19 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/** Verifies the Past Reservations screen using lightweight Compose test data. */
 @RunWith(AndroidJUnit4::class)
 class EntrantPastReservationsTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    /** Confirms a reservation with Past status appears in the list. */
     @Test
     fun testPastReservationIsDisplayed() {
 
-        val testCampsite = Campsite(
-            name = "Test Valley Campground",
-            location = "Kananaskis, AB"
-        )
-
         val pastReservation = Reservation(
-            campsite = testCampsite,
+            campsiteId = "test-campsite",
             dates = "Oct 10-12, 2026",
             guestNumber = 4,
             status = ReservationStatus.Past
@@ -47,11 +45,10 @@ class EntrantPastReservationsTest {
 
 
         composeTestRule.onNodeWithText("Past Reservations:").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Test Valley Campground").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Kananaskis, AB").assertIsDisplayed()
         composeTestRule.onNodeWithText("4 guests").assertIsDisplayed()
     }
 
+    /** Confirms the screen communicates when an entrant has no past reservations. */
     @Test
     fun testEmptyPastReservationsShowsPlaceholder() {
 
