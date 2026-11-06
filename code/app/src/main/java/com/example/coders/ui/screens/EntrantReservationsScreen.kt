@@ -1,4 +1,3 @@
-
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -6,11 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -20,13 +15,87 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.Entrant
 import com.example.coders.SignedInProfile
+import com.example.coders.Reservation
+import com.example.coders.ReservationRepo
+import com.example.coders.Campsite
+import com.example.coders.CampsiteRepo
+
 
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
+
     var isNavigating by remember { mutableStateOf(false) }
 
     val profile by SignedInProfile().rememberSignedInProfile()
     val entrant = profile as? Entrant
+
+    val campsiteRepo = remember { CampsiteRepo() }
+    val reservationRepo = remember { ReservationRepo() }
+
+
+    var campsites by remember {
+        mutableStateOf<Map<String, Campsite>>(emptyMap())
+    }
+
+    var reservations by remember(entrant?.id) {
+        mutableStateOf<List<Reservation>>(emptyList())
+    }
+
+    var isLoading by remember(entrant?.id) {
+        mutableStateOf(true)
+    }
+
+    // Listen for reservations associated with the signed-in entrant
+    DisposableEffect(entrant?.id, reservationRepo) {
+
+        val listener = entrant?.id?.let { entrantId ->
+            reservationRepo.listenForEntrantReservations(
+                entrantId = entrantId,
+
+                onUpdate = { updatedReservations ->
+                    reservations = updatedReservations
+                    isLoading = false
+                },
+
+                onError = {
+                    isLoading = false
+                }
+            )
+        }
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    DisposableEffect(campsiteRepo) {
+        onDispose {
+            campsiteRepo.close()
+        }
+    }
+
+    DisposableEffect(reservations, campsiteRepo) {
+        var disposed = false
+
+        campsites = emptyMap()
+
+        reservations.map { it.campsiteId }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .forEach { campsiteId ->
+
+                campsiteRepo.getCampsiteById(campsiteId) { campsite, _ ->
+
+                    if (!disposed && campsite != null) {
+                        campsites = campsites + (campsiteId to campsite)
+                    }
+                }
+            }
+
+        onDispose {
+            disposed = true
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -37,12 +106,11 @@ fun EntrantReservationsScreen(navController: NavController) {
 
         TextButton(
             onClick = {
-                if(!isNavigating){
+                if (!isNavigating) {
                     isNavigating = true
                     navController.popBackStack()
                 }
             }
-
         ) {
             Text("Back")
         }
@@ -56,26 +124,36 @@ fun EntrantReservationsScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(20.dp))
 
         when {
-            profile == null -> CircularProgressIndicator()
-            entrant == null -> Text("Reservations are available to entrant profiles only.")
-            entrant.reservations.isEmpty() -> Text("No reservations yet.")
-            else -> entrant.reservations.forEach { summary ->
+            profile == null || (entrant != null && isLoading) -> {
+                CircularProgressIndicator()
+            }
+
+            entrant == null -> {
+                Text("Reservations are available to entrant profiles only.")
+            }
+
+            reservations.isEmpty() -> {
+                Text("No reservations yet.")
+            }
+
+            else -> reservations.forEach { summary ->
+
+                val campsite = campsites[summary.campsiteId]
                 OutlinedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp)
                 ) {
-
                     Column(
                         modifier = Modifier.padding(20.dp)
                     ) {
 
                         Text("Campsite Name", fontWeight = FontWeight.Bold)
-                        Text(summary.campsite.name)
+                        Text(campsite?.name ?: "Loading...")
 
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Text("Location", fontWeight = FontWeight.Bold)
-                        Text(summary.campsite.location)
+                        Text(campsite?.location ?: "Loading...")
 
                         Spacer(modifier = Modifier.height(20.dp))
 
@@ -89,6 +167,7 @@ fun EntrantReservationsScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        /**
                         Button(
                             onClick = {
                                 navController.navigate("minimap")
@@ -99,7 +178,6 @@ fun EntrantReservationsScreen(navController: NavController) {
                         }
 
                         Spacer(modifier = Modifier.height(25.dp))
-
                         Text(
                             text = "Campsite Owner",
                             fontSize = 24.sp,
@@ -122,6 +200,8 @@ fun EntrantReservationsScreen(navController: NavController) {
                         ) {
                             Text("Message")
                         }
+                        */
+
                     }
                 }
             }
