@@ -33,6 +33,11 @@ import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.EntrantSearchScreen
 import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
+import com.example.coders.CampOwner
+import com.example.coders.ui.screens.CreateCampsiteScreen
+import com.example.coders.ui.screens.EditCampsiteScreen
+import com.example.coders.ui.screens.EntrantPastReservationsScreen
+import com.example.coders.ui.screens.RateCampsiteScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,6 +55,7 @@ class MainActivity : ComponentActivity() {
                 val authManager = remember {
                     AuthManager(applicationContext)
                 }
+                val campsiteRepo = remember { CampsiteRepo() }
                 val profileRepo = remember { ProfileRepo() }
                 val mainScope = rememberCoroutineScope()
 
@@ -121,7 +127,16 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("ownercampsites") {
-                        OwnerCampsitesScreen(navController)
+                        OwnerCampsitesScreen(
+                            navController = navController,
+                            campsiteRepo = campsiteRepo
+                        )
+                    }
+                    composable("create_campsite") {
+                        CreateCampsiteScreen(
+                            navController = navController,
+                            campsiteRepo = campsiteRepo
+                        )
                     }
 
                     composable("policies") {
@@ -142,6 +157,25 @@ class MainActivity : ComponentActivity() {
 
                     composable("entrantreservations") {
                         EntrantReservationsScreen(navController)
+                    }
+
+                    //routed the rate campsite screen
+                    composable(
+                        route = "rate_campsite/{reservationId}",
+                        arguments = listOf(
+                            navArgument("reservationId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        RateCampsiteScreen(
+                            navController = navController,
+                            reservationId = backStackEntry.arguments
+                                ?.getString("reservationId")
+                                .orEmpty()
+                        )
+                    }
+
+                    composable("entrantpastreservations") {
+                        EntrantPastReservationsScreen(navController)
                     }
 
                     composable("ownerreservations") {
@@ -171,7 +205,6 @@ class MainActivity : ComponentActivity() {
                             ?.getString("campsiteId")
                             .orEmpty()
 
-                        val campsiteRepo = remember { CampsiteRepo() }
 
                         val campsite = campsiteRepo
                             .getAllCampsites()
@@ -187,7 +220,34 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator()
+                                Text("Campsite not found")
+                            }
+                        }
+                    }
+                    composable(
+                        route = "edit_campsite/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        val campsiteId = backStackEntry.arguments?.getString("campsiteId").orEmpty()
+
+                        val campsite = campsiteRepo
+                            .getAllCampsites()
+                            .firstOrNull { it.id == campsiteId }
+
+                        if (campsite != null) {
+                            EditCampsiteScreen(
+                                navController = navController,
+                                campsite = campsite,
+                                campsiteRepo = campsiteRepo
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Campsite not found")
                             }
                         }
                     }

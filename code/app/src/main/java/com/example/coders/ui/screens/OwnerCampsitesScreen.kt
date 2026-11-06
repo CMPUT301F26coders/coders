@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +24,7 @@ import androidx.navigation.NavController
 import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
-
+import com.example.coders.SignedInProfile
 /**
  * Displays a list of campsites
  *
@@ -31,25 +32,45 @@ import com.example.coders.CampsiteRepo
 @Composable
 fun OwnerCampsitesScreen(
     navController: NavController,
-    campOwner: CampOwner? = null,
     campsiteRepo: CampsiteRepo? = null
 ) {
-    val defaultOwner = remember {
-        CampOwner(name = "John Smith", email = "john@gmail.com", phone = "780-555-0199")
-    }
 
-    var campsites by remember {
-        mutableStateOf(
-            listOf(
-                Campsite("Pine Lake Campsite", "Jasper, Alberta", "Lakeside", 6, "52.8,-118.0", defaultOwner),
-                Campsite("Mountain View Campsite", "Banff, Alberta", "Views", 4, "51.1,-115.5", defaultOwner),
-                Campsite("Emerald Falls Campsite", "Revelstoke, BC", "Falls", 8, "50.9,-118.1", defaultOwner),
-                Campsite("Glacier Ridge Campsite", "Kootenay, BC", "Ridge", 3, "50.9,-116.0", defaultOwner)
-            )
-        )
-    }
+    val repo = remember { campsiteRepo ?: CampsiteRepo() }
 
+
+    val profile by SignedInProfile().rememberSignedInProfile()
     var campsiteToDelete by remember { mutableStateOf<Campsite?>(null) }
+    var isNavigating by remember { mutableStateOf(false) }
+
+    var campsites by remember(profile?.id) {
+        mutableStateOf<List<Campsite>>(emptyList())
+    }
+    DisposableEffect(profile?.id, repo) {
+        val ownerId = (profile as? CampOwner)?.id
+
+        val listener = if (!ownerId.isNullOrBlank()) {
+            repo.listenForOwnerCampsites(
+                ownerId = ownerId,
+                onUpdate = { updatedCampsites ->
+                    campsites = updatedCampsites
+                }
+            )
+        } else {
+            null
+        }
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    DisposableEffect(repo) {
+        onDispose {
+            if (campsiteRepo == null) {
+                repo.close()
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -65,7 +86,12 @@ fun OwnerCampsitesScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 2.dp)
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(
+                onClick = {
+                    if(!isNavigating) {
+                        navController.popBackStack()
+                }
+                }) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
 
@@ -80,7 +106,7 @@ fun OwnerCampsitesScreen(
             campsites.forEach { campsite ->
                 OwnerCampsiteCard(
                     campsite = campsite,
-                    onDetailsClick = { navController.navigate("owner_campsite_details/${campsite.id}") },
+                    onDetailsClick = { navController.navigate("campsiteDetails/${campsite.id}") },
                     onDeleteClick = { campsiteToDelete = campsite }
                 )
                 Spacer(modifier = Modifier.height(25.dp))
@@ -108,8 +134,7 @@ fun OwnerCampsitesScreen(
                 text = { Text("Are you sure? cant undo.", fontSize = 10.sp) },
                 confirmButton = {
                     TextButton(onClick = {
-                        campsiteRepo?.deleteCampsite(target)
-                        campsites = campsites.filter { it.id != target.id }
+                        repo.deleteCampsite(target)
                         campsiteToDelete = null
                     }) { Text("Delete", fontSize = 10.sp) }
                 },

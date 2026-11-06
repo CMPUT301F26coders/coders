@@ -11,7 +11,6 @@ class RepositorySearchTest {
         email = "alice@test.com",
         phone = "111"
     )
-
     private val owner = CampOwner(
         name = "Bob Owner",
         email = "bob@test.com",
@@ -134,9 +133,12 @@ class RepositorySearchTest {
     fun searchCampsites_excludesBookedDate() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-11-15",
+            dates = "2026-11-15",
             guestNumber = 2,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
+
         )
 
         val bookedCampsite = edmonton.copy(
@@ -200,9 +202,11 @@ class RepositorySearchTest {
     fun searchCampsites_cancelledReservationIsAvailable() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-11-15",
+            dates = "2026-11-15",
             guestNumber = 2,
-            status = ReservationStatus.Cancelled
+            status = ReservationStatus.Cancelled,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val campsiteWithCancelledReservation = edmonton.copy(
@@ -233,9 +237,11 @@ class RepositorySearchTest {
     fun searchCampsites_dateRangeExcludesBookedCampsite() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-12-17",
+            dates = "2026-12-17",
             guestNumber = 2,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val bookedCampsite = edmonton.copy(
@@ -256,9 +262,11 @@ class RepositorySearchTest {
     fun searchCampsites_checkoutDateIsExcluded() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-12-20",
+            dates = "2026-12-20",
             guestNumber = 2,
-            status = ReservationStatus.Active
+            status = ReservationStatus.Active,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val bookedCampsite = edmonton.copy(
@@ -300,9 +308,11 @@ class RepositorySearchTest {
     fun searchCampsites_cancelledReservationInRange() {
         val reservation = Reservation(
             campsite = edmonton,
-            date = "2026-12-17",
+            dates = "2026-12-17",
             guestNumber = 2,
-            status = ReservationStatus.Cancelled
+            status = ReservationStatus.Cancelled,
+            campOwner = owner,
+            entrants = listOf(entrant)
         )
 
         val campsiteWithCancelledReservation = edmonton.copy(

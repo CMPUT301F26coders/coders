@@ -1,3 +1,4 @@
+
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -13,13 +14,25 @@ import androidx.navigation.NavController
 import com.example.coders.Campsite
 
 /**
- * Displays all information about a selected campsite.
+ * Displays detailed information about a selected campsite.
  *
- * Receives a Campsite object from Data.kt and displays
- * its information using Jetpack Compose.
+ * Receives a Campsite object and displays its name, location,
+ * description, maximum occupancy, rating, map location,
+ * campsite owner, and available amenities.
  *
- * @param navController Used to return to the previous screen.
- * @param campsite The selected campsite to display.
+ * The screen uses a scrollable layout to allow users to view
+ * all campsite information and provides a Back button to
+ * return to the previous screen.
+ *
+ * The Back button prevents repeated navigation requests,
+ * and the layout includes safe screen padding.
+ *
+ * This composable only handles the user interface and does
+ * not perform database operations or modify campsite data.
+ *
+ * @param navController Handles navigation to the previous screen.
+ * @param campsite The selected Campsite object containing
+ * the information to display.
  */
 @Composable
 fun CampsiteDetailsScreen(
@@ -28,6 +41,7 @@ fun CampsiteDetailsScreen(
 ) {
     // Prevent multiple back navigation requests from this screen.
     var backClicked by remember { mutableStateOf(false) }
+    var editClicked by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -53,7 +67,19 @@ fun CampsiteDetailsScreen(
             Text("Back")
         }
 
+        Button(
+            onClick = {
+                if (!editClicked) {
+                    editClicked = true
+                    navController.navigate("edit_campsite/${campsite.id}")
+                }
+            },
+            enabled = !editClicked
+        ) {
+            Text("Edit Campsite")
+        }
         Spacer(modifier = Modifier.height(12.dp))
+
 
         // Campsite name and location
         Text(
