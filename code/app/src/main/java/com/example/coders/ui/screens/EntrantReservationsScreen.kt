@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -368,6 +369,15 @@ fun EntrantReservationsScreen(navController: NavController) {
                 }
             }
         }
+//        Spacer(modifier = Modifier.height(24.dp))
+//        Button(
+//            onClick = { navController.navigate("entrantpastreservations") },
+//            colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray, contentColor = Color.Black),
+//            shape = RoundedCornerShape(8.dp)
+//        ) {
+//            Text("Past Reservations", fontWeight = FontWeight.Bold)
+//        }
+//        Spacer(modifier = Modifier.height(24.dp))
     }
 
 // The following AlertDialog is from OpenAI, Codex, "in my [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) I've already added the cancel reservation feature to each card. I need you to create the AlertDialog; confirmation updates that reservation in entrant.reservations to cancelled through ProfileRepo.updateProfile(...). Then Remove it from the active display after saving. This should go after the main Column in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt)"
