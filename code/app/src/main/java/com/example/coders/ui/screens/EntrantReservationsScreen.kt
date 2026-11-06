@@ -24,31 +24,76 @@ import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
 
+// The following enum was added using OpenAI, Codex, "Implement US 01.04.03: add Pending and
+// Active reservation tabs for entrant lottery offers", 2026-11-06.
+private enum class EntrantReservationTab(
+    val label: String,
+    val status: ReservationStatus
+) {
+    Pending("Pending", ReservationStatus.Pending),
+    Active("Active", ReservationStatus.Active)
+}
+
+// The following composable was modified using OpenAI, Codex, "Implement US 01.04.03: add Pending
+// and Active reservation tabs plus accept and confirmed-decline lottery-offer actions", 2026-11-06.
 /**
- * Displays the signed-in entrant's active reservations.
+ * Displays the signed-in entrant's lottery offers and active reservations.
  *
- * Each reservation shows its campsite, stay dates, guest count, and campsite owner. Entrants can
- * open the map or conversation screens, and can cancel a reservation after confirming the action.
- * A successful cancellation is saved to the entrant profile and immediately removed from this list.
+ * Pending lottery offers can be accepted or declined. Accepting makes the reservation active;
+ * declining it requires confirmation and changes its status to rejected. Active reservations can
+ * still be cancelled after confirmation.
  *
  * @param navController Handles navigation to the map, chat, and previous screens.
  */
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
     var isNavigating by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(EntrantReservationTab.Active) }
 
     var reservationToCancel by remember { mutableStateOf<Reservation?>(null) }
     var isCancelling by remember { mutableStateOf(false) }
     var cancellationError by remember { mutableStateOf<String?>(null) }
-    var locallyCancelledIds by remember { mutableStateOf(emptySet<String>()) }
+
+    var reservationToDecline by remember { mutableStateOf<Reservation?>(null) }
+    var isUpdatingOffer by remember { mutableStateOf(false) }
+    var offerUpdateError by remember { mutableStateOf<String?>(null) }
+
+    // The signed-in profile is loaded once. Keep successful changes visible until the next load.
+    var locallyUpdatedStatuses by remember { mutableStateOf(emptyMap<String, ReservationStatus>()) }
 
     val profileRepo = remember { ProfileRepo() }
 
     val profile by SignedInProfile().rememberSignedInProfile()
     val entrant = profile as? Entrant
 
-    val activeReservations = entrant?.reservations.orEmpty().filter { reservation ->
-        reservation.status == ReservationStatus.Active && reservation.id !in locallyCancelledIds
+    val reservations = entrant?.reservations.orEmpty().map { reservation ->
+        locallyUpdatedStatuses[reservation.id]?.let { status -> reservation.copy(status = status) }
+            ?: reservation
+    }
+    val visibleReservations = reservations.filter { it.status == selectedTab.status }
+
+    fun updateReservationStatus(
+        reservation: Reservation,
+        status: ReservationStatus,
+        onSuccess: () -> Unit
+    ) {
+        val currentEntrant = entrant ?: return
+        val updatedEntrant = currentEntrant.copy(
+            reservations = currentEntrant.reservations.map {
+                if (it.id == reservation.id) it.copy(status = status) else it
+            }
+        )
+
+        profileRepo.updateProfile(currentEntrant, updatedEntrant) { error ->
+            isUpdatingOffer = false
+
+            if (error == null) {
+                locallyUpdatedStatuses = locallyUpdatedStatuses + (reservation.id to status)
+                onSuccess()
+            } else {
+                offerUpdateError = error.message ?: "Unable to update the lottery offer."
+            }
+        }
     }
 
     Column(
@@ -78,11 +123,41 @@ fun EntrantReservationsScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            EntrantReservationTab.entries.forEach { tab ->
+                Button(
+                    onClick = { selectedTab = tab },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedTab == tab) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        },
+                        contentColor = if (selectedTab == tab) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        }
+                    )
+                ) {
+                    Text(tab.label)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         when {
             profile == null -> CircularProgressIndicator()
             entrant == null -> Text("Reservations are available to entrant profiles only.")
-            activeReservations.isEmpty() -> Text("No active reservations.")
-            else -> activeReservations.forEach { summary ->
+            visibleReservations.isEmpty() -> {
+                Text("No ${selectedTab.label.lowercase()} reservations.")
+            }
+            else -> visibleReservations.forEach { summary ->
                 OutlinedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp)
@@ -111,27 +186,75 @@ fun EntrantReservationsScreen(navController: NavController) {
                         Text(summary.guestNumber.toString())
 
                         Spacer(modifier = Modifier.height(20.dp))
-                        
-                        Button(
-                            onClick = {
-                                navController.navigate("minimap")
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("View On Map")
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
 
-                        Button(
-                            onClick = {
-                                cancellationError = null
-                                reservationToCancel = summary
-                            },
-                            modifier = Modifier.fillMaxWidth().semantics {
-                                contentDescription = "Cancel reservation for ${summary.campsite.name}"
+                        if (summary.status == ReservationStatus.Pending) {
+                            Button(
+                                enabled = !isUpdatingOffer,
+                                onClick = {
+                                    offerUpdateError = null
+                                    isUpdatingOffer = true
+                                    updateReservationStatus(
+                                        reservation = summary,
+                                        status = ReservationStatus.Active,
+                                        onSuccess = {
+                                            selectedTab = EntrantReservationTab.Active
+                                        }
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .semantics {
+                                        contentDescription =
+                                            "Accept offer for ${summary.campsite.name}"
+                                    }
+                            ) {
+                                Text(if (isUpdatingOffer) "Accepting…" else "Accept Offer")
                             }
-                        ) {
-                            Text("Cancel Reservation")
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedButton(
+                                enabled = !isUpdatingOffer,
+                                onClick = {
+                                    offerUpdateError = null
+                                    reservationToDecline = summary
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .semantics {
+                                        contentDescription =
+                                            "Decline offer for ${summary.campsite.name}"
+                                    }
+                            ) {
+                                Text("Decline Offer")
+                            }
+
+                            offerUpdateError?.let { error ->
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(error, color = MaterialTheme.colorScheme.error)
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    navController.navigate("minimap")
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("View On Map")
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = {
+                                    cancellationError = null
+                                    reservationToCancel = summary
+                                },
+                                modifier = Modifier.fillMaxWidth().semantics {
+                                    contentDescription = "Cancel reservation for ${summary.campsite.name}"
+                                }
+                            ) {
+                                Text("Cancel Reservation")
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(25.dp))
@@ -205,7 +328,8 @@ fun EntrantReservationsScreen(navController: NavController) {
                                 isCancelling = false
 
                                 if (error == null) {
-                                    locallyCancelledIds = locallyCancelledIds + reservation.id
+                                    locallyUpdatedStatuses = locallyUpdatedStatuses +
+                                        (reservation.id to ReservationStatus.Cancelled)
                                     reservationToCancel = null
                                 } else {
                                     cancellationError =
@@ -224,6 +348,54 @@ fun EntrantReservationsScreen(navController: NavController) {
                     onClick = { reservationToCancel = null }
                 ) {
                     Text("Keep reservation")
+                }
+            }
+        )
+    }
+
+    reservationToDecline?.let { reservation ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!isUpdatingOffer) reservationToDecline = null
+            },
+            title = { Text("Decline lottery offer?") },
+            text = {
+                Column {
+                    Text(
+                        "Decline your reservation offer for ${reservation.campsite.name}? " +
+                            "This action cannot be undone."
+                    )
+
+                    offerUpdateError?.let { error ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(error, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isUpdatingOffer,
+                    onClick = {
+                        offerUpdateError = null
+                        isUpdatingOffer = true
+                        updateReservationStatus(
+                            reservation = reservation,
+                            status = ReservationStatus.Rejected,
+                            onSuccess = {
+                                reservationToDecline = null
+                            }
+                        )
+                    }
+                ) {
+                    Text(if (isUpdatingOffer) "Declining…" else "Decline offer")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isUpdatingOffer,
+                    onClick = { reservationToDecline = null }
+                ) {
+                    Text("Keep offer")
                 }
             }
         )
