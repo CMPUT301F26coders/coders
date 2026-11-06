@@ -41,7 +41,7 @@ fun CampsiteDetailsScreen(
 ) {
     // Prevent multiple back navigation requests from this screen.
     var backClicked by remember { mutableStateOf(false) }
-//    var editClicked by remember { mutableStateOf(false) }
+    var editClicked by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -67,18 +67,18 @@ fun CampsiteDetailsScreen(
             Text("Back")
         }
 
-//        Button(
-//            onClick = {
-//                if (!editClicked) {
-//                    editClicked = true
-//                    navController.navigate("edit_campsite/${campsite.id}")
-//                }
-//            },
-//            enabled = !editClicked
-//        ) {
-//            Text("Edit Campsite")
-//        }
-//        Spacer(modifier = Modifier.height(12.dp))
+        Button(
+            onClick = {
+                if (!editClicked) {
+                    editClicked = true
+                    navController.navigate("edit_campsite/${campsite.id}")
+                }
+            },
+            enabled = !editClicked
+        ) {
+            Text("Edit Campsite")
+        }
+        Spacer(modifier = Modifier.height(12.dp))
 
 
         // Campsite name and location
