@@ -1,6 +1,7 @@
 
 package com.example.coders.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,47 +15,75 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.ConversationRepo
+import com.example.coders.Message
+import com.example.coders.SignedInProfile
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object ChatData {
     var owner = ""
+    var conversationId = ""
 }
 
 @Composable
 fun ChatScreen(navController: NavController) {
 
+
+    var conversationExists by remember(ChatData.conversationId) {
+        mutableStateOf(false)
+    }
+
+    val conversationRepo = remember { ConversationRepo() }
+    val profile by SignedInProfile().rememberSignedInProfile()
+
+    var isSending by remember { mutableStateOf(false) }
+    var sendError by remember { mutableStateOf<String?>(null) }
+
     var isNavigating by remember { mutableStateOf(false) }
 
     var message by remember { mutableStateOf("") }
 
-    val messages = remember(ChatData.owner) {
-        mutableStateListOf<String>().apply {
+    val messages = remember(ChatData.conversationId) {
+        mutableStateListOf<Message>()
+    }
 
-            if (ChatData.owner == "John Smith") {
-                add("Owner: Hi! Thanks for applying to Pine Lake Campsite.")
-                add("You: Hi! I am excited. Can you tell me more about the campsite?")
-                add("Owner: Of course! It has a lake view, hiking trails, and a fire pit!")
-                add("You: Great! Is parking available?")
-                add("Owner: Yes, there are parking spots available!")
-                add("You: Amazing! Can't wait!")
-            }
+    var campsiteName by remember(ChatData.conversationId) {
+        mutableStateOf("")
+    }
 
-            if (ChatData.owner == "Sarah Lee") {
-                add("Owner: Thanks for your interest in Mountain View Camp!")
-                add("You: Is the campsite available next weekend?")
-                add("Owner: Yes, it is!")
-            }
+    var isLoading by remember(ChatData.conversationId) {
+        mutableStateOf(true)
+    }
 
-            if (ChatData.owner == "Mike Brown") {
-                add("Owner: Welcome to Forest Hill Camp!")
-                add("You: Are there washrooms?")
-                add("Owner: Yes, washrooms are available!")
-            }
+    DisposableEffect(ChatData.conversationId, conversationRepo) {
+        val conversationId = ChatData.conversationId
 
-            if (ChatData.owner == "Emma Wilson") {
-                add("Owner: Your reservation details are ready!")
-                add("You: What time is check-in?")
-                add("Owner: Check-in starts at 2 PM.")
-            }
+
+        val listener = if (conversationId.isNotBlank()) {
+            conversationRepo.listenForConversation(
+                conversationId = conversationId,
+                onUpdate = { conversation ->
+                    conversationExists = conversation != null
+
+                    messages.clear()
+                    messages.addAll(conversation?.messages.orEmpty())
+                    campsiteName = conversation?.campsite?.name.orEmpty()
+                    isLoading = false
+                },
+                onError = { error ->
+                    Log.e("ChatScreen", "Failed to load messages", error)
+                    isLoading = false
+                }
+            )
+        } else {
+            isLoading = false
+            null
+        }
+
+        onDispose {
+            listener?.remove()
         }
     }
 
@@ -67,7 +96,7 @@ fun ChatScreen(navController: NavController) {
         // Back button
         TextButton(
             onClick = {
-                if(!isNavigating) {
+                if (!isNavigating) {
                     isNavigating = true
                     navController.popBackStack()
                 }
@@ -78,21 +107,13 @@ fun ChatScreen(navController: NavController) {
 
         // Campsite and owner name
         Text(
-            text = if (ChatData.owner == "John Smith") {
-                "Pine Lake Campsite"
-            } else if (ChatData.owner == "Sarah Lee") {
-                "Mountain View Camp"
-            } else if (ChatData.owner == "Mike Brown") {
-                "Forest Hill Camp"
-            } else {
-                "Riverside Campsite"
-            },
+            text = campsiteName,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold
         )
 
         Text(
-            text = ChatData.owner + " (Campsite Owner)",
+            text = ChatData.owner,
             color = Color.Gray,
             fontSize = 14.sp
         )
@@ -111,8 +132,7 @@ fun ChatScreen(navController: NavController) {
         ) {
 
             for (chatMessage in messages) {
-
-                if (chatMessage.startsWith("You:")) {
+                if (chatMessage.senderId == profile?.id) {
 
                     // Your message on the right
                     Row(
@@ -129,7 +149,7 @@ fun ChatScreen(navController: NavController) {
                             )
                         ) {
                             Text(
-                                text = chatMessage.removePrefix("You: "),
+                                text = chatMessage.content,
                                 color = Color.White,
                                 modifier = Modifier.padding(14.dp)
                             )
@@ -153,7 +173,7 @@ fun ChatScreen(navController: NavController) {
                             )
                         ) {
                             Text(
-                                text = chatMessage.removePrefix("Owner: "),
+                                text = chatMessage.content,
                                 color = Color.Black,
                                 modifier = Modifier.padding(14.dp)
                             )
@@ -186,19 +206,65 @@ fun ChatScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
+
             Button(
+                enabled = !isSending &&
+                        profile != null &&
+                        conversationExists &&
+                        ChatData.conversationId.isNotBlank(),
                 onClick = {
-                    if (message.isNotBlank()) {
-                        messages.add("You: " + message)
-                        message = ""
+                    val sender = profile
+                    val messageText = message.trim()
+
+                    if (messageText.isNotEmpty() &&
+                        sender != null &&
+                        ChatData.conversationId.isNotBlank()
+                    ) {
+                        val newMessage = Message(
+                            sender = sender,
+                            content = messageText,
+                            date = SimpleDateFormat(
+                                "yyyy-MM-dd HH:mm:ss",
+                                Locale.getDefault()
+                            ).format(Date())
+                        )
+
+                        isSending = true
+                        sendError = null
+
+                        conversationRepo.addMessage(
+                            conversationId = ChatData.conversationId,
+                            message = newMessage,
+                            onComplete = { error ->
+                                isSending = false
+
+                                if (error == null) {
+                                    message = ""
+                                } else {
+                                    Log.e(
+                                        "ChatScreen",
+                                        "Failed to send message",
+                                        error
+                                    )
+                                    sendError = "Failed to send message."
+                                }
+                            }
+                        )
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF625B71)
                 )
             ) {
-                Text("➜")
+                Text(if (isSending) "Sending..." else "➜")
             }
+
+        }
+        sendError?.let { error ->
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }
