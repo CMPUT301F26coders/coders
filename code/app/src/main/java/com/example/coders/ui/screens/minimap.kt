@@ -1,3 +1,9 @@
+/**
+ * Displays a campsite map using a static image.
+ *
+ * Outstanding issues: The map is hardcoded to Pine Lake Campground
+ * rather than dynamically displaying the selected campsite's map.
+ */
 
 package com.example.coders.ui.screens
 
@@ -16,6 +22,11 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.R
 
+/**
+ * Displays the map and a back navigation button.
+ *
+ * @param navController Used to navigate back to the previous screen.
+ */
 @Composable
 fun MiniMapScreen(navController: NavController) {
     var isNavigating by remember { mutableStateOf(false) }
