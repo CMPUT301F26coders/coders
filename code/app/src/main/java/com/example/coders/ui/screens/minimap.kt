@@ -1,3 +1,9 @@
+/**
+ * Displays a campsite map using a static image.
+ *
+ * Outstanding issues: The map is hardcoded to Pine Lake Campground
+ * rather than dynamically displaying the selected campsite's map.
+ */
 
 package com.example.coders.ui.screens
 

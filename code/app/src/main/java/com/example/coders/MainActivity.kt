@@ -1,3 +1,13 @@
+/**
+ * Main entry point for the application.
+ *
+ * Initializes repositories
+ * used throughout the app. Restores the locally saved user session and directs
+ * users to the appropriate screen based on their profile role.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 import android.os.Bundle
@@ -45,6 +55,15 @@ import kotlinx.coroutines.launch
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
 
+    /**
+     * Initializes the application's UI and navigation system.
+     *
+     * Sets up the app theme, navigation controller, and repositories.
+     * Restores the user's saved session and navigates to the appropriate
+     * screen based on their profile role.
+     *
+     * @param savedInstanceState Previously saved activity state if needed
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

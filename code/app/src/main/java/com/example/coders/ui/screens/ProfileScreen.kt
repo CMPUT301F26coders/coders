@@ -1,3 +1,16 @@
+/**
+ * Displays and manages the signed-in entrant's profile information and settings.
+ *
+ * Uses AuthManager and Firebase Firestore to display and
+ * update profile information, manage notification preferences, and delete
+ * the user's profile.
+ *
+ * Outstanding issues: Only entrant profiles are supported 
+ * (fulfills the user stories tied to profiles but could be improved).
+ * Deleting a profile does not automatically remove associated records
+ * such as reservations, conversations, or notifications.
+ */
+
 package com.example.coders.ui.screens
 
 import android.app.NotificationManager
@@ -27,6 +40,14 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.core.content.edit
 
+/**
+ * Displays the entrant's profile and account management options.
+ *
+ * Loads profile information from Firestore and allows the user to edit
+ * personal details, toggle notification preferences, or delete their profile.
+ *
+ * @param navController Used to navigate between screens.
+ */
 @Composable
 fun ProfileScreen(navController: NavController) {
     val context = LocalContext.current
@@ -433,6 +454,13 @@ fun ProfileScreen(navController: NavController) {
     }
 }
 
+/**
+ * Displays a profile field with its current value and an edit button.
+ *
+ * @param label The name of the profile field.
+ * @param value The current value of the field.
+ * @param onEdit Callback invoked when the edit button is pressed.
+ */
 @Composable
 private fun ProfileItem(
     label: String,
