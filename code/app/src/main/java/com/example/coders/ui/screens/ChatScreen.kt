@@ -20,7 +20,7 @@ object ChatData {
 }
 
 @Composable
-fun EntrantChatScreen(navController: NavController) {
+fun ChatScreen(navController: NavController) {
 
     var message by remember { mutableStateOf("") }
 
