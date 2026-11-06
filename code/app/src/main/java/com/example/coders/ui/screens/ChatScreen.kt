@@ -22,11 +22,23 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * An object acting as a temporary holder for chat routing
+ * Used to pass the target owners name and the specific conversation ID to the chatscreen
+ */
 object ChatData {
     var owner = ""
     var conversationId = ""
 }
 
+
+/**
+ * The messaging interface between an entrant and a camp owner.
+ *
+ * sets up firestore listener, fetches and displays messages live.
+ *
+ * @param navController navigation controller used to return to the previous screen
+ */
 @Composable
 fun ChatScreen(navController: NavController) {
 
