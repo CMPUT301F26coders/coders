@@ -26,6 +26,7 @@ import com.example.coders.CampsiteRepo
 //This function was assisted by Google, Gemini,
 // (Given the context of CreateCampsiteScreen.kt, Data.kt)
 // "Help me create a file which now updates the details of a campsite"
+//2026-11-06
 @Composable
 fun EditCampsiteScreen(
     navController: NavController,
