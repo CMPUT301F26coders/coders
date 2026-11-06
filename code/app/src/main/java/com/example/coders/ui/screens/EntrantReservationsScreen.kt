@@ -24,6 +24,15 @@ import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
 
+/**
+ * Displays the signed-in entrant's active reservations.
+ *
+ * Each reservation shows its campsite, stay dates, guest count, and campsite owner. Entrants can
+ * open the map or conversation screens, and can cancel a reservation after confirming the action.
+ * A successful cancellation is saved to the entrant profile and immediately removed from this list.
+ *
+ * @param navController Handles navigation to the map, chat, and previous screens.
+ */
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
     var isNavigating by remember { mutableStateOf(false) }
@@ -154,6 +163,7 @@ fun EntrantReservationsScreen(navController: NavController) {
             }
         }
     }
+
 // The following AlertDialog is from OpenAI, Codex, "in my [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) I've already added the cancel reservation feature to each card. I need you to create the AlertDialog; confirmation updates that reservation in entrant.reservations to cancelled through ProfileRepo.updateProfile(...). Then Remove it from the active display after saving. This should go after the main Column in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt)"
     reservationToCancel?.let { reservation ->
         AlertDialog(

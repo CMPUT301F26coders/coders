@@ -1,4 +1,4 @@
-// The following Test is from OpenAI, Codex, "okay instead of using dummy data in the [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) we need the demo to be acutally working with the backend, so get rid of the in file dummy testing in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) and instead create a test like [EntrantHomePageTest.kt](code/app/src/androidTest/java/com/example/coders/EntrantHomePageTest.kt)  for the [EntrantSearchScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantSearchScreen.kt)""
+// The following Test is from OpenAI, Codex, "okay instead of using dummy data in the [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) we need the demo to be acutally working with the backend, so get rid of the in file dummy testing in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) and instead create a test like [EntrantHomePageTest.kt](code/app/src/androidTest/java/com/example/coders/EntrantHomePageTest.kt) for the [EntrantSearchScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantSearchScreen.kt)"
 package com.example.coders
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -25,7 +25,12 @@ import org.junit.runner.RunWith
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-/** Verifies that entrant search displays campsite records delivered by Firestore. */
+/**
+ * Instrumented tests for entrant campsite search backed by Firestore.
+ *
+ * Each test signs up a unique entrant, writes its own campsite data to Firestore, and removes all
+ * created profiles and campsites afterward. This keeps the test independent of pre-existing data.
+ */
 @RunWith(AndroidJUnit4::class)
 class EntrantSearchScreenTest {
 
@@ -38,6 +43,7 @@ class EntrantSearchScreenTest {
     @get:Rule
     val testRule: TestRule = freshSessionRule(composeTestRule)
 
+    /** Removes the entrant, camp owners, campsites, and saved session created by a test. */
     @After
     fun cleanUpFirebaseTestRecords() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -54,6 +60,7 @@ class EntrantSearchScreenTest {
         runBlocking { AuthManager(context).clearUserId() }
     }
 
+    /** Confirms that a campsite inserted into Firestore appears on the entrant search screen. */
     @Test
     fun searchShowsCampsiteLoadedFromFirestore() {
         signUpAsEntrant()
@@ -71,6 +78,7 @@ class EntrantSearchScreenTest {
         composeTestRule.onNodeWithText("Maximum Occupancy: 4 guests").assertExists()
     }
 
+    /** Confirms that typing a campsite name filters the Firestore-backed search results. */
     @Test
     fun searchFiltersFirestoreCampsitesByName() {
         signUpAsEntrant()
@@ -96,6 +104,7 @@ class EntrantSearchScreenTest {
         composeTestRule.onNodeWithText(otherCampsite.name).assertDoesNotExist()
     }
 
+    /** Registers a unique entrant and waits until their home screen is displayed. */
     private fun signUpAsEntrant() {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithTag("firstNameInput").fetchSemanticsNodes().isNotEmpty()
@@ -110,11 +119,17 @@ class EntrantSearchScreenTest {
         waitForText("Home")
     }
 
+    /** Opens the entrant campsite-search screen from the bottom navigation bar. */
     private fun openSearch() {
         composeTestRule.onNodeWithContentDescription("Search").performClick()
         waitForText("Search Campsites")
     }
 
+    /**
+     * Creates a campsite owner and campsite document in Firestore for the current test.
+     *
+     * @return The saved campsite, including its generated ID.
+     */
     private fun seedCampsite(name: String, location: String, capacity: Int): Campsite {
         val owner = CampOwner(
             name = "Search Test Owner",
@@ -140,11 +155,13 @@ class EntrantSearchScreenTest {
         return campsite
     }
 
+    /** Waits for a visible Compose node containing [text]. */
     private fun waitForText(text: String) {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
         }
     }
 
+    /** Waits for a Firebase [Task] and returns its completed result. */
     private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
 }
