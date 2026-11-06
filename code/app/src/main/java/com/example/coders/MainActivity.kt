@@ -33,6 +33,8 @@ import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.EntrantSearchScreen
 import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
+import com.example.coders.CampOwner
+import com.example.coders.ui.screens.CreateCampsiteScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,6 +52,7 @@ class MainActivity : ComponentActivity() {
                 val authManager = remember {
                     AuthManager(applicationContext)
                 }
+                val campsiteRepo = remember { CampsiteRepo() }
                 val profileRepo = remember { ProfileRepo() }
                 val mainScope = rememberCoroutineScope()
 
@@ -121,7 +124,25 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("ownercampsites") {
-                        OwnerCampsitesScreen(navController)
+                        OwnerCampsitesScreen(
+                            navController = navController,
+                            campsiteRepo = campsiteRepo
+                        )
+                    }
+                    composable("create_campsite") {
+                        // so that we dont get access denied error
+                        // change this after, this is just for the frontend for the createcampsitetest to work
+                        val currentOwner = CampOwner(
+                            name = "John Smith",
+                            email = "john@gmail.com",
+                            phone = "7805550199"
+                        )
+
+                        CreateCampsiteScreen(
+                            navController = navController,
+                            campOwner = currentOwner,
+                            campsiteRepo = campsiteRepo
+                        )
                     }
 
                     composable("policies") {
@@ -171,7 +192,6 @@ class MainActivity : ComponentActivity() {
                             ?.getString("campsiteId")
                             .orEmpty()
 
-                        val campsiteRepo = remember { CampsiteRepo() }
 
                         val campsite = campsiteRepo
                             .getAllCampsites()
@@ -187,7 +207,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator()
+                                Text("Campsite not found")
                             }
                         }
                     }

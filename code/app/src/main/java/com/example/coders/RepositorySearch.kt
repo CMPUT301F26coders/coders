@@ -83,7 +83,7 @@ fun filterCampsites(
             } else if (checkIn != null && checkOut != null) {
 
                 val reservedDate = runCatching {
-                    java.time.LocalDate.parse(reservation.date.trim())
+                    java.time.LocalDate.parse(reservation.dates.trim())
                 }.getOrNull()
 
                 reservedDate != null &&
@@ -92,7 +92,7 @@ fun filterCampsites(
 
             } else {
                 date.isNotBlank() &&
-                        reservation.date == date.trim()
+                        reservation.dates == date.trim()
             }
         }
         matchesLocation && matchesGuests && matchesDate

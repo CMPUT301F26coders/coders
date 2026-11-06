@@ -43,7 +43,8 @@ class CommunicationTest {
         val chat = Conversation(
             messages = listOf(message),
             campOwner = owner,
-            entrant = entrant
+            entrant = entrant,
+            campsite = Campsite(name = "Pine Lake")
         )
 
         assertEquals("Bob", chat.campOwner.name)
@@ -78,7 +79,8 @@ class CommunicationTest {
         val chat = Conversation(
             messages = listOf(message),
             campOwner = owner,
-            entrant = entrant
+            entrant = entrant,
+            campsite = Campsite(name = "Pine Lake")
         )
 
         val owner2 = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
@@ -88,7 +90,8 @@ class CommunicationTest {
         val chat2 = Conversation(
             messages = listOf(message2),
             campOwner = owner2,
-            entrant = entrant2
+            entrant = entrant2,
+            campsite = Campsite(name = "Pine Lake")
         )
 
         assertNotEquals(chat.id, chat2.id)

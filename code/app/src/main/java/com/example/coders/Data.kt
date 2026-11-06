@@ -3,6 +3,10 @@ package com.example.coders
 import androidx.compose.runtime.mutableStateListOf
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Exclude
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import java.util.UUID
 
@@ -25,19 +29,21 @@ interface Profile {
 /**
  * Represents a user who is an Entrant.
  *
- * @property bookings A list of bookings made by the entrant.
+ * @property reservations A list of bookings made by the entrant.
  * @property waitlists A list of waitlists made by the entrant.
  * @property notifications A list of notifications made by the entrant.
+ * @property conversations Conversations associated with this entrant.
  */
 data class Entrant(
     override val name: String = "",
     override val email: String = "",
     override val phone: String = "",
-    val bookings: List<Reservation> = emptyList(),
+    val reservations: List<Reservation> = emptyList(),
     val waitlists: List<Waitlist> = emptyList(),
     val notifications: List<Notification> = emptyList(),
     override val type: String = "Entrant",
-    override val id: String = UUID.randomUUID().toString()
+    override val id: String = UUID.randomUUID().toString(),
+    val conversations: MutableList<Conversation> = mutableListOf()
 ) : Profile {
 
 }
@@ -50,6 +56,7 @@ data class Entrant(
  * @property reservations A list of reservations made by the camp owner.
  * @property notificationsSent A list of notifications sent by the camp owner.
  * @property notificationsReceived A list of notifications received by the camp owner.
+ * @property conversations Conversations associated with this camp owner.
  */
 data class CampOwner(
     override val name: String = "",
@@ -60,6 +67,7 @@ data class CampOwner(
     val reservations : List<Reservation> = emptyList(),
     val notificationsSent : List<Notification> = emptyList(),
     val notificationsReceived : List<Notification> = emptyList(),
+    val conversations: MutableList<Conversation> = mutableListOf(),
     override val type: String = "CampOwner",
     override val id: String = UUID.randomUUID().toString()
 ) : Profile {
@@ -97,10 +105,18 @@ data class Admin (
  *
  * @property campsite The campsite being waited on.
  * @property entrantList The list of entrants waiting for the campsite.
+ * @property id Stable waitlist document ID.
+ * @property lotteryId Stable lottery document ID.
+ * @property campsiteId Campsite document ID.
+ * @property entrantIds Entrant profile document IDs.
  */
 data class Waitlist (
-    val campsite : Campsite,
-    val entrantList : List<Entrant>
+    val campsite : Campsite = Campsite(),
+    val entrantList : List<Entrant> = emptyList(),
+    val id: String = UUID.randomUUID().toString(),
+    val lotteryId: String = "",
+    val campsiteId: String = "",
+    val entrantIds: List<String> = emptyList()
 )
 
 /**
@@ -113,6 +129,7 @@ data class Waitlist (
  * @property capacity The capacity of the campsite. Necessary to make a campsite instance
  * @property mapLocation The visual map location of the campsite. Necessary to make a campsite instance
  * @property campOwner The camp owner of the campsite. Necessary to make a campsite instance
+ * @property campOwnerId The id of the camp owner of the campsite. Necessary to make a campsite instance
  *
  * Unnecessary properties to make a campsite instance:
  * @property rating The rating of the campsite. UnNecessary to make a campsite instance
@@ -126,24 +143,24 @@ data class Waitlist (
  */
 
 data class Campsite(
-    val name: String = "",
-    val location: String = "",
-    val description: String = "",
-    val capacity: Int = 0,
-    val mapLocation: String = "",
+    var name: String = "",
+    var location: String = "",
+    var description: String = "",
+    var capacity: Int = 0,
+    var mapLocation: String = "",
     val campOwner: CampOwner = CampOwner(),
-    val rating: Double? = null,
+    var rating: Double? = null,
 
-    val images: List<Image> = emptyList(),
-    val tags: List<String> = emptyList(),
+    var images: List<Image> = emptyList(),
+    var tags: List<String> = emptyList(),
 
     val waitlist: List<Waitlist> = emptyList(),
     val reservations: List<Reservation> = emptyList(),
     val notifications: List<Notification> = emptyList(),
     val qr: String = "",
-    val id: String = UUID.randomUUID().toString()
-) {
-}
+    val id: String = UUID.randomUUID().toString(),
+    val campOwnerId: String = ""
+)
 
 /**
  * Represents the status of a campsite's lottery from a CampOwner perspective.
@@ -191,29 +208,61 @@ enum class ReservationStatus {
 /**
  * Represents a lottery for a campsite.
  *
- * @property campsites A list of campsites in the lottery.
- * @property date The date of the lottery.
- * @property status The status of the lottery.
+ * @property campsites Campsite details associated with the lottery.
+ * @property date Legacy display date for the lottery.
+ * @property status Current owner-facing lottery status.
+ * @property id Stable lottery document ID.
+ * @property campOwnerId Owner profile document ID.
+ * @property campsiteIds Campsite document IDs associated with the lottery.
+ * @property registrationStartDate Registration period start.
+ * @property registrationEndDate Registration period end.
+ * @property bookingStartDate Winner booking period start.
+ * @property bookingEndDate Winner booking period end.
+ * @property winnerCount Number of winners to draw.
+ * @property waitlistCapacity Optional maximum number of entrants.
+ * @property waitlistEntrantIds Entrant profile IDs on the waitlist.
  */
 data class Lottery (
-    val campsites : List<Campsite>,
-    val date : String,
-    val status : Enum<CampOwnerLotteryStatus>
+    val campsites : List<Campsite> = emptyList(),
+    val date : String = "",
+    val status : CampOwnerLotteryStatus = CampOwnerLotteryStatus.Active,
+    val id: String = UUID.randomUUID().toString(),
+    val campOwnerId: String = "",
+    val campsiteIds: List<String> = emptyList(),
+    val registrationStartDate: String = "",
+    val registrationEndDate: String = "",
+    val bookingStartDate: String = "",
+    val bookingEndDate: String = "",
+    val winnerCount: Int = 1,
+    val waitlistCapacity: Int? = null,
+    val waitlistEntrantIds: List<String> = emptyList()
 )
 
 /**
  * Represents a reservation for a campsite.
  *
- * @property campsite The campsite being reserved.
- * @property date The date of the reservation.
+ * @property campsite The campsite details captured with the reservation.
+ * @property dates The dates of the reservation.
  * @property guestNumber The number of guests for the reservation.
  * @property status The status of the reservation.
+ * @property campOwner The camp owner of the reservation.
+ * @property entrants The entrants for the reservation.
+ * @property id The id of the reservation.
+ * @property campsiteId The id of the campsite being reserved.
+ * @property campOwnerId The id of the camp owner of the reservation.
+ * @property entrantIds The ids of the entrants for the reservation.
  */
 data class Reservation (
-    val campsite : Campsite,
-    val date : String,
-    val guestNumber : Int,
-    val status : Enum<ReservationStatus>
+    val campsite : Campsite = Campsite(),
+    val dates : String = "",
+    val guestNumber : Int = 0,
+    val status : ReservationStatus = ReservationStatus.Active,
+    val campOwner : CampOwner = CampOwner(),
+    val entrants : List<Entrant> = emptyList(),
+    val id: String = UUID.randomUUID().toString(),
+    val campsiteId: String = "",
+    val campOwnerId: String = "",
+    val entrantIds: List<String> = emptyList()
 )
 
 /**
@@ -222,27 +271,70 @@ data class Reservation (
  * @property title The title of the notification.
  * @property content The content of the notification.
  * @property date The date of the notification.
+ * @property id Stable notification document ID.
+ * @property recipientId Recipient profile document ID.
+ * @property senderId Sender profile document ID.
  */
 data class Notification (
-    val title : String,
-    val content : String,
-    val date : String,
+    val title : String = "",
+    val content : String = "",
+    val date : String = "",
     val id: String = UUID.randomUUID().toString(),
-
+    val recipientId: String = "",
+    val senderId: String = ""
 )
 
 /**
  * Represents a message.
  *
- * @property sender The sender of the message.
+ * @property senderType Sender profile type stored as a Firestore-safe string.
+ * @property senderId Sender profile document ID.
+ * @property senderName Sender display name.
+ * @property senderEmail Sender email.
+ * @property senderPhone Sender phone number.
+ * @property sender Reconstructed sender profile for app display.
  * @property content The content of the message.
  * @property date The date of the message.
  */
 data class Message (
-    val sender : Profile,
-    val content : String,
-    val date : String,
-)
+    val senderType: String = "Entrant",
+    val senderId: String = "",
+    val senderName: String = "",
+    val senderEmail: String = "",
+    val senderPhone: String = "",
+    val content : String = "",
+    val date : String = ""
+) {
+    /**
+     * Creates a message from an app profile while storing sender fields in Firestore-safe form.
+     *
+     * @param sender The sender profile.
+     * @param content The content of the message.
+     * @param date The date of the message.
+     */
+    constructor(sender: Profile, content: String, date: String) : this(
+        senderType = sender.type,
+        senderId = sender.id,
+        senderName = sender.name,
+        senderEmail = sender.email,
+        senderPhone = sender.phone,
+        content = content,
+        date = date
+    )
+
+    /**
+     * Reconstructs the sender profile from the scalar fields stored with the message.
+     *
+     * @return The sender profile.
+     */
+    @get:Exclude
+    val sender: Profile
+        get() = when (senderType) {
+            "CampOwner" -> CampOwner(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
+            "Admin" -> Admin(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
+            else -> Entrant(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
+        }
+}
 
 /**
  * Represents a chat between two profiles.
@@ -250,27 +342,74 @@ data class Message (
  * @property messages A list of messages in the chat.
  * @property campOwner The camp owner of the chat.
  * @property entrant The entrant of the chat.
+ * @property campsite The campsite details captured with the chat.
+ * @property campOwnerId Camp owner profile document ID.
+ * @property entrantId Entrant profile document ID.
+ * @property campsiteId Campsite document ID.
+ * @property participantIds Profile document IDs participating in the chat.
  */
 data class Conversation (
-    val messages : List<Message>,
-    val campOwner : CampOwner,
-    val entrant : Entrant,
+    val messages : List<Message> = emptyList(),
+    val campOwner : CampOwner = CampOwner(),
+    val entrant : Entrant = Entrant(),
     val id: String = UUID.randomUUID().toString(),
+    val campsite: Campsite = Campsite(),
+    val campOwnerId: String = "",
+    val entrantId: String = "",
+    val campsiteId: String = "",
+    val participantIds: List<String> = emptyList()
 )
 
+
 /**
- * Represents a repository of campsites.
+ * Decodes documents from a Firestore listener and forwards results or errors.
+ *
+ * @param decode Decodes a Firestore document into the requested value type.
+ * @param onUpdate Called with the current data after it loads or changes.
+ * @param onError Called when the Firestore listener reports an error.
+ * @return The listener registration, which can be removed to stop listening.
+ */
+private fun <T> Query.listenForDecodedDocuments(
+    decode: (DocumentSnapshot) -> T?,
+    onUpdate: (List<T>) -> Unit,
+    onError: (Exception) -> Unit = {}
+): ListenerRegistration = addSnapshotListener { snapshot, error ->
+    if (error != null) {
+        onError(error)
+    } else {
+        onUpdate(snapshot?.documents?.mapNotNull(decode).orEmpty())
+    }
+}
+
+/**
+ * Checks whether a profile contains identity fields rather than placeholder defaults
+ *
+ * @return Whether the profile contains identity fields.
+ */
+private fun Profile.hasStoredIdentity(): Boolean =
+    name.isNotBlank() || email.isNotBlank() || phone.isNotBlank()
+
+/**
+ * Provides campsite storage, search, and owner-scoped live queries.
  *
  * @property _campsites A list of campsites.
  * @property campsiteRef The reference to the campsites collection in the database.
  * @property db The database.
  */
-class CampsiteRepo {
+class CampsiteRepo : AutoCloseable {
     private val db = Firebase.firestore
     private val campsiteRef = db.collection("campsites")
 
     private val _campsites = mutableStateListOf<Campsite>()
 
+    /**
+     * Filters campsites currently loaded in the compatibility cache.
+     *
+     * @param location The campsite location to match.
+     * @param date The date to match.
+     * @param guests The guest capacity to match.
+     * @return The matching campsites.
+     */
     fun searchCampsites(
         location: String = "",
         date: String = "",
@@ -282,60 +421,179 @@ class CampsiteRepo {
     /**
      * Returns all campsites currently loaded from Firestore.
      *
-     * @return A list of campsites.
+     * @return All campsites currently loaded by the repository.
      */
     fun getAllCampsites(): List<Campsite> {
         return _campsites.toList()
     }
 
     /**
-     *Gets all the camp sites for a particular owner.
+     * Fetches the current campsite collection once.
      *
-     * @param owner Owner of the campsite.
-     * @returns a list of all campsites owned by the given owner.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getAllCampsites(onComplete: (List<Campsite>?, Exception?) -> Unit) {
+        campsiteRef.get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::campsiteFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Fetches one campsite by its stable document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getCampsiteById(id: String, onComplete: (Campsite?, Exception?) -> Unit) {
+        campsiteRef.document(id).get()
+            .addOnSuccessListener { document -> onComplete(campsiteFromDocument(document), null) }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes campsite changes. The returned handle should be removed when no longer needed.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForCampsites(
+        onUpdate: (List<Campsite>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = campsiteRef.listenForDecodedDocuments(::campsiteFromDocument, onUpdate, onError)
+
+    /**
+     * Observes campsites registered to one owner.
+     *
+     * @param ownerId The owner profile ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForOwnerCampsites(
+        ownerId: String,
+        onUpdate: (List<Campsite>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = campsiteRef.whereEqualTo("campOwnerId", ownerId)
+        .listenForDecodedDocuments(::campsiteFromDocument, onUpdate, onError)
+
+    /**
+     * Gets all the camp sites for a particular owner.
+     *
+     * @param owner The campsite owner whose campsites should be returned.
+     * @return The matching campsites.
      */
     fun getCampsitesByOwner(owner: CampOwner): List<Campsite> {
         return _campsites.filter {
-            it.campOwner == owner
+            (it.campOwnerId.ifBlank { if (it.campOwner.hasStoredIdentity()) it.campOwner.id else "" }) == owner.id
         }
+    }
+
+    /**
+     * Fetches an owner's campsites once using the stable owner profile ID.
+     *
+     * @param ownerId The owner profile ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getCampsitesByOwner(
+        ownerId: String,
+        onComplete: (List<Campsite>?, Exception?) -> Unit
+    ) {
+        campsiteRef.whereEqualTo("campOwnerId", ownerId).get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::campsiteFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
     }
 
     /**
      * Adds a campsite to the repository.
      *
-     * @param campsite The campsite to add.
+     * @param campsite The campsite record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun addCampsite(campsite: Campsite) {
-        campsiteRef.document(campsite.id).set(campsite)
+    fun addCampsite(campsite: Campsite, onComplete: (Exception?) -> Unit = {}) {
+        val record = campsite.copy(campOwnerId = campsiteOwnerId(campsite))
+        campsiteRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
      * Updates a campsite in the repository.
      *
-     * @param oldCampsite The old campsite.
-     * @param updatedCampsite The updated campsite.
+     * @param oldCampsite The existing campsite, used to preserve its ID.
+     * @param updatedCampsite The updated campsite data to save.
      */
     fun updateCampsite(oldCampsite: Campsite, updatedCampsite: Campsite) {
-        if (oldCampsite.id != updatedCampsite.id) {
-            campsiteRef.document(oldCampsite.id).delete()
-        }
-        campsiteRef.document(updatedCampsite.id).set(updatedCampsite)
+        updateCampsite(updatedCampsite.copy(id = oldCampsite.id))
+    }
+
+    /**
+     * Updates a campsite without changing its document ID.
+     *
+     * @param campsite The campsite record to update.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun updateCampsite(campsite: Campsite, onComplete: (Exception?) -> Unit = {}) {
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite)
+        )
+        campsiteRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
      * Deletes a campsite from the repository.
      *
-     * @param campsite The campsite to delete.
+     * @param campsite The campsite record to delete.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun deleteCampsite(campsite: Campsite) {
-        campsiteRef.document(campsite.id).delete()
+    fun deleteCampsite(campsite: Campsite, onComplete: (Exception?) -> Unit = {}) {
+        deleteCampsite(campsite.id, onComplete)
     }
 
     /**
-     * Initializes the repository.
+     * Deletes a campsite by its document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    init{
-        campsiteRef.addSnapshotListener { snapshot, error ->
+    fun deleteCampsite(id: String, onComplete: (Exception?) -> Unit = {}) {
+        campsiteRef.document(id).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Converts a Firestore document into a campsite using its document ID.
+     *
+     * @param document The Firestore document to convert.
+     * @return The decoded campsite, or `null` if conversion fails.
+     */
+    private fun campsiteFromDocument(document: DocumentSnapshot): Campsite? =
+        document.toObject(Campsite::class.java)?.let { campsite ->
+            campsite.copy(
+                id = document.id,
+                campOwnerId = campsiteOwnerId(campsite)
+            )
+        }
+
+    /**
+     * Returns the campsite owner ID without using placeholder profile IDs.
+     *
+     * @param campsite The campsite whose owner ID should be returned.
+     * @return The camp owner profile ID, or an empty string when unavailable.
+     */
+    private fun campsiteOwnerId(campsite: Campsite): String =
+        campsite.campOwnerId.ifBlank {
+            if (campsite.campOwner.hasStoredIdentity()) campsite.campOwner.id else ""
+        }
+
+    private val cacheListener = campsiteRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 return@addSnapshotListener
             }
@@ -343,14 +601,18 @@ class CampsiteRepo {
             _campsites.clear()
 
             snapshot?.documents?.forEach { document ->
-                val campsite = document.toObject(Campsite::class.java)
+                val campsite = campsiteFromDocument(document)
                 if (campsite != null) {
                     _campsites.add(campsite)
                 }
             }
 
-        }
     }
+
+    /**
+     * Removes the repository's compatibility cache listener.
+     */
+    override fun close() = cacheListener.remove()
 }
 
 /**
@@ -360,13 +622,20 @@ class CampsiteRepo {
  * @property profileRef The reference to the profiles collection in the database.
  * @property db The database.
  */
-class ProfileRepo {
+class ProfileRepo : AutoCloseable {
     private val db = Firebase.firestore
     private val profileRef = db.collection("profiles")
 
     private val _profiles = mutableStateListOf<Profile>()
 
 
+    /**
+     * Filters profiles currently loaded in the compatibility cache.
+     *
+     * @param name The name to match.
+     * @param type The profile role to match, or an empty string for all roles.
+     * @return The profiles matching the supplied name and role.
+     */
     fun searchProfiles(
         name: String = "",
         type: String = ""
@@ -377,8 +646,8 @@ class ProfileRepo {
     /**
      * Adds a profile to the repository.
      *
-     * @param profile The profile to add.
-     * @param onComplete Called with `null` on success or the write error on failure.
+     * @param profile The profile record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
     fun addProfile(profile: Profile, onComplete: (Exception?) -> Unit) {
         profileRef.document(profile.id)
@@ -390,31 +659,34 @@ class ProfileRepo {
     /**
      * Updates a profile in the repository.
      *
-     * @param oldProfile The old profile.
-     * @param updatedProfile The updated profile.
+     * @param oldProfile The existing profile, used to preserve its ID.
+     * @param updatedProfile The updated profile data to save.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun updateProfile(oldProfile: Profile, updatedProfile: Profile) {
-        if (oldProfile.id != updatedProfile.id) {
-            profileRef.document(oldProfile.id).delete()
-        }
-        profileRef.document(updatedProfile.id).set(updatedProfile)
+    fun updateProfile(oldProfile: Profile, updatedProfile: Profile, onComplete: (Exception?) -> Unit = {}) {
+        val record = withProfileId(updatedProfile, oldProfile.id)
+        profileRef.document(oldProfile.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
      * Deletes a profile from the repository.
      *
-     * @param profile The profile to delete.
+     * @param profile The profile record to delete.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun deleteProfile(profile: Profile) {
+    fun deleteProfile(profile: Profile, onComplete: (Exception?) -> Unit = {}) {
         profileRef.document(profile.id).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
      * Loads a profile by its saved Firestore document ID.
      *
-     * @param id The profile document ID.
-     * @param onComplete Called with the profile and no error, or `null` and an error.
-     * @return The profile.
+     * @param id The stable document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
      */
     fun getProfileById(id: String, onComplete: (Profile?, Exception?) -> Unit) {
         profileRef.document(id).get()
@@ -425,24 +697,66 @@ class ProfileRepo {
     }
 
     /**
+     * Fetches all profiles once, for administrative browsing.
+     *
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getAllProfiles(onComplete: (List<Profile>?, Exception?) -> Unit) {
+        profileRef.get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::profileFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes profiles, optionally filtered by role.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param type The profile role to match, or `null` for all roles.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForProfiles(
+        onUpdate: (List<Profile>) -> Unit,
+        type: String? = null,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration {
+        val query = if (type == null) profileRef else profileRef.whereEqualTo("type", type)
+        return query.listenForDecodedDocuments(::profileFromDocument, onUpdate, onError)
+    }
+
+    /**
      * Converts a Firestore document to a profile.
      *
-     * @param document The Firestore document.
-     * @return The profile.
+     * @param document The Firestore document to convert.
+     * @return The decoded profile, or `null` if the document is missing or has an unknown type.
      */
-    private fun profileFromDocument(document: DocumentSnapshot): Profile? =
-        when (document.getString("type")) {
+    private fun profileFromDocument(document: DocumentSnapshot): Profile? {
+        val profile = when (document.getString("type")) {
             "Entrant" -> document.toObject(Entrant::class.java)
             "CampOwner" -> document.toObject(CampOwner::class.java)
             "Admin" -> document.toObject(Admin::class.java)
             else -> null
         }
+        return profile?.let { withProfileId(it, document.id) }
+    }
 
     /**
-     * Initializes the repository.
+     * Copies a profile with the Firestore document ID as its stable ID.
+     *
+     * @param profile The profile record to save or add.
+     * @param id The stable document ID.
+     * @return The profile with its Firestore document ID.
      */
-    init {
-        profileRef.addSnapshotListener { snapshot, error ->
+    private fun withProfileId(profile: Profile, id: String): Profile = when (profile) {
+        is Entrant -> profile.copy(id = id)
+        is CampOwner -> profile.copy(id = id)
+        is Admin -> profile.copy(id = id)
+        else -> profile
+    }
+
+    private val cacheListener = profileRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 return@addSnapshotListener
             }
@@ -456,14 +770,24 @@ class ProfileRepo {
                 }
             }
 
-        }
     }
+
+    /**
+     * Removes the repository's compatibility cache listener.
+     */
+    override fun close() = cacheListener.remove()
 }
 
+/**
+ * Represents an image associated with a campsite.
+ *
+ */
 data class Image(
-    val url: String,
-    val description: String,
-    val id: String = UUID.randomUUID().toString()
+    val url: String = "",
+    val description: String = "",
+    val id: String = UUID.randomUUID().toString(),
+    val campsiteId: String = "",
+    val uploaderId: String = ""
 )
 
 /**
@@ -473,7 +797,7 @@ data class Image(
  * @property imageRef The reference to the image collection in the database.
  * @property db The database.
  */
-class ImageRepo {
+class ImageRepo : AutoCloseable {
     private val db = Firebase.firestore
     private val imageRef = db.collection("image")
 
@@ -482,26 +806,112 @@ class ImageRepo {
     /**
      * Adds a image to the repository.
      *
-     * @param image The image to add.
+     * @param image The image record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun addImage(image: Image) {
-    imageRef.document(image.id).set(image)
+    fun addImage(image: Image, onComplete: (Exception?) -> Unit = {}) {
+        imageRef.document(image.id).set(image)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Updates an image record by its stable ID.
+     *
+     * @param image The image record to update.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun updateImage(image: Image, onComplete: (Exception?) -> Unit = {}) {
+        imageRef.document(image.id).set(image)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
      * Deletes a image from the repository.
      *
-     * @param image The image to delete.
+     * @param image The image record to delete.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun deleteImage(image: Image) {
-    imageRef.document(image.id).delete()
+    fun deleteImage(image: Image, onComplete: (Exception?) -> Unit = {}) {
+        imageRef.document(image.id).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
-     * Initializes the repository.
+     * Returns the images currently loaded by the compatibility listener.
+     *
+     * @return The images currently loaded by the repository.
      */
-    init {
-        imageRef.addSnapshotListener { snapshot, error ->
+    fun getAllImages(): List<Image> = _images.toList()
+
+    /**
+     * Fetches one image by document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getImageById(id: String, onComplete: (Image?, Exception?) -> Unit) {
+        imageRef.document(id).get()
+            .addOnSuccessListener { document -> onComplete(imageFromDocument(document), null) }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Loads images associated with a campsite once.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getImagesForCampsite(
+        campsiteId: String,
+        onComplete: (List<Image>?, Exception?) -> Unit
+    ) {
+        imageRef.whereEqualTo("campsiteId", campsiteId).get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::imageFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes all image records, for administrative browsing.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForImages(
+        onUpdate: (List<Image>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = imageRef.listenForDecodedDocuments(::imageFromDocument, onUpdate, onError)
+
+    /**
+     * Observes images belonging to a campsite.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForCampsiteImages(
+        campsiteId: String,
+        onUpdate: (List<Image>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = imageRef.whereEqualTo("campsiteId", campsiteId)
+        .listenForDecodedDocuments(::imageFromDocument, onUpdate, onError)
+
+    /**
+     * Converts a Firestore document into an image using its document ID.
+     *
+     * @param document The Firestore document to convert.
+     * @return The decoded image, or `null` if conversion fails.
+     */
+    private fun imageFromDocument(document: DocumentSnapshot): Image? =
+        document.toObject(Image::class.java)?.copy(id = document.id)
+
+    private val cacheListener = imageRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 return@addSnapshotListener
             }
@@ -509,14 +919,18 @@ class ImageRepo {
             _images.clear()
 
             snapshot?.documents?.forEach { document ->
-                val image = document.toObject(Image::class.java)
+                val image = imageFromDocument(document)
                 if (image != null) {
                     _images.add(image)
                 }
             }
 
-        }
     }
+
+    /**
+     * Removes the repository's compatibility cache listener.
+     */
+    override fun close() = cacheListener.remove()
 }
 
 /**
@@ -526,7 +940,7 @@ class ImageRepo {
  * @property notificationRef The reference to the notification collection in the database.
  * @property db The database.
  */
-class NotificationRepo {
+class NotificationRepo : AutoCloseable {
     private val db = Firebase.firestore
     private val notificationRef = db.collection("notification")
 
@@ -535,17 +949,112 @@ class NotificationRepo {
     /**
      * Adds a notification to the repository.
      *
-     * @param notification The notification to add.
+     * @param notification The notification record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun addNotification(notification: Notification) {
-    notificationRef.document(notification.id).set(notification)
+    fun addNotification(notification: Notification, onComplete: (Exception?) -> Unit = {}) {
+        notificationRef.document(notification.id).set(notification)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
-     * Initializes the repository.
+     * Updates a notification record by its stable ID.
+     *
+     * @param notification The notification record to update.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    init {
-        notificationRef.addSnapshotListener { snapshot, error ->
+    fun updateNotification(notification: Notification, onComplete: (Exception?) -> Unit = {}) {
+        notificationRef.document(notification.id).set(notification)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Returns notifications currently loaded by the compatibility listener.
+     *
+     * @return The notifications currently loaded by the repository.
+     */
+    fun getAllNotifications(): List<Notification> = _notifications.toList()
+
+    /**
+     * Loads notifications addressed to one profile.
+     *
+     * @param userId The profile ID whose notifications should be returned.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getNotificationsForUser(userId: String, onComplete: (List<Notification>?, Exception?) -> Unit) {
+        notificationRef.whereEqualTo("recipientId", userId).get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::notificationFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes notifications addressed to one profile.
+     *
+     * @param userId The profile ID whose notifications should be returned.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForUserNotifications(
+        userId: String,
+        onUpdate: (List<Notification>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = notificationRef.whereEqualTo("recipientId", userId)
+        .listenForDecodedDocuments(::notificationFromDocument, onUpdate, onError)
+
+    /**
+     * Observes every notification for the administrator's notification log.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForAllNotifications(
+        onUpdate: (List<Notification>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = notificationRef.listenForDecodedDocuments(::notificationFromDocument, onUpdate, onError)
+
+    /**
+     * Observes notifications sent by one profile, for the owner's sent log.
+     *
+     * @param senderId The sender profile ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForSentNotifications(
+        senderId: String,
+        onUpdate: (List<Notification>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = notificationRef.whereEqualTo("senderId", senderId)
+        .listenForDecodedDocuments(::notificationFromDocument, onUpdate, onError)
+
+    /**
+     * Deletes a notification by its stable ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun deleteNotification(id: String, onComplete: (Exception?) -> Unit = {}) {
+        notificationRef.document(id).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Converts a Firestore document into a notification using its document ID.
+     *
+     * @param document The Firestore document to convert.
+     * @return The decoded notification, or `null` if conversion fails.
+     */
+    private fun notificationFromDocument(document: DocumentSnapshot): Notification? =
+        document.toObject(Notification::class.java)?.copy(id = document.id)
+
+    private val cacheListener = notificationRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 return@addSnapshotListener
             }
@@ -553,20 +1062,23 @@ class NotificationRepo {
             _notifications.clear()
 
             snapshot?.documents?.forEach { document ->
-                val notification = document.toObject(Notification::class.java)
+                val notification = notificationFromDocument(document)
                 if (notification != null) {
                     _notifications.add(notification)
                 }
             }
 
-        }
     }
+
+    /**
+     * Removes the repository's compatibility cache listener.
+     */
+    override fun close() = cacheListener.remove()
 }
 
 /**
  * Represents a repository of conversations.
  *
- * @property _conversations A list of conversation.
  * @property conversationRef The reference to the conversation collection in the database.
  * @property db The database.
  */
@@ -574,36 +1086,530 @@ class ConversationRepo {
     private val db = Firebase.firestore
     private val conversationRef = db.collection("conversation")
 
-    private val _conversations = mutableStateListOf<Conversation>()
-
     /**
      * Adds a conversation to the repository.
      *
-     * @param conversation The conversation to add.
+     * @param conversation The conversation record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun addConversation(conversation: Conversation) {
-        conversationRef.document(conversation.id).set(conversation)
+    fun addConversation(conversation: Conversation, onComplete: (Exception?) -> Unit = {}) {
+        val record = withParticipantIds(conversation)
+        conversationRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**
-     * Initializes the repository.
+     * Replaces a conversation while preserving its stable ID.
      *
+     * @param conversation The conversation record to update.
+     * @param onComplete Called with `null` on success or the error on failure.
      */
-    init {
-        conversationRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
-
-            _conversations.clear()
-
-            snapshot?.documents?.forEach { document ->
-                val conversation = document.toObject(Conversation::class.java)
-                if (conversation != null) {
-                    _conversations.add(conversation)
-                }
-            }
-
-        }
+    fun updateConversation(conversation: Conversation, onComplete: (Exception?) -> Unit = {}) {
+        val record = withParticipantIds(conversation)
+        conversationRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
     }
+
+    /**
+     * Appends a message to the conversation's message array.
+     *
+     * @param conversationId The conversation document ID.
+     * @param message The message record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun addMessage(
+        conversationId: String,
+        message: Message,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        conversationRef.document(conversationId)
+            .update("messages", FieldValue.arrayUnion(message))
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Fetches one conversation by its stable document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getConversationById(id: String, onComplete: (Conversation?, Exception?) -> Unit) {
+        conversationRef.document(id).get()
+            .addOnSuccessListener { document -> onComplete(conversationFromDocument(document), null) }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Fetches all conversations once, for administrative message-log review.
+     *
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getAllConversations(onComplete: (List<Conversation>?, Exception?) -> Unit) {
+        conversationRef.get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::conversationFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes conversations for a participant; the caller should remove the returned handle.
+     *
+     * @param userId The profile ID whose notifications or conversations should be returned.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForUserConversations(
+        userId: String,
+        onUpdate: (List<Conversation>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = conversationRef.whereArrayContains("participantIds", userId)
+        .listenForDecodedDocuments(::conversationFromDocument, onUpdate, onError)
+
+    /**
+     * Observes all conversations for the administrator's message log.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForAllConversations(
+        onUpdate: (List<Conversation>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = conversationRef.listenForDecodedDocuments(::conversationFromDocument, onUpdate, onError)
+
+    /**
+     * Observes a single conversation for real-time message updates.
+     *
+     * @param conversationId The conversation document ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForConversation(
+        conversationId: String,
+        onUpdate: (Conversation?) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = conversationRef.document(conversationId).addSnapshotListener { document, error ->
+        if (error != null) onError(error) else onUpdate(document?.let(::conversationFromDocument))
+    }
+
+    /**
+     * Deletes a conversation by document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun deleteConversation(id: String, onComplete: (Exception?) -> Unit = {}) {
+        conversationRef.document(id).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Fills missing relationship IDs from the conversation's participant details.
+     *
+     * @param conversation The conversation record to save or add.
+     * @return The conversation with its relationship IDs filled.
+     */
+    private fun withParticipantIds(conversation: Conversation): Conversation = conversation.copy(
+        campOwnerId = conversation.campOwnerId.ifBlank {
+            if (conversation.campOwner.hasStoredIdentity()) conversation.campOwner.id else ""
+        },
+        entrantId = conversation.entrantId.ifBlank {
+            if (conversation.entrant.hasStoredIdentity()) conversation.entrant.id else ""
+        },
+        campsiteId = conversation.campsiteId.ifBlank {
+            if (conversation.campsite.name.isNotBlank()) conversation.campsite.id else ""
+        },
+        participantIds = (conversation.participantIds + conversation.campOwnerId + conversation.entrantId +
+            (if (conversation.campOwner.hasStoredIdentity()) conversation.campOwner.id else "") +
+            (if (conversation.entrant.hasStoredIdentity()) conversation.entrant.id else ""))
+            .filter(String::isNotBlank)
+            .distinct()
+    )
+
+    /**
+     * Converts a Firestore document into a conversation using its document ID.
+     *
+     * @param document The Firestore document to convert.
+     * @return The decoded conversation, or `null` if conversion fails.
+     */
+    private fun conversationFromDocument(document: DocumentSnapshot): Conversation? =
+        document.toObject(Conversation::class.java)?.copy(id = document.id)
+}
+
+/**
+ * Provides Firebase operations for lotteries and lottery waitlists.
+ *
+ * @property lotteryRef The reference to the lottery collection in the database.
+ * @property db The database.
+ */
+class LotteryRepo {
+    private val db = Firebase.firestore
+    private val lotteryRef = db.collection("lottery")
+
+    /**
+     * Saves a new lottery using its stable document ID.
+     *
+     * @param lottery The lottery record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun addLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
+        val record = withRelationshipIds(lottery)
+        lotteryRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Updates a lottery without changing its ID.
+     *
+     * @param lottery The lottery record to update.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun updateLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
+        val record = withRelationshipIds(lottery)
+        lotteryRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Fetches one lottery by ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getLotteryById(id: String, onComplete: (Lottery?, Exception?) -> Unit) {
+        lotteryRef.document(id).get()
+            .addOnSuccessListener { document -> onComplete(lotteryFromDocument(document), null) }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes lotteries owned by one profile.
+     *
+     * @param ownerId The owner profile ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForOwnerLotteries(
+        ownerId: String,
+        onUpdate: (List<Lottery>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = lotteryRef.whereEqualTo("campOwnerId", ownerId)
+        .listenForDecodedDocuments(::lotteryFromDocument, onUpdate, onError)
+
+    /**
+     * Observes lotteries an entrant has joined.
+     *
+     * @param entrantId The entrant profile ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForEntrantLotteries(
+        entrantId: String,
+        onUpdate: (List<Lottery>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = lotteryRef.whereArrayContains("waitlistEntrantIds", entrantId)
+        .listenForDecodedDocuments(::lotteryFromDocument, onUpdate, onError)
+
+    /**
+     * Observes all lotteries, for administrative browsing.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForAllLotteries(
+        onUpdate: (List<Lottery>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = lotteryRef.listenForDecodedDocuments(::lotteryFromDocument, onUpdate, onError)
+
+    /**
+     * Observes lotteries that include the campsite.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForCampsiteLotteries(
+        campsiteId: String,
+        onUpdate: (List<Lottery>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = lotteryRef.whereArrayContains("campsiteIds", campsiteId)
+        .listenForDecodedDocuments(::lotteryFromDocument, onUpdate, onError)
+
+    /**
+     * Adds an entrant to a lottery waitlist, enforcing a configured capacity.
+     *
+     * @param lotteryId The lottery document ID.
+     * @param entrantId The entrant profile ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun joinWaitlist(
+        lotteryId: String,
+        entrantId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(lotteryDocument)
+            if (!snapshot.exists()) throw IllegalArgumentException("Lottery not found.")
+            val entrants = snapshot.get("waitlistEntrantIds") as? List<*> ?: emptyList<Any>()
+            val capacity = snapshot.getLong("waitlistCapacity")?.toInt()
+            if (entrantId !in entrants && capacity != null && entrants.size >= capacity) {
+                throw IllegalStateException("The lottery waitlist is full.")
+            }
+            transaction.update(lotteryDocument, "waitlistEntrantIds", FieldValue.arrayUnion(entrantId))
+            true
+        }.addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Removes an entrant from a lottery waitlist.
+     *
+     * @param lotteryId The lottery document ID.
+     * @param entrantId The entrant profile ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun leaveWaitlist(lotteryId: String, entrantId: String, onComplete: (Exception?) -> Unit = {}) {
+        lotteryRef.document(lotteryId)
+            .update("waitlistEntrantIds", FieldValue.arrayRemove(entrantId))
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Deletes a lottery by ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun deleteLottery(id: String, onComplete: (Exception?) -> Unit = {}) {
+        lotteryRef.document(id).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Fills missing campsite relationship IDs from embedded campsite details.
+     *
+     * @param lottery The lottery record to save or add.
+     * @return The lottery with its campsite IDs filled.
+     */
+    private fun withRelationshipIds(lottery: Lottery): Lottery = lottery.copy(
+        campsiteIds = (lottery.campsiteIds + lottery.campsites.map { it.id })
+            .filter(String::isNotBlank)
+            .distinct()
+    )
+
+    /**
+     * Converts a Firestore document into a lottery using its document ID.
+     *
+     * @param document The Firestore document to convert.
+     * @return The decoded lottery, or `null` if conversion fails.
+     */
+    private fun lotteryFromDocument(document: DocumentSnapshot): Lottery? =
+        document.toObject(Lottery::class.java)?.copy(id = document.id)
+
+}
+
+/**
+ * Represents a repository of reservation. Provides Firebase operations for reservations, including scoped live queries.
+ *
+ * @property reservationRef The reference to the reservation collection in the database.
+ * @property db The database.
+ */
+class ReservationRepo {
+    private val db = Firebase.firestore
+    private val reservationRef = db.collection("reservation")
+
+    /**
+     * Saves a reservation, filling its relationship IDs from the embedded objects
+     * when they were not provided.
+     *
+     * @param reservation The reservation record to save or add.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun addReservation(reservation: Reservation, onComplete: (Exception?) -> Unit = {}) {
+        val record = withRelationshipIds(reservation)
+        reservationRef.document(record.id)
+            .set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Replaces the saved reservation with the supplied version.
+     *
+     * @param reservation The reservation record to update.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun updateReservation(reservation: Reservation, onComplete: (Exception?) -> Unit = {}) {
+        val record = withRelationshipIds(reservation)
+        reservationRef.document(record.id)
+            .set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Updates only the status field of an existing reservation.
+     *
+     * @param reservationId The reservation document ID.
+     * @param status The new reservation status.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun updateReservationStatus(
+        reservationId: String,
+        status: ReservationStatus,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        reservationRef.document(reservationId)
+            .update("status", status.name)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Deletes a reservation by its stable document ID.
+     *
+     * @param reservationId The reservation document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun deleteReservation(reservationId: String, onComplete: (Exception?) -> Unit = {}) {
+        reservationRef.document(reservationId)
+            .delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
+     * Loads one reservation. A missing document returns `null` without an error.
+     *
+     * @param reservationId The reservation document ID.
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getReservationById(
+        reservationId: String,
+        onComplete: (Reservation?, Exception?) -> Unit
+    ) {
+        reservationRef.document(reservationId)
+            .get()
+            .addOnSuccessListener { document ->
+                onComplete(reservationFromDocument(document), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Fetches every reservation once, for administrative browsing.
+     *
+     * @param onComplete Called with the result and no error, or `null` and the error.
+     */
+    fun getAllReservations(onComplete: (List<Reservation>?, Exception?) -> Unit) {
+        reservationRef.get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(snapshot.documents.mapNotNull(::reservationFromDocument), null)
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Observes all reservations, for administrative browsing.
+     *
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForAllReservations(
+        onUpdate: (List<Reservation>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = reservationRef.listenForDecodedDocuments(::reservationFromDocument, onUpdate, onError)
+
+    /**
+     * Listens only to reservations associated with the given entrant.
+     *
+     * @param entrantId The entrant profile ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForEntrantReservations(
+        entrantId: String,
+        onUpdate: (List<Reservation>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = reservationRef.whereArrayContains("entrantIds", entrantId)
+        .listenForDecodedDocuments(::reservationFromDocument, onUpdate, onError)
+
+    /**
+     * Listens only to reservations associated with the given camp owner.
+     *
+     * @param campOwnerId The camp owner profile ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForOwnerReservations(
+        campOwnerId: String,
+        onUpdate: (List<Reservation>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = reservationRef.whereEqualTo("campOwnerId", campOwnerId)
+        .listenForDecodedDocuments(::reservationFromDocument, onUpdate, onError)
+
+    /**
+     * Listens only to reservations associated with the given campsite.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param onUpdate Called with the current data after it loads or changes.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForCampsiteReservations(
+        campsiteId: String,
+        onUpdate: (List<Reservation>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = reservationRef.whereEqualTo("campsiteId", campsiteId)
+        .listenForDecodedDocuments(::reservationFromDocument, onUpdate, onError)
+
+    /**
+     * Fills missing relationship IDs from the reservation's associated records.
+     *
+     * @param reservation The reservation record to save or add.
+     * @return The reservation with its relationship IDs filled.
+     */
+    private fun withRelationshipIds(reservation: Reservation): Reservation = reservation.copy(
+        campsiteId = reservation.campsiteId.ifBlank {
+            if (reservation.campsite.name.isNotBlank()) reservation.campsite.id else ""
+        },
+        campOwnerId = reservation.campOwnerId.ifBlank {
+            when {
+                reservation.campOwner.hasStoredIdentity() -> reservation.campOwner.id
+                reservation.campsite.campOwner.hasStoredIdentity() -> reservation.campsite.campOwner.id
+                else -> ""
+            }
+        },
+        entrantIds = (reservation.entrantIds + reservation.entrants.map { it.id })
+            .filter(String::isNotBlank)
+            .distinct()
+    )
+
+    /**
+     * Converts a Firestore document into a reservation using its document ID.
+     *
+     * @param document The Firestore document to convert.
+     * @return The decoded reservation, or `null` if conversion fails.
+     */
+    private fun reservationFromDocument(document: DocumentSnapshot): Reservation? =
+        document.toObject(Reservation::class.java)?.copy(id = document.id)
 }
