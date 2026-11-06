@@ -1,3 +1,12 @@
+/**
+ * Contains unit tests for the application's Campsite model.
+ *
+ * Tests that campsite properties are stored correctly when created,
+ * including the campsite name, capacity, and default values.
+ * Also verifies that each campsite receives a unique and non-empty ID.
+ *
+ * Outstanding issues: None known.
+ */
 
 package com.example.coders
 
