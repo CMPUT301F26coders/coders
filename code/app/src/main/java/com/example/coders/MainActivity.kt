@@ -18,7 +18,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-
+import com.example.coders.ui.screens.ProfileScreen
 import com.example.coders.ui.screens.AdminHomeScreen
 import com.example.coders.ui.screens.ChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
@@ -57,6 +57,9 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     startDestination = "startup"
                 ) {
+                    composable("profile") {
+                        ProfileScreen(navController)
+                    }
 
                     composable("startup") {
                         LaunchedEffect(Unit) {

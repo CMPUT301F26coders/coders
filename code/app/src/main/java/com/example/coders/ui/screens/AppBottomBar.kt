@@ -64,9 +64,16 @@ fun AppBottomBar(navController: NavController) {
 
         NavigationBarItem(
             selected = false,
-            onClick = { },
+            onClick = {
+                if (!isOwner) {
+                    navigateTo("profile")
+                }
+            },
             icon = {
-                Icon(Icons.Default.Person, contentDescription = "Profile")
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = "Profile"
+                )
             }
         )
     }
