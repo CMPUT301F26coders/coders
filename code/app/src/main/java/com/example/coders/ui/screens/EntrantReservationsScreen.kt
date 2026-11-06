@@ -15,14 +15,13 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.Entrant
 import com.example.coders.ProfileRepo
-import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
 import com.example.coders.Reservation
 import com.example.coders.ReservationRepo
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
-
+import com.example.coders.Profile
 
 // The following enum was added using OpenAI, Codex, "Implement US 01.04.03: add Pending and
 // Active reservation tabs for entrant lottery offers", 2026-11-06.
@@ -75,12 +74,39 @@ fun EntrantReservationsScreen(navController: NavController) {
         mutableStateOf<Map<String, Campsite>>(emptyMap())
     }
 
+    var campOwners by remember {
+        mutableStateOf<Map<String, Profile>>(emptyMap())
+    }
+
     var reservations by remember(entrant?.id) {
         mutableStateOf<List<Reservation>>(emptyList())
     }
 
     var isLoading by remember(entrant?.id) {
         mutableStateOf(true)
+    }
+
+
+    DisposableEffect(reservations, profileRepo) {
+        var disposed = false
+
+        campOwners = emptyMap()
+
+        reservations.map { it.campOwnerId }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .forEach { ownerId ->
+
+                profileRepo.getProfileById(ownerId) { owner, _ ->
+                    if (!disposed && owner != null) {
+                        campOwners = campOwners + (ownerId to owner)
+                    }
+                }
+            }
+
+        onDispose {
+            disposed = true
+        }
     }
 
     // Listen for reservations associated with the signed-in entrant
@@ -111,6 +137,11 @@ fun EntrantReservationsScreen(navController: NavController) {
             campsiteRepo.close()
         }
     }
+    DisposableEffect(profileRepo) {
+        onDispose {
+            profileRepo.close()
+        }
+    }
 
     DisposableEffect(reservations, campsiteRepo) {
         var disposed = false
@@ -132,10 +163,9 @@ fun EntrantReservationsScreen(navController: NavController) {
 
         onDispose {
             disposed = true
-    val reservations = entrant?.reservations.orEmpty().map { reservation ->
-        locallyUpdatedStatuses[reservation.id]?.let { status -> reservation.copy(status = status) }
-            ?: reservation
+        }
     }
+
     val visibleReservations = reservations.filter { it.status == selectedTab.status }
 
     fun updateReservationStatus(
@@ -226,12 +256,13 @@ fun EntrantReservationsScreen(navController: NavController) {
             }
 
             reservations.isEmpty() -> {
-                Text("No reservations yet.")
+                Text("No reservations in this tab.")
             }
 
-            else -> reservations.forEach { summary ->
+            else -> visibleReservations.forEach { summary ->
 
                 val campsite = campsites[summary.campsiteId]
+                val campOwner = campOwners[summary.campOwnerId]
                 OutlinedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp)
@@ -309,16 +340,6 @@ fun EntrantReservationsScreen(navController: NavController) {
                         } else {
                             Button(
                                 onClick = {
-                                    navController.navigate("minimap")
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("View On Map")
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = {
                                     cancellationError = null
                                     reservationToCancel = summary
                                 },
@@ -338,29 +359,16 @@ fun EntrantReservationsScreen(navController: NavController) {
                         )
 
                         Text(
-                            text = summary.campOwner.name,
+                            text = campOwner?.name?: "Loading... ",
                             fontSize = 20.sp
                         )
 
-                        Button(
-                            onClick = {
-                                ChatData.owner = summary.campOwner.name
-                                navController.navigate("chat")
-                            },
-                            modifier = Modifier.semantics {
-                                contentDescription = "Message ${summary.campOwner.name}"
-                            }
-                        ) {
-                            Text("Message")
-                        }
-                        */
 
                     }
                 }
             }
         }
     }
-}
 
 // The following AlertDialog is from OpenAI, Codex, "in my [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) I've already added the cancel reservation feature to each card. I need you to create the AlertDialog; confirmation updates that reservation in entrant.reservations to cancelled through ProfileRepo.updateProfile(...). Then Remove it from the active display after saving. This should go after the main Column in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt)"
     reservationToCancel?.let { reservation ->
