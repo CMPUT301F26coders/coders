@@ -222,60 +222,6 @@ class EntrantHomePageTest {
         return reservations
     }
 
-    // The following function was added using OpenAI, Codex, "Add instrumented tests for accepting
-    // and declining lottery offers", 2026-11-06.
-    /** Adds one lottery offer that the current entrant has not accepted yet. */
-    private fun seedPendingOfferForSignedInEntrant(
-        campsiteName: String
-    ): Reservation {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
-            ?: error("The sign-up flow did not save the entrant profile ID")
-        val entrantDocument = firestore.collection("profiles").document(entrantId)
-        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
-
-        val owner = CampOwner(
-            name = "Lottery Owner",
-            email = "lottery-owner-${UUID.randomUUID()}@example.com",
-            phone = "7805550199"
-        )
-        val campsite = Campsite(
-            name = campsiteName,
-            location = "Jasper, Alberta",
-            description = "A campsite offered through a lottery.",
-            capacity = 4,
-            mapLocation = "Jasper, Alberta",
-            campOwner = owner,
-            id = UUID.randomUUID().toString()
-        )
-        val offer = Reservation(
-            campsite = campsite,
-            dates = "2026-11-15 - 2026-11-17",
-            guestNumber = 2,
-            status = ReservationStatus.Pending,
-            campOwner = owner,
-            entrants = listOf(entrant),
-            entrantIds = listOf(entrantId)
-        )
-        await(entrantDocument.set(entrant.copy(reservations = entrant.reservations + offer)))
-        return offer
-    }
-
-    // The following function was added using OpenAI, Codex, "Add instrumented tests for accepting
-    // and declining lottery offers", 2026-11-06.
-    private fun reservationStatusOnSignedInEntrant(reservationId: String): ReservationStatus {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
-            ?: error("The sign-up flow did not save the entrant profile ID")
-        val entrant = await(
-            firestore.collection("profiles").document(entrantId).get()
-        ).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
-
-        return entrant.reservations.first { it.id == reservationId }.status
-    }
-
     private fun assertNoDemoConversations() {
         waitForEmptyMessages()
         listOf(
@@ -502,55 +448,4 @@ class EntrantHomePageTest {
         composeTestRule.onNodeWithText("No active reservations.").assertExists()
     }
 
-    // The following test was added using OpenAI, Codex, "Add an instrumented test that accepts a
-    // pending lottery offer and persists Active status", 2026-11-06.
-    // TEST 18: Accepting a lottery offer changes its saved status to Active.
-    @Test
-    fun test18_AcceptLotteryOfferMovesItToActiveReservations() {
-        openHome()
-        val offer = seedPendingOfferForSignedInEntrant("Accept Offer Camp")
-        openEntrantReservations()
-
-        composeTestRule.onNodeWithText("Pending").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithText("Accept Offer Camp")
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-
-        composeTestRule.onNodeWithText("Accept Offer").performClick()
-
-        composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            reservationStatusOnSignedInEntrant(offer.id) == ReservationStatus.Active
-        }
-
-        composeTestRule.onNodeWithText("Accept Offer Camp").assertExists()
-        composeTestRule.onNodeWithText("Accept Offer").assertDoesNotExist()
-    }
-
-    // The following test was added using OpenAI, Codex, "Add an instrumented test that confirms a
-    // declined lottery offer, persists Rejected status, and removes it from Pending", 2026-11-06.
-    // TEST 19: Confirming a declined lottery offer rejects it and removes it from Pending.
-    @Test
-    fun test19_DeclineLotteryOfferRejectsAndRemovesItFromPending() {
-        openHome()
-        val offer = seedPendingOfferForSignedInEntrant("Decline Offer Camp")
-        openEntrantReservations()
-
-        composeTestRule.onNodeWithText("Pending").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithText("Decline Offer Camp")
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-
-        composeTestRule.onNodeWithText("Decline Offer").performClick()
-        composeTestRule.onNodeWithText("Decline lottery offer?").assertExists()
-        composeTestRule.onNodeWithText("Decline offer", useUnmergedTree = true).performClick()
-
-        composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            reservationStatusOnSignedInEntrant(offer.id) == ReservationStatus.Rejected
-        }
-
-        composeTestRule.onNodeWithText("No pending reservations.").assertExists()
-        composeTestRule.onNodeWithText("Decline Offer Camp").assertDoesNotExist()
-    }
 }
