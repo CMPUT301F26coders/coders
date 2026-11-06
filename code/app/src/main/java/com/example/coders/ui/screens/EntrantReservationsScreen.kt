@@ -18,29 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.coders.CampOwner
-import com.example.coders.Campsite
 import com.example.coders.Entrant
 import com.example.coders.ProfileRepo
 import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
-
-private const val DUMMY_RESERVATION_ID = "dummy-reservation-for-cancellation-test"
-//init as false, on confirmation, it becomes true
-private var dummyReservationinit by mutableStateOf(false)
-
-//temporary ui data for testing
-private val dummyReservation = Reservation(
-    id = DUMMY_RESERVATION_ID,
-    campsite = Campsite(
-        name = "Test Campsite",
-        location = "Test Location"
-    ),
-    dates = "November 12–14, 2026",
-    guestNumber = 2,
-    campOwner = CampOwner(name = "Test Camp Owner")
-)
 
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
@@ -56,10 +38,7 @@ fun EntrantReservationsScreen(navController: NavController) {
     val profile by SignedInProfile().rememberSignedInProfile()
     val entrant = profile as? Entrant
 
-    val reservationsToDisplay = entrant?.reservations.orEmpty().ifEmpty {
-        if (entrant != null && !dummyReservationinit) listOf(dummyReservation) else emptyList()
-    }
-    val activeReservations = reservationsToDisplay.filter { reservation ->
+    val activeReservations = entrant?.reservations.orEmpty().filter { reservation ->
         reservation.status == ReservationStatus.Active && reservation.id !in locallyCancelledIds
     }
 
@@ -199,14 +178,6 @@ fun EntrantReservationsScreen(navController: NavController) {
                 TextButton(
                     enabled = !isCancelling,
                     onClick = {
-                        //the dummy reservation is for testing this screen; dont save it. REMOVE LATER
-                        if (reservation.id == DUMMY_RESERVATION_ID) {
-                            dummyReservationinit = true
-                            locallyCancelledIds = locallyCancelledIds + reservation.id
-                            reservationToCancel = null
-                            return@TextButton
-                        }
-
                         entrant?.let { currentEntrant ->
                             isCancelling = true
 
