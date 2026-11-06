@@ -23,16 +23,30 @@ import androidx.navigation.NavController
 import com.example.coders.R
 
 /**
- * Displays the map and a back navigation button.
+ * Displays a map image of Pine Lake Campground.
  *
- * @param navController Used to navigate back to the previous screen.
+ * This screen allows users to:
+ * - View the campground map.
+ * - Return to the previous screen using the Back button.
+ *
+ * The map image is loaded from the app's drawable resources.
+ * The screen uses a navigation state to prevent the Back button
+ * from triggering multiple navigation actions.
+ *
+ * @param navController Controls navigation between screens
+ *                      and allows the user to return to the previous screen.
  */
 @Composable
 fun MiniMapScreen(navController: NavController) {
+
+    // Tracks whether the Back button has already been pressed.
     var isNavigating by remember { mutableStateOf(false) }
+
+    // Creates the main screen layout.
     Scaffold(
     ) { innerPadding ->
 
+        // Arranges the Back button, title, and map vertically.
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -40,6 +54,8 @@ fun MiniMapScreen(navController: NavController) {
                 .padding(16.dp)
         ) {
 
+            // Returns to the previous screen.
+            // Prevents multiple navigation actions from repeated clicks.
             Button(
                 onClick = {
                     if (!isNavigating) {
@@ -51,6 +67,7 @@ fun MiniMapScreen(navController: NavController) {
                 Text("Back")
             }
 
+            // Displays the campground map title.
             Text(
                 text = "Pine Lake Campground Map",
                 style = MaterialTheme.typography.headlineMedium
@@ -58,6 +75,7 @@ fun MiniMapScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Displays the campground map image from drawable resources.
             Image(
                 painter = painterResource(R.drawable.pine_lake_map),
                 contentDescription = "Pine Lake Campground Map",

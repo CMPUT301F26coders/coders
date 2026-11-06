@@ -1,3 +1,13 @@
+/**
+ * Contains unit tests for the application's user profile models.
+ *
+ * Tests the creation and properties of Entrant, CampOwner, and Admin profiles.
+ * Verifies that profile information is stored correctly, different profile
+ * types can be used together, and profile IDs are unique and stable.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 import org.junit.Assert.assertEquals
@@ -5,8 +15,26 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Contains unit tests for the different user profile types.
+ *
+ * These tests verify that:
+ * - Entrants store their personal information correctly.
+ * - Campsite owners store their information and lists correctly.
+ * - Admins store their information and notification logs.
+ * - Different profile types can be stored together.
+ * - Profile IDs are unique, stable, and non-empty.
+ */
 class ProfileTest {
 
+    /**
+     * Tests that an entrant stores its properties correctly.
+     *
+     * Creates an entrant and verifies that:
+     * - The name, email, and phone number are correct.
+     * - The reservations list is initially empty.
+     * - The waitlists list is initially empty.
+     */
     @Test
     fun entrant_creation_storesPropertiesCorrectly() {
         val entrant = Entrant(
@@ -24,6 +52,14 @@ class ProfileTest {
         assertTrue(entrant.waitlists.isEmpty())
     }
 
+    /**
+     * Tests that a campsite owner stores its properties correctly.
+     *
+     * Creates a campsite owner and verifies that:
+     * - The owner's name and email are correct.
+     * - The campsites list is initially empty.
+     * - The lotteries list is initially empty.
+     */
     @Test
     fun campOwner_creation_storesPropertiesAndListsCorrectly() {
         val owner = CampOwner(
@@ -43,6 +79,14 @@ class ProfileTest {
         assertTrue(owner.lotteries.isEmpty())
     }
 
+    /**
+     * Tests that an admin stores notification logs correctly.
+     *
+     * Creates an admin with one notification and verifies that:
+     * - The admin's name is correct.
+     * - The notification log contains exactly one notification.
+     * - The stored notification has the correct title.
+     */
     @Test
     fun admin_creation_storesAuditLogsCorrectly() {
         val notification = Notification("Title", "Content", "2026-10-26")
@@ -63,6 +107,15 @@ class ProfileTest {
         assertEquals("Title", admin.notificationLogs[0].title)
     }
 
+    /**
+     * Tests that different user profile types can be stored together.
+     *
+     * Creates an entrant, campsite owner, and admin as Profile objects.
+     * Verifies that:
+     * - The list contains exactly three profiles.
+     * - Each profile stores the correct name.
+     * - All three profile types can be accessed through the Profile class.
+     */
     @Test
     fun all_profile_types_creation_storesPropertiesCorrectly() {
         val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())
@@ -77,6 +130,16 @@ class ProfileTest {
         assertEquals("User3", userList[2].name)
     }
 
+    /**
+     * Tests that profile IDs are unique, stable, and non-empty.
+     *
+     * Creates an entrant and campsite owner and verifies that:
+     * - The two profiles have different IDs.
+     * - The entrant's ID remains unchanged when accessed again.
+     * - The entrant's ID is not blank.
+     *
+     * This helps ensure profiles can be identified individually.
+     */
     @Test
     fun profile_idsAreUniqueAndStable() {
         val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())

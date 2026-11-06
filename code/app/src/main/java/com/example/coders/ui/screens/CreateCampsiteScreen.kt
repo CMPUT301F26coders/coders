@@ -1,3 +1,15 @@
+/*
+ * Purpose
+ * UI layer for Camp Owners to register new campsites
+ * primary data collection form, constructs a new Campsite
+ * Saved in the database via the CampsiteRepo.
+ *
+ * Outstanding Issues:
+ * - Map coordinates are hardcoded to "0.0,0.0"
+ * - Image upload and Tag addition buttons are visual placeholders only
+ * - QR code generation is not yet triggered upon campsite creation.
+ */
+
 package com.example.coders.ui.screens
 
 import android.widget.Toast
@@ -26,9 +38,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
 import com.example.coders.SignedInProfile
 
-/**
- * Displays the Info Collection Screen for registering new Campsite.
 
+/**
+ * Displays a form to collect information to create a new campsite (name, location, description, capacity)
+ * Records that campsite in the database
+ *
+ * @param navController navigation to return to previous screen
+ * @param campsiteRepo the repo for database creation of the new campsite
  */
 @Composable
 fun CreateCampsiteScreen(
@@ -185,6 +201,8 @@ fun CreateCampsiteScreen(
             Button(
                 onClick = {
                     val capacityInt = occupancy.toIntOrNull()
+
+                    //making sure nothing left blank
                     if (name.isBlank() || location.isBlank() || description.isBlank() || capacityInt == null || campOwner == null) {
                         showMissingInfoError = true
                     } else {
@@ -227,8 +245,17 @@ fun CreateCampsiteScreen(
 }
 
 /**
- * renders the input field for the campsite registration
+ * text input field used in the form for campsite creation
+ *
+ * @param label The label text displayed above the input field.
+ * @param placeholder the text thats inside the input field before the user types anything
+ * @param value the string
+ * @param onValueChange when the users input changes
+ * @param testTag for testing
  */
+
+//logic for input field assisted by Google, Gemini, "How do I create an input field for a campsite so that I am able to test it"
+// 2026-11-06
 @Composable
 fun CampsiteInputField(
     label: String,
@@ -252,6 +279,10 @@ fun CampsiteInputField(
         )
     }
 }
+
+/**
+ * UI preview of the CreateCampsiteScreen
+ */
 @Preview(showBackground = true)
 @Composable
 fun PreviewCreateCampsiteScreen() {

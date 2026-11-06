@@ -1,3 +1,11 @@
+/*
+ * Purpose/Role:
+ * UI layer displays a filtered list of past reservations
+ *
+ * Outstanding Issues:
+ * - The "CSV" download button is a placeholder (the asCsv helper functions exist but dont have a file exporter).
+ */
+
 package com.example.coders.ui.screens
 
 import android.net.Uri
@@ -38,6 +46,15 @@ import com.example.coders.SignedInProfile
 
 
 //The code for filtering past reservations is from Google, Gemini, "How can I make sure this code only displays past reservations and not all reservations"
+//2026-11-06
+
+/**
+ * displays a list of past reservations for entrant
+ *
+ *
+ * @param navController used to navigate between screens
+ * @param testEntrant Entrant profile for mock data
+ */
 @Composable
 fun EntrantPastReservationsScreen(
     navController: NavController,
@@ -163,6 +180,16 @@ fun EntrantPastReservationsScreen(
     }
 }
 
+/**
+ * Renders a summary card for a single past reservation.
+ *
+ * This card displays the campsite's name, location, and guest count, alongside
+ * interactive buttons for rating the campsite and downloading the reservation details as a CSV.
+ *
+ * @param campsiteName name of reserved campsite
+ * @param location location of campsite
+ * @param guests number of guests in the reservatoin
+ */
 @Composable
 fun PastReservationCard(
     reservation: Reservation,
@@ -236,6 +263,15 @@ fun PastReservationCard(
     }
 }
 
+
+//Functions for CSVs created by Google, Gemini "How do i convert a Reservation object into a CSV format" 2026-11-05
+
+/**
+ * converts reservation and its details into formatted csv string
+ *
+ * @param campsite Campsite associated with this reservation.
+ * @return string formatted as a standard CSV
+ */
 private fun Reservation.asCsv(campsite: Campsite?): String = buildString {
     appendLine("reservation_id,campsite_id,campsite_name,location,dates,guests,status,rating")
     appendCsvValue(id)
@@ -256,6 +292,15 @@ private fun Reservation.asCsv(campsite: Campsite?): String = buildString {
     appendLine()
 }
 
+//Functions for CSVs created by Google, Gemini "How do i convert a Reservation object into a CSV format" 2026-11-05
+/**
+ * Safely appends a string value for CSV export
+ *
+ * Wraps the text in double quotes
+
+ *
+ * @param value The string to be appended
+ */
 private fun StringBuilder.appendCsvValue(value: String) {
     append('"')
     append(value.replace("\"", "\"\""))

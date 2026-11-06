@@ -1,3 +1,14 @@
+/*
+ * Purpose:
+ * UI that allows Camp Owners to modify existing campsite details
+ * A form with the existing state of a Campsite object and pushes updates
+ * to the Firestore database using CampsiteRepo
+ *
+ * Outstanding Issues:
+ * - "Upload Images" button is a visual placeholder, Firebase integration is missing.
+ * - Tag addition functionality ("+") is just a placeholder
+ * - No logic to manage the campsites QR code if details change
+ */
 
 package com.example.coders.ui.screens
 
@@ -26,6 +37,17 @@ import com.example.coders.CampsiteRepo
 //This function was assisted by Google, Gemini,
 // (Given the context of CreateCampsiteScreen.kt, Data.kt)
 // "Help me create a file which now updates the details of a campsite"
+//2026-11-05
+
+/**
+ * displays screen to edit details of a campsite that already exists
+ * The form is already filled with the details the owner entered when initially creating the campsite,
+ * they can edit any detail and it updates the campsite details
+ *
+ * @param navController to navigate back after
+ * @param campsite the campsite object that has the details of the campsite before editing
+ * @param campsiteRepo repo for database campsite updates
+ */
 @Composable
 fun EditCampsiteScreen(
     navController: NavController,
@@ -147,6 +169,7 @@ fun EditCampsiteScreen(
 
                     Button(
                         onClick = {
+                            //validate the input, if its not right, revert to the previous existing
                             val updatedCampsite = campsite.copy(
                                 name = name,
                                 location = location,
@@ -175,6 +198,16 @@ fun EditCampsiteScreen(
 //This function was assisted by Google, Gemini,
 // (Given the context of CreateCampsiteScreen.kt, Data.kt)
 // "Help me create a file which now updates the details of a campsite"
+//2026-11-05
+
+/**
+ * renders the text input field for the campsite edit form
+ *
+ * @param label the label thats above the input field
+ * @param value the current input
+ * @param onValueChange call back when the input is changed
+ * @param testTag string tag for testing
+ */
 @Composable
 private fun EditCampsiteInputField(
     label: String,
