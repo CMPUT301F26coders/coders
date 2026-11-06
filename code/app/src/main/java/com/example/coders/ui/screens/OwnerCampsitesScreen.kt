@@ -25,7 +25,6 @@ import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.SignedInProfile
-
 /**
  * Displays a list of campsites
  *
@@ -36,10 +35,42 @@ fun OwnerCampsitesScreen(
     campsiteRepo: CampsiteRepo? = null
 ) {
 
-    val campsites = campsiteRepo?.getAllCampsites() ?: emptyList()
+    val repo = remember { campsiteRepo ?: CampsiteRepo() }
+
+
     val profile by SignedInProfile().rememberSignedInProfile()
     var campsiteToDelete by remember { mutableStateOf<Campsite?>(null) }
     var isNavigating by remember { mutableStateOf(false) }
+
+    var campsites by remember(profile?.id) {
+        mutableStateOf<List<Campsite>>(emptyList())
+    }
+    DisposableEffect(profile?.id, repo) {
+        val ownerId = (profile as? CampOwner)?.id
+
+        val listener = if (!ownerId.isNullOrBlank()) {
+            repo.listenForOwnerCampsites(
+                ownerId = ownerId,
+                onUpdate = { updatedCampsites ->
+                    campsites = updatedCampsites
+                }
+            )
+        } else {
+            null
+        }
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    DisposableEffect(repo) {
+        onDispose {
+            if (campsiteRepo == null) {
+                repo.close()
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -103,7 +134,7 @@ fun OwnerCampsitesScreen(
                 text = { Text("Are you sure? cant undo.", fontSize = 10.sp) },
                 confirmButton = {
                     TextButton(onClick = {
-                        campsiteRepo?.deleteCampsite(target)
+                        repo.deleteCampsite(target)
                         campsiteToDelete = null
                     }) { Text("Delete", fontSize = 10.sp) }
                 },
