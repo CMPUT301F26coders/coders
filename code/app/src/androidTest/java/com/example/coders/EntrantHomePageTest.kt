@@ -553,4 +553,39 @@ class EntrantHomePageTest {
         composeTestRule.onNodeWithText("No pending reservations.").assertExists()
         composeTestRule.onNodeWithText("Decline Offer Camp").assertDoesNotExist()
     }
+
+    // The following test was added using OpenAI, Codex, "Add an instrumented test that confirms
+    // cancellation persists Cancelled status and removes an entrant reservation from Active",
+    // 2026-11-06.
+    // TEST 20: Confirming cancellation updates Firestore and removes the reservation from Active.
+    @Test
+    fun test20_CancelReservationUpdatesFirestoreAndRemovesItFromActiveReservations() {
+        openHome()
+        val reservations = seedReservationsForSignedInEntrant()
+        val reservationToCancel = reservations.first()
+        openEntrantReservations()
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText(reservationToCancel.campsite.name)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithContentDescription(
+            "Cancel reservation for ${reservationToCancel.campsite.name}"
+        ).performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Cancel reservation?").assertExists()
+        composeTestRule.onNodeWithText(
+            "Confirm cancellation",
+            useUnmergedTree = true
+        ).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            reservationStatusOnSignedInEntrant(reservationToCancel.id) ==
+                ReservationStatus.Cancelled &&
+                composeTestRule.onAllNodesWithText(reservationToCancel.campsite.name)
+                    .fetchSemanticsNodes().isEmpty()
+        }
+
+        composeTestRule.onNodeWithText(reservationToCancel.campsite.name).assertDoesNotExist()
+    }
 }
