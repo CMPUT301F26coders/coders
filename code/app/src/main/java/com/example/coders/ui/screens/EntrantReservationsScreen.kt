@@ -18,15 +18,50 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.coders.CampOwner
+import com.example.coders.Campsite
 import com.example.coders.Entrant
+import com.example.coders.ProfileRepo
+import com.example.coders.Reservation
+import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
+
+private const val DUMMY_RESERVATION_ID = "dummy-reservation-for-cancellation-test"
+//init as false, on confirmation, it becomes true
+private var dummyReservationinit by mutableStateOf(false)
+
+//temporary ui data for testing
+private val dummyReservation = Reservation(
+    id = DUMMY_RESERVATION_ID,
+    campsite = Campsite(
+        name = "Test Campsite",
+        location = "Test Location"
+    ),
+    dates = "November 12–14, 2026",
+    guestNumber = 2,
+    campOwner = CampOwner(name = "Test Camp Owner")
+)
 
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
     var isNavigating by remember { mutableStateOf(false) }
 
+    var reservationToCancel by remember { mutableStateOf<Reservation?>(null) }
+    var isCancelling by remember { mutableStateOf(false) }
+    var cancellationError by remember { mutableStateOf<String?>(null) }
+    var locallyCancelledIds by remember { mutableStateOf(emptySet<String>()) }
+
+    val profileRepo = remember { ProfileRepo() }
+
     val profile by SignedInProfile().rememberSignedInProfile()
     val entrant = profile as? Entrant
+
+    val reservationsToDisplay = entrant?.reservations.orEmpty().ifEmpty {
+        if (entrant != null && !dummyReservationinit) listOf(dummyReservation) else emptyList()
+    }
+    val activeReservations = reservationsToDisplay.filter { reservation ->
+        reservation.status == ReservationStatus.Active && reservation.id !in locallyCancelledIds
+    }
 
     Column(
         modifier = Modifier
@@ -58,8 +93,8 @@ fun EntrantReservationsScreen(navController: NavController) {
         when {
             profile == null -> CircularProgressIndicator()
             entrant == null -> Text("Reservations are available to entrant profiles only.")
-            entrant.reservations.isEmpty() -> Text("No reservations yet.")
-            else -> entrant.reservations.forEach { summary ->
+            activeReservations.isEmpty() -> Text("No active reservations.")
+            else -> activeReservations.forEach { summary ->
                 OutlinedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp)
@@ -88,7 +123,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                         Text(summary.guestNumber.toString())
 
                         Spacer(modifier = Modifier.height(20.dp))
-
+                        
                         Button(
                             onClick = {
                                 navController.navigate("minimap")
@@ -96,6 +131,19 @@ fun EntrantReservationsScreen(navController: NavController) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("View On Map")
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                cancellationError = null
+                                reservationToCancel = summary
+                            },
+                            modifier = Modifier.fillMaxWidth().semantics {
+                                contentDescription = "Cancel reservation for ${summary.campsite.name}"
+                            }
+                        ) {
+                            Text("Cancel Reservation")
                         }
 
                         Spacer(modifier = Modifier.height(25.dp))
@@ -126,5 +174,77 @@ fun EntrantReservationsScreen(navController: NavController) {
                 }
             }
         }
+    }
+// The following AlertDialog is from OpenAI, Codex, "in my [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) I've already added the cancel reservation feature to each card. I need you to create the AlertDialog; confirmation updates that reservation in entrant.reservations to cancelled through ProfileRepo.updateProfile(...). Then Remove it from the active display after saving. This should go after the main Column in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt)"
+    reservationToCancel?.let { reservation ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!isCancelling) reservationToCancel = null
+            },
+            title = { Text("Cancel reservation?") },
+            text = {
+                Column {
+                    Text(
+                        "Cancel your reservation for ${reservation.campsite.name}? " +
+                            "This action cannot be undone."
+                    )
+
+                    cancellationError?.let { error ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(error, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isCancelling,
+                    onClick = {
+                        //the dummy reservation is for testing this screen; dont save it. REMOVE LATER
+                        if (reservation.id == DUMMY_RESERVATION_ID) {
+                            dummyReservationinit = true
+                            locallyCancelledIds = locallyCancelledIds + reservation.id
+                            reservationToCancel = null
+                            return@TextButton
+                        }
+
+                        entrant?.let { currentEntrant ->
+                            isCancelling = true
+
+                            val updatedEntrant = currentEntrant.copy(
+                                reservations = currentEntrant.reservations.map {
+                                    if (it.id == reservation.id) {
+                                        it.copy(status = ReservationStatus.Cancelled)
+                                    } else {
+                                        it
+                                    }
+                                }
+                            )
+
+                            profileRepo.updateProfile(currentEntrant, updatedEntrant) { error ->
+                                isCancelling = false
+
+                                if (error == null) {
+                                    locallyCancelledIds = locallyCancelledIds + reservation.id
+                                    reservationToCancel = null
+                                } else {
+                                    cancellationError =
+                                        error.message ?: "Unable to cancel reservation."
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (isCancelling) "Cancelling…" else "Confirm cancellation")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isCancelling,
+                    onClick = { reservationToCancel = null }
+                ) {
+                    Text("Keep reservation")
+                }
+            }
+        )
     }
 }
