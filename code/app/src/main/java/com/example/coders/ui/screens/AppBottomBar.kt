@@ -1,3 +1,13 @@
+/*
+ * Purpose/Role:
+ * Core navigation component providing the Bottom Navigation bar for the app.
+ * Implements basic Role Based Access at the UI level by conditionally
+ * rendering tabs depending on the User role.
+ *
+ * Outstanding Issues:
+ * - No outstanding issues.
+ */
+
 package com.example.coders.ui.screens
 
 import androidx.compose.material.icons.Icons

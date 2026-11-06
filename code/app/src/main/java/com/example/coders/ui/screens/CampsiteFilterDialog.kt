@@ -1,3 +1,14 @@
+/*
+ * Purpose:
+ * Reusable UI dialog component for collecting search filters
+ * (location, dates, guest count)
+ * Follows the stateless composable pattern by passing
+ * input data back to the parent screen via the onApply callback.
+ *
+ * Outstanding Issues:
+ * - No outstanding issues
+ */
+
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*

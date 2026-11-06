@@ -1,3 +1,11 @@
+/*
+ * Purpose/Role:
+ * UI layer displays a filtered list of past reservations
+ *
+ * Outstanding Issues:
+ * - The "CSV" download button is a placeholder (the asCsv helper functions exist but dont have a file exporter).
+ */
+
 package com.example.coders.ui.screens
 
 import android.net.Uri

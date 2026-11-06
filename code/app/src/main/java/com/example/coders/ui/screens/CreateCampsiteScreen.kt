@@ -1,3 +1,15 @@
+/*
+ * Purpose
+ * UI layer for Camp Owners to register new campsites
+ * primary data collection form, constructs a new Campsite
+ * Saved in the database via the CampsiteRepo.
+ *
+ * Outstanding Issues:
+ * - Map coordinates are hardcoded to "0.0,0.0"
+ * - Image upload and Tag addition buttons are visual placeholders only
+ * - QR code generation is not yet triggered upon campsite creation.
+ */
+
 package com.example.coders.ui.screens
 
 import android.widget.Toast

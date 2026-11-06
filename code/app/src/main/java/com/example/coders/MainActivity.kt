@@ -29,7 +29,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.coders.ui.screens.ProfileScreen
-import com.example.coders.ui.screens.AdminHomeScreen
 import com.example.coders.ui.screens.ChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
 import com.example.coders.ui.screens.HomeScreen
@@ -131,10 +130,6 @@ class MainActivity : ComponentActivity() {
 
                     composable("signup") {
                         SignUpScreen(navController)
-                    }
-
-                    composable("admin") {
-                        AdminHomeScreen()
                     }
 
                     composable("home") {
