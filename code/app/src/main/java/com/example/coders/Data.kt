@@ -1,3 +1,15 @@
+/**
+ * Defines the application's data models and Firebase Firestore repositories.
+ *
+ * Contains models for profiles, campsites, reservations, lotteries,
+ * waitlists, notifications, messages, and conversations.
+ *
+ * Implements the repository pattern to manage Firestore operations,
+ * including creating, retrieving, updating, deleting, and observing records.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 import androidx.compose.runtime.mutableStateListOf
@@ -18,6 +30,8 @@ import android.util.Log
  * @property name The name of the profile.
  * @property email The email of the profile.
  * @property phone The phone number of the profile.
+* @property id The unique identifier of the profile.
+ * @property type The role associated with the profile.
  */
 interface Profile {
     val name: String
@@ -357,6 +371,7 @@ data class Message (
  * @property entrantId Entrant profile document ID.
  * @property campsiteId Campsite document ID.
  * @property participantIds Profile document IDs participating in the chat.
+* @property id The unique identifier of the conversation.
  */
 data class Conversation (
     val messages : List<Message> = emptyList(),
@@ -974,7 +989,12 @@ class ReservationRatingRepo {
 
 /**
  * Represents an image associated with a campsite.
- *
+ * 
+* @property url The URL of the image.
+ * @property description A description of the image.
+ * @property id The unique identifier of the image.
+ * @property campsiteId The ID of the campsite associated with the image.
+ * @property uploaderId The ID of the profile that uploaded the image.
  */
 data class Image(
     val url: String = "",
@@ -1438,6 +1458,9 @@ class ConversationRepo {
 
 
     /**
+     * Creates a conversation between the campsite owner and each entrant
+     * associated with a reservation.
+     *
      * @param reservation The reservation to create a conversation for
      */
     fun createConversationsForReservation(
