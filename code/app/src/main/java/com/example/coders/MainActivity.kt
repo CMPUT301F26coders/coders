@@ -18,7 +18,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-
+import com.example.coders.ui.screens.ProfileScreen
 import com.example.coders.ui.screens.AdminHomeScreen
 import com.example.coders.ui.screens.ChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
@@ -35,6 +35,7 @@ import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.CampOwner
 import com.example.coders.ui.screens.CreateCampsiteScreen
+import com.example.coders.ui.screens.EditCampsiteScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,6 +61,9 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     startDestination = "startup"
                 ) {
+                    composable("profile") {
+                        ProfileScreen(navController)
+                    }
 
                     composable("startup") {
                         LaunchedEffect(Unit) {
@@ -198,6 +202,33 @@ class MainActivity : ComponentActivity() {
                             CampsiteDetailsScreen(
                                 navController = navController,
                                 campsite = campsite
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Campsite not found")
+                            }
+                        }
+                    }
+                    composable(
+                        route = "edit_campsite/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        val campsiteId = backStackEntry.arguments?.getString("campsiteId").orEmpty()
+
+                        val campsite = campsiteRepo
+                            .getAllCampsites()
+                            .firstOrNull { it.id == campsiteId }
+
+                        if (campsite != null) {
+                            EditCampsiteScreen(
+                                navController = navController,
+                                campsite = campsite,
+                                campsiteRepo = campsiteRepo
                             )
                         } else {
                             Box(
