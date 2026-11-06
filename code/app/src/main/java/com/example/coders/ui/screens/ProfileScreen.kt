@@ -135,6 +135,7 @@ fun ProfileScreen(navController: NavController) {
                     )
                     Text(p.email)
                     Text(p.phone)
+                    Text(p.id)
                 }
 
                 Card(
