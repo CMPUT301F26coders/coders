@@ -131,17 +131,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("create_campsite") {
-                        // so that we dont get access denied error
-                        // change this after, this is just for the frontend for the createcampsitetest to work
-                        val currentOwner = CampOwner(
-                            name = "John Smith",
-                            email = "john@gmail.com",
-                            phone = "7805550199"
-                        )
-
                         CreateCampsiteScreen(
                             navController = navController,
-                            campOwner = currentOwner,
                             campsiteRepo = campsiteRepo
                         )
                     }

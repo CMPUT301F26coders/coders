@@ -24,6 +24,7 @@ import com.example.coders.CampsiteRepo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
+import com.example.coders.SignedInProfile
 
 /**
  * Displays the Info Collection Screen for registering new Campsite.
@@ -32,9 +33,10 @@ import androidx.navigation.compose.rememberNavController
 @Composable
 fun CreateCampsiteScreen(
     navController: NavController,
-    campOwner: CampOwner?,
     campsiteRepo: CampsiteRepo?
 ) {
+    val profile by remember { SignedInProfile() }.rememberSignedInProfile()
+    val campOwner = profile as? CampOwner
     val context = LocalContext.current
 
 
@@ -45,25 +47,9 @@ fun CreateCampsiteScreen(
     var rules by remember { mutableStateOf("") }
     var tags by remember { mutableStateOf(listOf<String>()) }
 
-    var showNotRegisteredError by remember { mutableStateOf(campOwner == null) }
+
     var showMissingInfoError by remember { mutableStateOf(false) }
 
-//the rejection screen
-    if (showNotRegisteredError) {
-        AlertDialog(
-            onDismissRequest = {  },
-            title = { Text("Access Denied") },
-            text = { Text("Only registered users can register a campsite.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showNotRegisteredError = false
-                    navController.popBackStack()
-                }) {
-                    Text("Ok")
-                }
-            }
-        )
-    }
 
     // missing req info message screen
     if (showMissingInfoError) {
@@ -211,15 +197,26 @@ fun CreateCampsiteScreen(
                             capacity = capacityInt,
                             mapLocation = "0.0,0.0", //place holder coords, logic not implemented yet
                             campOwner = campOwner,
+                            campOwnerId = campOwner.id,
                             tags = tags
                         )
-                        campsiteRepo?.addCampsite(newCampsite)
-
-                        Toast.makeText(context, "Campsite Registered", Toast.LENGTH_SHORT).show()
-                        navController.popBackStack()
+                        if (campsiteRepo == null) {
+                            Toast.makeText(context, "Campsite repository unavailable", Toast.LENGTH_SHORT).show()
+                        } else {
+                            campsiteRepo.addCampsite(newCampsite) { error ->
+                                if (error == null) {
+                                    Toast.makeText(context, "Campsite Registered", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                } else {
+                                    Toast.makeText(context, "Failed to save campsite", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface)
             ) {
@@ -261,7 +258,6 @@ fun PreviewCreateCampsiteScreen() {
     //  dummy NavController, dummy owner, and null for the repo
     CreateCampsiteScreen(
         navController = rememberNavController(),
-        campOwner = CampOwner(name = "Test Owner", email = "test@gmail.com", phone = "123-456-7890"),
         campsiteRepo = null
     )
 }
