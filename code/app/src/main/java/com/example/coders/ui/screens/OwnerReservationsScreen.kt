@@ -18,11 +18,18 @@ import com.example.coders.Reservation
 import com.example.coders.ReservationRepo
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
+import com.example.coders.Campsite
+import com.example.coders.CampsiteRepo
 
 @Composable
 fun OwnerReservationsScreen(navController: NavController) {
 
     val reservationRepo = remember { ReservationRepo() }
+    val campsiteRepo = remember { CampsiteRepo() }
+
+    var campsites by remember {
+        mutableStateOf<Map<String, Campsite>>(emptyMap())
+    }
     val signedInProfile = remember { SignedInProfile() }
     val profile by signedInProfile.rememberSignedInProfile()
 
@@ -71,6 +78,32 @@ fun OwnerReservationsScreen(navController: NavController) {
         }
         onDispose {
             listener?.remove()
+        }
+    }
+    DisposableEffect(reservations, campsiteRepo) {
+        var disposed = false
+
+
+        reservations.map { it.campsiteId }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .forEach { campsiteId ->
+
+                campsiteRepo.getCampsiteById(campsiteId) { campsite, _ ->
+                    if (!disposed && campsite != null) {
+                        campsites = campsites + (campsiteId to campsite)
+                    }
+                }
+            }
+
+        onDispose {
+            disposed = true
+        }
+    }
+
+    DisposableEffect(campsiteRepo) {
+        onDispose {
+            campsiteRepo.close()
         }
     }
 
@@ -161,7 +194,7 @@ fun OwnerReservationsScreen(navController: NavController) {
         }
 
         filteredReservations.forEach { reservation ->
-
+            val campsite = campsites[reservation.campsiteId]
             OutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp)
@@ -171,7 +204,7 @@ fun OwnerReservationsScreen(navController: NavController) {
                 ) {
 
                     Text(
-                        text = reservation.campsite.name,
+                        text = campsite?.name ?: "Loading...",
                         fontWeight = FontWeight.Bold
                     )
 
@@ -221,7 +254,7 @@ fun OwnerReservationsScreen(navController: NavController) {
                 Column {
                     Text(
                         "Are you sure you want to reject the reservation at " +
-                                "${reservationToReject?.campsite?.name}? " +
+                                "${reservationToReject?.let { campsites[it.campsiteId]?.name } ?: "Loading..."}? " +
                                 "This action cannot be undone."
                     )
 
