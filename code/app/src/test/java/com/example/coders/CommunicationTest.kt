@@ -1,3 +1,4 @@
+
 package com.example.coders
 
 import com.example.coders.Notification
@@ -6,8 +7,24 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Contains unit tests for the communication features of the app.
+ *
+ * These tests verify that:
+ * - Notifications store their title, content, and date correctly.
+ * - Messages store the correct sender and content.
+ * - Conversations store messages, campsite owners, and entrants.
+ * - Notifications receive unique and non-empty IDs.
+ * - Conversations receive unique and non-empty IDs.
+ */
 class CommunicationTest {
 
+    /**
+     * Tests that a notification stores its information correctly.
+     *
+     * Creates a notification and verifies that its title,
+     * content, and date match the values provided.
+     */
     @Test
     fun notification_storesTitleAndContent() {
         val notification = Notification(
@@ -21,6 +38,13 @@ class CommunicationTest {
         assertEquals("2026-10-26", notification.date)
     }
 
+    /**
+     * Tests that a message stores its sender and content correctly.
+     *
+     * Creates an entrant and a message, then verifies that:
+     * - The sender's name is correct.
+     * - The message content matches the provided text.
+     */
     @Test
     fun message_storesSenderAndContent() {
         val entrant = Entrant("Alice", "alice@test.com", "123", emptyList(), emptyList())
@@ -34,6 +58,16 @@ class CommunicationTest {
         assertEquals("What time is check-in?", message.content)
     }
 
+    /**
+     * Tests that a conversation stores its participants and messages correctly.
+     *
+     * Creates a campsite owner, entrant, and message.
+     * Then creates a conversation and verifies that:
+     * - The campsite owner's name is correct.
+     * - The entrant's name is correct.
+     * - The conversation contains one message.
+     * - The stored message contains the expected text.
+     */
     @Test
     fun conversation_storesMessagesAndCampOwnerAndEntrant() {
         val owner = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
@@ -53,6 +87,15 @@ class CommunicationTest {
         assertEquals("Hello!", chat.messages[0].content)
     }
 
+    /**
+     * Tests that different notifications receive unique and non-empty IDs.
+     *
+     * Creates two notifications and verifies that:
+     * - Their generated IDs are different.
+     * - Neither notification has a blank ID.
+     *
+     * This helps ensure each notification can be identified separately.
+     */
     @Test
     fun notification_ids_autoIncrementOnCreation() {
         val notification1 = Notification(
@@ -70,6 +113,15 @@ class CommunicationTest {
         assertTrue(notification2.id.isNotBlank())
     }
 
+    /**
+     * Tests that different conversations receive unique and non-empty IDs.
+     *
+     * Creates two separate conversations and verifies that:
+     * - Their generated IDs are different.
+     * - Neither conversation has a blank ID.
+     *
+     * This helps ensure each conversation can be identified individually.
+     */
     @Test
     fun conversation_ids_autoIncrementOnCreation() {
         val owner = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
