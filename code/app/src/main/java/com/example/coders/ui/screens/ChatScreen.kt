@@ -1,3 +1,13 @@
+/*
+ * Purpose/Role:
+ * Real time messaging UI between Entrants and Camp Owners. The view layer
+ * observing live Firestore data through the ConversationRepo, rendering messages
+ * with left right alignment based on the sender ID.
+ *
+ * Outstanding Issues:
+ * - no critical outstanding issues
+ */
+
 
 package com.example.coders.ui.screens
 

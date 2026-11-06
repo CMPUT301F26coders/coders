@@ -1,3 +1,14 @@
+/*
+ * Purpose:
+ * UI that allows Camp Owners to modify existing campsite details
+ * A form with the existing state of a Campsite object and pushes updates
+ * to the Firestore database using CampsiteRepo
+ *
+ * Outstanding Issues:
+ * - "Upload Images" button is a visual placeholder, Firebase integration is missing.
+ * - Tag addition functionality ("+") is just a placeholder
+ * - No logic to manage the campsites QR code if details change
+ */
 
 package com.example.coders.ui.screens
 

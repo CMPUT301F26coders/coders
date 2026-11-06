@@ -1,3 +1,13 @@
+/*
+ * Purpose/Role:
+ * The primary discovery screen for Entrants
+ * Integrates the CampsiteFilterDialog and
+ * local text search to filter the list of campsites
+ *
+ * Outstanding Issues:
+ * - no critical outstanding issues
+ */
+
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*

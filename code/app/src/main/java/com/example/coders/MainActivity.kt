@@ -114,10 +114,6 @@ class MainActivity : ComponentActivity() {
                         SignUpScreen(navController)
                     }
 
-                    composable("admin") {
-                        AdminHomeScreen()
-                    }
-
                     composable("home") {
                         HomeScreen(navController)
                     }
