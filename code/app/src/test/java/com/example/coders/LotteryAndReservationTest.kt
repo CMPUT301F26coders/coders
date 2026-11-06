@@ -1,4 +1,16 @@
 
+/**
+ * Contains unit tests for the application's lottery and reservation models.
+ *
+ * Tests that waitlists correctly store campsites and entrants,
+ * lotteries store their campsite information, dates, and statuses,
+ * and reservations store their campsite, guest count, and status.
+ * Also verifies that lottery and reservation statuses
+ * contain the expected values.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 import org.junit.Assert.assertEquals
@@ -12,7 +24,7 @@ import org.junit.Test
  * - Waitlists store the correct campsite and entrants.
  * - Lotteries store their campsite, date, and status correctly.
  * - Reservations store their campsite, guest count, and status.
- * - Lottery and reservation status enums contain the expected values.
+ * - Lottery and reservation statuses contain the expected values.
  */
 class LotteryAndReservationTest {
 
@@ -100,7 +112,7 @@ class LotteryAndReservationTest {
     }
 
     /**
-     * Tests that the lottery and reservation status enums
+     * Tests that the lottery and reservation statuses
      * contain the expected number of values.
      *
      * Verifies that:

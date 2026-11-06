@@ -1,3 +1,13 @@
+/**
+ * Contains unit tests for the application's message summary feature.
+ *
+ * Tests that entrants and campsite owners see the correct conversation
+ * partners and latest messages. Also verifies that empty conversations
+ * display a placeholder message and that profiles without supported
+ * conversation lists return no message summaries.
+ *
+ * Outstanding issues: None known.
+ */
 
 package com.example.coders
 

@@ -1,3 +1,12 @@
+/**
+ * Provides access to the currently signed-in user's profile.
+ *
+ * Uses AuthManager to retrieve the locally saved profile ID and ProfileRepo
+ * to load the corresponding profile from Firestore.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 import androidx.compose.runtime.Composable

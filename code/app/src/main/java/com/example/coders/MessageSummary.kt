@@ -1,3 +1,12 @@
+/**
+ * Defines the data used to display conversation summaries in the messages screen.
+ *
+ * Contains the MessageSummary model and a helper function that converts
+ * a user's conversations into summaries for display.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 /**
@@ -7,6 +16,7 @@ package com.example.coders
  * @property otherPersonName Name of the conversation partner.
  * @property latestMessage Text of the latest message, or a placeholder when there are no messages.
  * @property latestDate Date of the latest message, or an empty string when there are no messages.
+ * @property conversationId Unique identifier of the associated conversation.
  */
 data class MessageSummary(
     val campsiteName: String,

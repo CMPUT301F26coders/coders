@@ -1,3 +1,13 @@
+/**
+ * Contains unit tests for the application's communication models.
+ *
+ * Tests that notifications correctly store their title, content, and date,
+ * messages store their sender and content, and conversations store their
+ * participants and messages. Also verifies that notifications and
+ * conversations receive unique and non-empty IDs.
+ *
+ * Outstanding issues: None known.
+ */
 
 package com.example.coders
 

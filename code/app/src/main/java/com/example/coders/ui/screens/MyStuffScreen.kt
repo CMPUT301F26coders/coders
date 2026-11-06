@@ -1,3 +1,12 @@
+/**
+ * Defines the My Stuff screen for entrants and campsite owners.
+ *
+ * Displays role-specific navigation options
+ * for managing campsites, bookings, and reservations.
+ *
+ * Outstanding issues: Entrant waitlist navigation is currently
+ * commented out cuz its not implemented.
+ */
 
 package com.example.coders.ui.screens
 
@@ -20,6 +29,13 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.UserSession
 
+
+/**
+ * Displays the My Stuff screen with navigation options 
+ * based on the current user's role.
+ *
+ * @param navController Used to navigate to the appropriate management screens.
+ */
 @Composable
 fun MyStuffScreen(navController: NavController) {
 
@@ -116,6 +132,15 @@ fun MyStuffScreen(navController: NavController) {
     }
 }
 
+
+/**
+ * Displays a menu button with an icon, title, and subtitle.
+ *
+ * @param title The main text displayed on the button.
+ * @param subtitle The supporting text displayed below the title.
+ * @param icon The icon displayed beside the text.
+ * @param onClick Action performed when the button is clicked.
+ */
 @Composable
 fun MyStuffMenuButton(
     title: String,

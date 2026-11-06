@@ -1,3 +1,12 @@
+/**
+ * Manages local user sessions using Preferences DataStore.
+ *
+ * Stores and retrieves the signed-in user's profile ID to maintain
+ * their session across app launches.
+ *
+ * Outstanding issues: None known.
+ */
+
 package com.example.coders
 
 import android.content.Context

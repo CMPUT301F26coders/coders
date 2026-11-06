@@ -1,3 +1,11 @@
+/**
+ * Displays and manages reservations associated with the signed-in campsite owner.
+ *
+ * Uses repository to connect to Firestore to retrieve reservations,
+ * display them by status, and allow campsite owners to reject active reservations.
+ *
+ * Outstanding issues: None known.
+ */
 
 package com.example.coders.ui.screens
 
@@ -21,6 +29,14 @@ import com.example.coders.SignedInProfile
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 
+/**
+ * Displays the campsite owner's reservations grouped by status.
+ *
+ * Observes reservation updates from Firestore, retrieves associated campsite
+ * details, and provides a confirmation dialog for rejecting reservations.
+ *
+ * @param navController Used to navigate back to the previous screen.
+ */
 @Composable
 fun OwnerReservationsScreen(navController: NavController) {
 

@@ -1,4 +1,5 @@
 # Sprint History
+Note: We also have a sprint planning tab in our project that reflects our sprints
 
 ## Sprint 1 (Oct 21 – Oct 28)
 
