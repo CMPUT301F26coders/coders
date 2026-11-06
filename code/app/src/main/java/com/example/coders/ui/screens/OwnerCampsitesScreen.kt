@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +24,7 @@ import androidx.navigation.NavController
 import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
+import com.example.coders.SignedInProfile
 
 /**
  * Displays a list of campsites
@@ -31,12 +33,11 @@ import com.example.coders.CampsiteRepo
 @Composable
 fun OwnerCampsitesScreen(
     navController: NavController,
-    campOwner: CampOwner? = null,
     campsiteRepo: CampsiteRepo? = null
 ) {
 
     val campsites = campsiteRepo?.getAllCampsites() ?: emptyList()
-
+    val profile by SignedInProfile().rememberSignedInProfile()
     var campsiteToDelete by remember { mutableStateOf<Campsite?>(null) }
     var isNavigating by remember { mutableStateOf(false) }
 

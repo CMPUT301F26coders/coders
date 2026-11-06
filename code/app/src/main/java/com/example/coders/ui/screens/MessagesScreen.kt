@@ -67,6 +67,7 @@ fun MessagesScreen(navController: NavController) {
                         message = summary.latestMessage,
                         date = summary.latestDate,
                         picture = R.drawable.ic_launcher_foreground,
+                        conversationId = summary.conversationId,
                         navController = navController
                     )
                 }
@@ -83,6 +84,7 @@ fun MessageBox(
     message: String,
     date: String,
     picture: Int,
+    conversationId: String,
     navController: NavController
 ) {
 
@@ -95,12 +97,12 @@ fun MessageBox(
         OutlinedButton(
             onClick = {
                 ChatData.owner = owner
+                ChatData.conversationId = conversationId
                 navController.navigate("chat")
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
-
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
