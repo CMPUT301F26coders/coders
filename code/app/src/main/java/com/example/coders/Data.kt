@@ -257,7 +257,10 @@ data class Lottery (
     val bookingEndDate: String = "",
     val winnerCount: Int = 1,
     val waitlistCapacity: Int? = null,
-    val waitlistEntrantIds: List<String> = emptyList()
+    val waitlistEntrantIds: List<String> = emptyList(),
+    val participatingOwnerIds: List<String> = emptyList(),
+    val allowOtherOwners: Boolean = false
+
 )
 
 /**
@@ -286,7 +289,11 @@ data class Reservation (
     val campOwnerId: String = "",
     val entrantIds: List<String> = emptyList(),
     /** The entrant's one-to-five rating, kept independent from [status]. */
-    val rating: Int? = null
+    val rating: Int? = null,
+    val lotteryId: String = "",
+    val startDate: String = "",
+    val endDate: String = ""
+
 )
 
 /**
@@ -1530,6 +1537,25 @@ class ConversationRepo {
 class LotteryRepo {
     private val db = Firebase.firestore
     private val lotteryRef = db.collection("lottery")
+    /**
+     * Checks that lottery settings are valid.
+     *
+     * @param lottery The lottery to check.
+     * @return True if the settings are valid.
+     */
+    fun validateLottery(lottery: Lottery): Boolean {
+        if (lottery.winnerCount <= 0) {
+            return false
+        }
+    
+        if (lottery.waitlistCapacity != null &&
+            lottery.waitlistCapacity <= 0) {
+            return false
+        }
+    
+        return true
+    }
+
 
     /**
      * Saves a new lottery using its stable document ID.
@@ -1537,25 +1563,70 @@ class LotteryRepo {
      * @param lottery The lottery record to save or add.
      * @param onComplete Called with `null` on success or the error on failure.
      */
+    
     fun addLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
+        if (!validateLottery(lottery)) {
+            onComplete(IllegalArgumentException("Invalid lottery settings."))
+            return
+        }
+    
         val record = withRelationshipIds(lottery)
         lotteryRef.document(record.id).set(record)
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
 
+
+    
     /**
-     * Updates a lottery without changing its ID.
+     * Updates a lottery only before registration closes.
      *
-     * @param lottery The lottery record to update.
-     * @param onComplete Called with `null` on success or the error on failure.
+     * @param lottery The lottery with updated settings.
+     * @param onComplete Called with null on success or an error on failure.
      */
     fun updateLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
-        val record = withRelationshipIds(lottery)
-        lotteryRef.document(record.id).set(record)
-            .addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+        if (!validateLottery(lottery)) {
+            onComplete(IllegalArgumentException("Invalid lottery settings."))
+            return
+        }
+    
+        val lotteryDocument = lotteryRef.document(lottery.id)
+    
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(lotteryDocument)
+    
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+    
+            val registrationEndDate = snapshot.getString("registrationEndDate")
+                ?: throw IllegalStateException("Registration end date is missing.")
+    
+            val closingDate = java.time.LocalDate.parse(registrationEndDate)
+            val today = java.time.LocalDate.now()
+    
+            if (!today.isBefore(closingDate)) {
+                throw IllegalStateException("Registration has already ended.")
+            }
+    
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "registrationStartDate" to lottery.registrationStartDate,
+                    "registrationEndDate" to lottery.registrationEndDate,
+                    "bookingStartDate" to lottery.bookingStartDate,
+                    "bookingEndDate" to lottery.bookingEndDate,
+                    "winnerCount" to lottery.winnerCount,
+                    "waitlistCapacity" to lottery.waitlistCapacity
+                )
+            )
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
+
 
     /**
      * Fetches one lottery by ID.
