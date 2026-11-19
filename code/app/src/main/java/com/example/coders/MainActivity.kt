@@ -97,23 +97,13 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 profileRepo.getProfileById(savedProfileId) { profile, _ ->
                                     mainScope.launch(Dispatchers.Main.immediate) {
-
-                                        val destination = when (profile) {
-                                            is Admin -> {
-                                                UserSession.isOwner = false
-                                                "admin"
-                                            }
-                                            is CampOwner -> {
-                                                UserSession.isOwner = true
-                                                "home"
-                                            }
-                                            is Entrant -> {
-                                                UserSession.isOwner = false
-                                                "home"
-                                            }
-                                            else -> "signup"
+                                        val destination = if(profile != null) {
+                                            UserSession.initializeView(profile)
+                                            "home"
                                         }
-
+                                        else{
+                                            "signup"
+                                        }
                                         navController.replaceStartupWith(destination)
                                     }
                                 }

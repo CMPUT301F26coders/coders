@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.UserSession
-
+import com.example.coders.ViewMode
 
 /**
  * Displays the My Stuff screen with navigation options 
@@ -39,8 +39,8 @@ import com.example.coders.UserSession
 @Composable
 fun MyStuffScreen(navController: NavController) {
 
-    val isOwner = UserSession.isOwner
 
+    val isOwner = (UserSession.viewMode == ViewMode.CAMP_OWNER)
     Scaffold(
         bottomBar = {
             AppBottomBar(navController = navController)

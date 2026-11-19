@@ -20,19 +20,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavController
 import com.example.coders.UserSession
+import com.example.coders.ViewMode
 
 /**
  * Renders navigation bar for the application
  *based on the users role
  * All users have "Home", "Messages", "My Stuff", and "Profile".
- * Entrants see a "Search" tab, while Camp Owners do not.
+ * Entrants and Admins see a "Search" tab, while Camp Owners do not.
  *
  * @param navController navigation controller used to switch between main app destinations
  */
 @Composable
 fun AppBottomBar(navController: NavController) {
 
-    val isOwner = UserSession.isOwner
+    val viewMode = UserSession.viewMode
 
     // Local helper function to handle navigation
     fun navigateTo(route: String) {
@@ -70,7 +71,7 @@ fun AppBottomBar(navController: NavController) {
             }
         )
 
-        if (!isOwner) {
+        if (viewMode != ViewMode.CAMP_OWNER) {
             NavigationBarItem(
                 selected = false,
                 onClick = { navigateTo("search") },

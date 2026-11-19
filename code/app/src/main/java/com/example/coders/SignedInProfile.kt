@@ -37,8 +37,9 @@ class SignedInProfile {
                 ?: return@LaunchedEffect
 
             ProfileRepo().getProfileById(profileId) { profile, error ->
-                if (error == null) {
+                if (error == null && profile != null) {
                     profileState.value = profile
+                    UserSession.initializeView(profile)
                 }
             }
         }
