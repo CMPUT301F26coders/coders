@@ -188,17 +188,15 @@ fun SignUpScreen(navController: NavController) {
                             } else {
                                 try {
                                     AuthManager(context.applicationContext).saveUserId(profile.id)
+                                    UserSession.initializeView(profile)
                                     when (profile) {
-                                        is Admin -> {
-                                            UserSession.isOwner = false
-                                            navController.navigate("admin")
+                                        is Admin -> { //starts by having admin in an entrant view, can switch to camp owner view
+                                            navController.navigate("home")
                                         }
                                         is CampOwner -> {
-                                            UserSession.isOwner = true
                                             navController.navigate("home")
                                         }
                                         is Entrant -> {
-                                            UserSession.isOwner = false
                                             navController.navigate("home")
                                         }
                                     }

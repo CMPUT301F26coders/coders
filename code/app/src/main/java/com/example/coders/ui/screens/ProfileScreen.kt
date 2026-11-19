@@ -1,14 +1,16 @@
 /**
- * Displays and manages the signed-in entrant's profile information and settings.
+ * Displays and manages profile information for all user types.
  *
- * Uses AuthManager and Firebase Firestore to display and
- * update profile information, manage notification preferences, and delete
- * the user's profile.
+ * Allows users to view and update their personal information
+ * and delete their profiles.
  *
- * Outstanding issues: Only entrant profiles are supported 
- * (fulfills the user stories tied to profiles but could be improved).
- * Deleting a profile does not automatically remove associated records
- * such as reservations, conversations, or notifications.
+ * Entrant view provides notification preferences.
+ * Administrators can switch between entrant, campsite owner,
+ * and administrator interfaces.
+ *
+ * Outstanding issues:
+ * Deleting a profile does not automatically remove associated
+ * reservations, conversations, or notifications.
  */
 
 package com.example.coders.ui.screens
@@ -33,21 +35,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.AuthManager
-import com.example.coders.Entrant
 import com.example.coders.ProfileRepo
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.core.content.edit
+import com.example.coders.Profile
+import com.example.coders.UserSession
+import com.example.coders.ViewMode
+import com.example.coders.Admin
 
 /**
- * Displays the entrant's profile and account management options.
+ * Displays the user's profile and account management options.
  *
  * Loads profile information from Firestore and allows the user to edit
  * personal details, toggle notification preferences, or delete their profile.
  *
  * @param navController Used to navigate between screens.
  */
+@OptIn(ExperimentalMaterial3Api::class) //needed for dropdown menu
 @Composable
 fun ProfileScreen(navController: NavController) {
     val context = LocalContext.current
@@ -56,7 +62,7 @@ fun ProfileScreen(navController: NavController) {
     val repo = remember { ProfileRepo() }
     val db = remember { FirebaseFirestore.getInstance() }
 
-    var user by remember { mutableStateOf<Entrant?>(null) }
+    var user by remember { mutableStateOf<Profile?>(null) }
     var loading by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -78,9 +84,9 @@ fun ProfileScreen(navController: NavController) {
                 loading = false
             } else {
                 repo.getProfileById(id) { profile, exception ->
-                    user = profile as? Entrant
+                    user = profile
                     if (exception != null || user == null) {
-                        error = exception?.message ?: "Entrant not found."
+                        error = exception?.message ?: "Profile not found."
                         loading = false
                     } else {
                         db.collection("profiles").document(id).get()
@@ -158,7 +164,6 @@ fun ProfileScreen(navController: NavController) {
                     Text(p.phone)
                     Text(p.id)
                 }
-
                 Card(
                     colors = CardDefaults.cardColors(Color.White),
                     shape = RoundedCornerShape(14.dp)
@@ -167,55 +172,113 @@ fun ProfileScreen(navController: NavController) {
                         ProfileItem("First Name", p.name.substringBefore(" ")) {
                             openEdit("First Name")
                         }
+
                         HorizontalDivider()
+
                         ProfileItem("Last Name", p.name.substringAfter(" ", "")) {
                             openEdit("Last Name")
                         }
+
                         HorizontalDivider()
-                        ProfileItem("Email", p.email) { openEdit("Email") }
+
+                        ProfileItem("Email", p.email) {
+                            openEdit("Email")
+                        }
+
                         HorizontalDivider()
+
                         ProfileItem("Phone Number", p.phone) {
                             openEdit("Phone Number")
                         }
+
                         HorizontalDivider()
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                            verticalAlignment = Alignment.CenterVertically
+
+                        Text("Account Type: ${p.type}")
+                    }
+                }
+                if (p is Admin) {
+
+                    var expanded by remember { mutableStateOf(false) }
+
+                    val viewOptions = listOf(
+                        ViewMode.ADMIN,
+                        ViewMode.ENTRANT,
+                        ViewMode.CAMP_OWNER
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
+                    ) {
+                        OutlinedTextField(
+                            value = UserSession.viewMode.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Switch View") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = expanded
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
                         ) {
-                            Icon(Icons.Default.Person, null)
-                            Spacer(Modifier.width(12.dp))
-                            Text("Account Type", Modifier.weight(1f))
-                            Text("● Entrant", color = MaterialTheme.colorScheme.primary)
+                            viewOptions.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when (mode) {
+                                                ViewMode.ADMIN -> "Admin"
+                                                ViewMode.ENTRANT -> "Entrant"
+                                                ViewMode.CAMP_OWNER -> "Campsite Owner"
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        UserSession.switchView(p, mode)
+                                        expanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
+
 
                 Card(
                     colors = CardDefaults.cardColors(Color.White),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(Modifier.padding(horizontal = 12.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = 64.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Notifications, null)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Turn Off Notifications")
-                                Text(
-                                    if (dnd) "Notifications muted"
-                                    else "Notifications enabled",
-                                    style = MaterialTheme.typography.labelSmall
+                        if(UserSession.viewMode == ViewMode.ENTRANT) {
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Notifications, null)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("Turn Off Notifications")
+                                    Text(
+                                        if (dnd) "Notifications muted"
+                                        else "Notifications enabled",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                                Switch(
+                                    checked = !dnd,
+                                    enabled = !busy,
+                                    onCheckedChange = { pendingDnd = !it }
                                 )
                             }
-                            Switch(
-                                checked = !dnd,
-                                enabled = !busy,
-                                onCheckedChange = { pendingDnd = !it }
-                            )
+                            HorizontalDivider()
                         }
-                        HorizontalDivider()
                         Row(
                             Modifier.fillMaxWidth().heightIn(min = 56.dp)
                                 .clickable { deleteConfirm = true },
@@ -279,9 +342,9 @@ fun ProfileScreen(navController: NavController) {
                         .update(key, updated)
                         .addOnSuccessListener {
                             user = when (key) {
-                                "name" -> p.copy(name = updated)
-                                "email" -> p.copy(email = updated)
-                                else -> p.copy(phone = updated)
+                                "name" -> p.withUpdatedDetails(name = updated)
+                                "email" -> p.withUpdatedDetails(email = updated)
+                                else -> p.withUpdatedDetails(phone = updated)
                             }
                             busy = false
                             editField = null
@@ -399,6 +462,7 @@ fun ProfileScreen(navController: NavController) {
                             scope.launch {
                                 try {
                                     auth.clearUserId()
+                                    UserSession.clearSession()
                                     context.getSharedPreferences(
                                         "entrant_notification_settings",
                                         Context.MODE_PRIVATE
