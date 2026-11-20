@@ -30,39 +30,20 @@ import com.example.coders.UserSession
  */
 @Composable
 fun HomeScreen(navController: NavController) {
-    val isOwner = UserSession.isOwner
 
     Scaffold(
         bottomBar = {
             AppBottomBar(navController = navController)
         }
     ) { innerPadding ->
-
-        if (isOwner) {
-            OwnerHomeContent(
-                modifier = Modifier.padding(innerPadding)
-            )
-        } else {
-            EntrantHomeContent(
-                navController = navController,
-                modifier = Modifier.padding(innerPadding)
-            )
-        }
+        HomeContent(
+            navController = navController,
+            modifier = Modifier.padding(innerPadding)
+        )
     }
 }
 
-/**
- * Displays the campsite owner's home screen content.
- *
- * @param modifier Modifier used to customize the layout.
- */
-@Composable
-fun OwnerHomeContent(modifier: Modifier = Modifier) {
-    Text(
-        text = "Campsite Owner Home",
-        modifier = modifier
-    )
-}
+
 
 /**
  * Displays the entrant's home screen with notifications and
@@ -72,7 +53,7 @@ fun OwnerHomeContent(modifier: Modifier = Modifier) {
  * @param modifier Modifier used to customize the layout.
  */
 @Composable
-fun EntrantHomeContent(
+fun HomeContent(
     navController: NavController,
     modifier: Modifier = Modifier
 ) {

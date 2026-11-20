@@ -40,6 +40,20 @@ interface Profile {
     val id: String
 
     val type: String
+
+    /**
+     * Returns a copy of the profile with updated personal information.
+     *
+     * @param name The updated name.
+     * @param email The updated email.
+     * @param phone The updated phone number.
+     * @return A new profile containing the updated information.
+     */
+    fun withUpdatedDetails(
+        name: String = this.name,
+        email: String = this.email,
+        phone: String = this.phone
+    ): Profile
 }
 
 /**
@@ -62,6 +76,13 @@ data class Entrant(
     val conversations: MutableList<Conversation> = mutableListOf()
 ) : Profile {
 
+    override fun withUpdatedDetails(
+        name: String,
+        email: String,
+        phone: String
+    ): Profile {
+        return copy(name = name, email = email, phone = phone)
+    }
 }
 
 /**
@@ -88,6 +109,20 @@ data class CampOwner(
     override val id: String = UUID.randomUUID().toString()
 ) : Profile {
 
+    /**
+     * copies the profile with updated details, used on profile screen
+     *
+     * @property name name of user
+     * @property email email of user
+     * @property phone phone number of user
+     */
+    override fun withUpdatedDetails(
+        name: String,
+        email: String,
+        phone: String
+    ): Profile {
+        return copy(name = name, email = email, phone = phone)
+    }
 }
 
 /**
@@ -114,6 +149,13 @@ data class Admin (
     override val id: String = UUID.randomUUID().toString()
 ) : Profile {
 
+    override fun withUpdatedDetails(
+        name: String,
+        email: String,
+        phone: String
+    ): Profile {
+        return copy(name = name, email = email, phone = phone)
+    }
 }
 
 /**
