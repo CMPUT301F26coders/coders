@@ -301,7 +301,9 @@ data class Lottery (
     val waitlistCapacity: Int? = null,
     val waitlistEntrantIds: List<String> = emptyList(),
     val participatingOwnerIds: List<String> = emptyList(),
-    val allowOtherOwners: Boolean = false
+    val allowOtherOwners: Boolean = false,
+    val availabilityStartDate: String = "",
+    val availabilityEndDate: String = ""
 
 )
 
