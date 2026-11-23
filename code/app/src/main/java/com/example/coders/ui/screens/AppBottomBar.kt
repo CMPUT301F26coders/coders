@@ -54,14 +54,15 @@ fun AppBottomBar(navController: NavController) {
                 Icon(Icons.Default.Home, contentDescription = "Home")
             }
         )
-
-        NavigationBarItem(
-            selected = false,
-            onClick = { navigateTo("messages") },
-            icon = {
-                Icon(Icons.Default.Email, contentDescription = "Messages")
-            }
-        )
+        if (viewMode != ViewMode.ADMIN) {
+            NavigationBarItem(
+                selected = false,
+                onClick = { navigateTo("messages") },
+                icon = {
+                    Icon(Icons.Default.Email, contentDescription = "Messages")
+                }
+            )
+        }
 
         NavigationBarItem(
             selected = false,
