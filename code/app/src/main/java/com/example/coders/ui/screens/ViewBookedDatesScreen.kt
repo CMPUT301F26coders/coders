@@ -6,7 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,74 +18,203 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+
+import com.example.coders.CampOwner
+import com.example.coders.CampsiteRepo
+import com.example.coders.Reservation
+import com.example.coders.ReservationRepo
+import com.example.coders.ReservationStatus
+import com.example.coders.SignedInProfile
+
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 /**
- * Displays a calendar of booked and available dates for a campsite.
+ * US 02.06.01: View Booked Dates.
  *
- * Campsite owners can:
- * - View booked dates in red and available dates in green.
- * - Move between months using the navigation buttons.
- * - Select a date to check its booking status.
- * - View reservation details for a booked date.
- * - See a message when the campsite has no bookings.
+ * Displays active reservations for a campsite using Firebase.
+ * Booked dates appear red and other dates appear green.
+ * The calendar updates automatically when reservations change.
  *
- * This screen only handles the user interface.
- * Booking information is provided by another part of the app.
+ * Only the campsite owner may view the reservation details.
  *
- * @param navController Controls navigation back to the previous screen.
- * @param campsiteId The ID of the campsite being viewed.
- * @param bookedDates A map containing booked dates and their reservation details.
- *                    Dates must use the YYYY-MM-DD format.
+ * @param navController Used for navigation.
+ * @param campsiteId ID of the selected campsite.
+ * @param bookedDates Kept for compatibility with MainActivity.
  */
 @Composable
 fun ViewBookedDatesScreen(
     navController: NavController,
     campsiteId: String,
-    bookedDates: Map<String, String>
+    bookedDates: Map<String, String> = emptyMap()
 ) {
+    val reservationRepo = remember { ReservationRepo() }
+    val campsiteRepo = remember { CampsiteRepo() }
 
-    // Remember which month and year the owner is viewing.
+    val signedInProfile = remember { SignedInProfile() }
+    val profile by signedInProfile.rememberSignedInProfile()
+    val ownerId = (profile as? CampOwner)?.id
+
     var calendar by remember {
         mutableStateOf(Calendar.getInstance())
     }
 
-    // Remember the date selected by the owner.
     var selectedDate by remember {
         mutableStateOf("")
     }
 
-    // Get the year, month, and number of days in the current month.
+    var reservations by remember {
+        mutableStateOf<List<Reservation>>(emptyList())
+    }
+
+    var isOwner by remember {
+        mutableStateOf(false)
+    }
+
+    var loading by remember {
+        mutableStateOf(true)
+    }
+
+    var errorMessage by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    /**
+     * Verify that the selected campsite belongs
+     * to the signed-in campsite owner.
+     */
+    DisposableEffect(campsiteId, ownerId) {
+        var disposed = false
+
+        loading = true
+        isOwner = false
+        errorMessage = null
+        reservations = emptyList()
+
+        if (ownerId.isNullOrBlank() || campsiteId.isBlank()) {
+            loading = false
+            errorMessage = "Sign in as a campsite owner."
+        } else {
+            campsiteRepo.getCampsiteById(campsiteId) { campsite, error ->
+                if (!disposed) {
+                    val campsiteOwnerId = campsite?.campOwnerId
+                        ?.ifBlank { campsite.campOwner.id }
+
+                    when {
+                        error != null ->
+                            errorMessage = error.message
+
+                        campsite == null ->
+                            errorMessage = "Campsite not found."
+
+                        campsiteOwnerId != ownerId ->
+                            errorMessage = "You do not own this campsite."
+
+                        else ->
+                            isOwner = true
+                    }
+
+                    loading = false
+                }
+            }
+        }
+
+        onDispose {
+            disposed = true
+        }
+    }
+
+    /**
+     * Listen for real-time Firebase reservation updates.
+     * The listener is removed when the screen closes.
+     */
+    DisposableEffect(campsiteId, isOwner) {
+        val listener = if (isOwner) {
+            loading = true
+
+            reservationRepo.listenForCampsiteReservations(
+                campsiteId = campsiteId,
+                onUpdate = { updatedReservations ->
+                    reservations = updatedReservations
+                    errorMessage = null
+                    loading = false
+                },
+                onError = { error ->
+                    errorMessage = error.message
+                        ?: "Unable to load reservations."
+                    loading = false
+                }
+            )
+        } else {
+            null
+        }
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    // Only active reservations count as booked.
+    val activeReservations = reservations.filter {
+        it.status == ReservationStatus.Active
+    }
+
+    // Convert each active reservation into individual booked dates.
+    val firebaseBookedDates = remember(activeReservations) {
+        val dates = mutableMapOf<String, String>()
+
+        activeReservations.forEach { reservation ->
+            val reservationDates = getReservationDates(
+                reservation.startDate,
+                reservation.endDate
+            )
+
+            reservationDates.forEach { date ->
+                val details = """
+                    Reservation ID: ${reservation.id}
+                    Guests: ${reservation.guestNumber}
+                    Check-in: ${reservation.startDate}
+                    Check-out: ${reservation.endDate}
+                """.trimIndent()
+
+                dates[date] = listOfNotNull(
+                    dates[date],
+                    details
+                ).joinToString("\n\n")
+            }
+        }
+
+        dates.toMap()
+    }
+
+    val hasInvalidDates = activeReservations.any {
+        getReservationDates(it.startDate, it.endDate).isEmpty()
+    }
+
     val year = calendar.get(Calendar.YEAR)
     val month = calendar.get(Calendar.MONTH)
     val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-    // Convert the month into a readable name, such as "November 2026".
     val monthName = SimpleDateFormat(
         "MMMM yyyy",
         Locale.getDefault()
     ).format(calendar.time)
 
-    // Main layout containing the calendar and reservation information.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
 
-        // Return to the previous screen.
         TextButton(
-            onClick = {
-                navController.popBackStack()
-            }
+            onClick = { navController.popBackStack() }
         ) {
             Text("Back")
         }
 
-        // Screen title.
         Text(
             text = "Booked Dates",
             fontSize = 28.sp,
@@ -96,174 +227,222 @@ fun ViewBookedDatesScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Show which campsite the owner is viewing.
-        Text("Campsite ID: $campsiteId")
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Display the current month with buttons to change months.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            // Move to the previous month.
-            Button(
-                onClick = {
-                    val newCalendar = calendar.clone() as Calendar
-                    newCalendar.add(Calendar.MONTH, -1)
-                    calendar = newCalendar
-                    selectedDate = ""
-                }
-            ) {
-                Text("<")
+        when {
+            loading -> {
+                CircularProgressIndicator()
             }
 
-            // Display the month and year.
-            Text(
-                text = monthName,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            // Move to the next month.
-            Button(
-                onClick = {
-                    val newCalendar = calendar.clone() as Calendar
-                    newCalendar.add(Calendar.MONTH, 1)
-                    calendar = newCalendar
-                    selectedDate = ""
-                }
-            ) {
-                Text(">")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Find which weekday the first day of the month falls on.
-        // This helps position dates correctly in the calendar.
-        val firstDay = calendar.clone() as Calendar
-        firstDay.set(Calendar.DAY_OF_MONTH, 1)
-
-        // Calculate how many empty spaces are needed before day 1.
-        val emptyDays = firstDay.get(Calendar.DAY_OF_WEEK) - 1
-
-        // Display the calendar using seven columns, one for each weekday.
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(7),
-            modifier = Modifier.height(330.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-
-            // Display weekday headings from Sunday to Saturday.
-            item { Text("S") }
-            item { Text("M") }
-            item { Text("T") }
-            item { Text("W") }
-            item { Text("T") }
-            item { Text("F") }
-            item { Text("S") }
-
-            // Add empty spaces to align the first day of the month.
-            items(emptyDays) {
-                Spacer(modifier = Modifier.size(40.dp))
-            }
-
-            // Create a calendar box for every day in the month.
-            items(daysInMonth) { index ->
-
-                // Convert the index into the actual day number.
-                val day = index + 1
-
-                // Format the date as YYYY-MM-DD.
-                // Example: 2026-11-10
-                val date = "%04d-%02d-%02d".format(
-                    Locale.US,
-                    year,
-                    month + 1,
-                    day
+            errorMessage != null -> {
+                Text(
+                    text = errorMessage ?: "",
+                    color = MaterialTheme.colorScheme.error
                 )
+            }
 
-                // Check whether the date exists in the booked dates map.
-                val isBooked = bookedDates.containsKey(date)
+            !isOwner -> {
+                Text("You cannot view this campsite's bookings.")
+            }
 
-                // Use red for booked dates and green for available dates.
-                val backgroundColor = if (isBooked) {
-                    Color(0xFFFFCDD2)
-                } else {
-                    Color(0xFFC8E6C9)
+            else -> {
+                Text("Campsite ID: $campsiteId")
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Navigate between calendar months.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            val newCalendar = calendar.clone() as Calendar
+                            newCalendar.add(Calendar.MONTH, -1)
+                            calendar = newCalendar
+                            selectedDate = ""
+                        }
+                    ) {
+                        Text("<")
+                    }
+
+                    Text(
+                        text = monthName,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Button(
+                        onClick = {
+                            val newCalendar = calendar.clone() as Calendar
+                            newCalendar.add(Calendar.MONTH, 1)
+                            calendar = newCalendar
+                            selectedDate = ""
+                        }
+                    ) {
+                        Text(">")
+                    }
                 }
 
-                // Display the date as a clickable calendar box.
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            backgroundColor,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable {
-                            selectedDate = date
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
+                Spacer(modifier = Modifier.height(20.dp))
 
-                    // Show the day number inside the box.
+                val firstDay = calendar.clone() as Calendar
+                firstDay.set(Calendar.DAY_OF_MONTH, 1)
+
+                val emptyDays = firstDay.get(Calendar.DAY_OF_WEEK) - 1
+
+                // Display the calendar.
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(7),
+                    modifier = Modifier.height(330.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
+                        item {
+                            Text(day)
+                        }
+                    }
+
+                    items(emptyDays) {
+                        Spacer(modifier = Modifier.size(40.dp))
+                    }
+
+                    items(daysInMonth) { index ->
+                        val day = index + 1
+
+                        val date = "%04d-%02d-%02d".format(
+                            Locale.US,
+                            year,
+                            month + 1,
+                            day
+                        )
+
+                        val isBooked = firebaseBookedDates.containsKey(date)
+
+                        val backgroundColor = if (isBooked) {
+                            Color(0xFFFFCDD2)
+                        } else {
+                            Color(0xFFC8E6C9)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    backgroundColor,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    selectedDate = date
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = day.toString(),
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+
+                Text("Red = Booked")
+                Text("Green = Available")
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                // Show message when no dates are booked.
+                if (firebaseBookedDates.isEmpty() && !hasInvalidDates) {
+                    Text("This campsite has no bookings.")
+                }
+
+                if (hasInvalidDates) {
                     Text(
-                        text = day.toString(),
-                        color = Color.Black
+                        text = "Some active reservations have invalid or missing dates.",
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
-        }
 
-        // Explain the calendar colors.
-        Text("Red = Booked")
-        Text("Green = Available")
+                // Display reservation details for selected date.
+                if (selectedDate.isNotEmpty()) {
+                    Text(
+                        text = "Selected Date: $selectedDate",
+                        fontWeight = FontWeight.Bold
+                    )
 
-        Spacer(modifier = Modifier.height(15.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-        // Show a message when there are no booked dates.
-        if (bookedDates.isEmpty()) {
-            Text("This campsite has no bookings.")
-        }
+                    val details = firebaseBookedDates[selectedDate]
 
-        // Display booking information after the owner selects a date.
-        if (selectedDate.isNotEmpty()) {
+                    if (details != null) {
+                        Text(
+                            text = "Status: Booked",
+                            color = Color.Red
+                        )
 
-            // Show the selected date.
-            Text(
-                text = "Selected Date: $selectedDate",
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Check whether the selected date is booked.
-            if (bookedDates.containsKey(selectedDate)) {
-
-                // Show the booked status.
-                Text(
-                    text = "Status: Booked",
-                    color = Color.Red
-                )
-
-                // Display the reservation details provided by the app.
-                Text(
-                    text = bookedDates[selectedDate] ?: ""
-                )
-
-            } else {
-
-                // Show available status when no booking exists.
-                Text(
-                    text = "Status: Available",
-                    color = Color(0xFF2E7D32)
-                )
+                        Text(details)
+                    } else {
+                        Text(
+                            text = "Status: Available",
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+/**
+ * Converts reservation dates into individual booked nights.
+ *
+ * Expected format: yyyy-MM-dd.
+ * The check-in date is included and checkout is excluded.
+ *
+ * Example:
+ * November 11 to November 13 books November 11 and 12.
+ */
+private fun getReservationDates(
+    startDate: String,
+    endDate: String
+): List<String> {
+
+    val formatter = SimpleDateFormat(
+        "yyyy-MM-dd",
+        Locale.US
+    ).apply {
+        isLenient = false
+    }
+
+    val start = try {
+        formatter.parse(startDate)
+    } catch (e: Exception) {
+        null
+    } ?: return emptyList()
+
+    val end = try {
+        formatter.parse(endDate)
+    } catch (e: Exception) {
+        null
+    } ?: return emptyList()
+
+    if (!start.before(end)) {
+        return emptyList()
+    }
+
+    val current = Calendar.getInstance().apply {
+        time = start
+    }
+
+    val endCalendar = Calendar.getInstance().apply {
+        time = end
+    }
+
+    val result = mutableListOf<String>()
+
+    while (current.before(endCalendar)) {
+        result.add(formatter.format(current.time))
+        current.add(Calendar.DAY_OF_MONTH, 1)
+    }
+
+    return result
 }
