@@ -14,6 +14,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
+import com.example.coders.CampOwner
+import com.example.coders.ProfileRepo
 import java.util.Calendar
 
 /**
@@ -21,8 +23,8 @@ import java.util.Calendar
  *
  * Allows a campsite owner to select multiple campsites,
  * set availability, registration and booking periods,
- * set the number of winners, and decide whether other
- * owners may contribute campsites.
+ * set the number of winners, and choose other campsite
+ * owners to invite to the lottery.
  *
  * @param navController Handles navigation.
  * @param campsites Campsites belonging to the signed-in owner.
@@ -35,7 +37,7 @@ fun MultiOwnerLotteryScreen(
     campsites: List<Campsite>,
     onCreateLottery: (
         List<String>,
-        Boolean,
+        List<String>,
         String,
         String,
         String,
@@ -51,8 +53,40 @@ fun MultiOwnerLotteryScreen(
         mutableStateListOf<String>()
     }
 
-    var allowOtherOwners by remember {
+    // Load campsite owners from Firebase.
+    val profileRepo = remember { ProfileRepo() }
+
+    var owners by remember {
+        mutableStateOf<List<CampOwner>>(emptyList())
+    }
+
+    var ownersLoading by remember {
+        mutableStateOf(true)
+    }
+
+    var ownersError by remember {
         mutableStateOf(false)
+    }
+
+    val selectedOwnerIds = remember {
+        mutableStateListOf<String>()
+    }
+
+    val currentOwnerId = campsites.firstOrNull()?.campOwnerId.orEmpty()
+
+    LaunchedEffect(currentOwnerId) {
+        ownersLoading = true
+
+        profileRepo.getAllProfiles { profiles, error ->
+            ownersLoading = false
+            ownersError = error != null
+
+            if (error == null) {
+                owners = profiles.orEmpty()
+                    .filterIsInstance<CampOwner>()
+                    .filter { it.id != currentOwnerId }
+            }
+        }
     }
 
     // Stores the availability start and end dates.
@@ -161,7 +195,7 @@ fun MultiOwnerLotteryScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Create Multi-Owner Lottery",
+            text = "Create Lottery",
             style = MaterialTheme.typography.headlineSmall
         )
 
@@ -495,38 +529,45 @@ fun MultiOwnerLotteryScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 6. OTHER CAMPSITE OWNERS
+        // 6. CHOOSE CAMPSITE OWNERS
 
         Text(
-            text = "Other Campsite Owners",
+            text = "Choose Campsite Owners",
             style = MaterialTheme.typography.titleMedium
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp)
-        ) {
-            Checkbox(
-                checked = allowOtherOwners,
-                onCheckedChange = {
-                    allowOtherOwners = it
+        Text("Select the campsite owners you want to invite to this lottery.")
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            ownersLoading -> Text("Loading campsite owners...")
+            ownersError -> Text("Could not load campsite owners.")
+            owners.isEmpty() -> Text("No campsite owners found.")
+
+            else -> owners.forEach { owner ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Checkbox(
+                        checked = owner.id in selectedOwnerIds,
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                if (owner.id !in selectedOwnerIds) {
+                                    selectedOwnerIds.add(owner.id)
+                                }
+                            } else {
+                                selectedOwnerIds.remove(owner.id)
+                            }
+                        }
+                    )
+
+                    Text(owner.name)
                 }
-            )
-
-            Text(
-                text = "Allow other campsite owners to add their campsites"
-            )
+            }
         }
-
-        Text(
-            text = if (allowOtherOwners) {
-                "Other owners can contribute campsites to this lottery."
-            } else {
-                "Only your selected campsites will be included."
-            },
-            style = MaterialTheme.typography.bodySmall
-        )
 
         Spacer(modifier = Modifier.height(28.dp))
 
@@ -537,7 +578,7 @@ fun MultiOwnerLotteryScreen(
                 winnerCount?.let { count ->
                     onCreateLottery(
                         selectedCampsiteIds.toList(),
-                        allowOtherOwners,
+                        selectedOwnerIds.toList(),
                         availabilityStartDate,
                         availabilityEndDate,
                         registrationStartDate,
