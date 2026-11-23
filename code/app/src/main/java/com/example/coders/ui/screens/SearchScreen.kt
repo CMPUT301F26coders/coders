@@ -27,11 +27,16 @@ import com.example.coders.SignedInProfile
 import com.example.coders.Image as ImageRecord
 import com.example.coders.ProfileImageRepo
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.example.coders.dataUrlToImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.Alignment
 
 /**
  * Displays searchable and filterable list of all available campsites for entrants
@@ -51,6 +56,45 @@ private enum class SearchTab(
     Images("Images")
 }
 
+
+@Composable
+fun DeleteButton(onDelete: () -> Unit) {
+    IconButton(onClick = onDelete) {
+        Icon(
+            imageVector = Icons.Default.Delete,
+            contentDescription = "Delete",
+            tint = MaterialTheme.colorScheme.error
+        )
+    }
+}
+
+@Composable
+fun DeleteConfirmationDialog(
+    itemName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Confirm Deletion")
+        },
+        text = {
+            Text("Are you sure you want to delete $itemName?")
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 @Composable
 fun SearchScreen(navController: NavController) {
 
@@ -67,6 +111,10 @@ fun SearchScreen(navController: NavController) {
 
     var profiles by remember {
         mutableStateOf<List<Profile>>(emptyList())
+    }
+
+    var itemToDelete by remember {
+        mutableStateOf<Pair<String, String>?>(null)
     }
 
     val signedInProfile by SignedInProfile().rememberSignedInProfile()
@@ -223,30 +271,30 @@ fun SearchScreen(navController: NavController) {
                                         )
                                     }
                                 ) {
-
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.Top
                                     ) {
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = campsite.name,
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
 
-                                        Text(
-                                            text = campsite.name,
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
+                                            Text("Location: ${campsite.location}")
+                                            Text("Maximum Occupancy: ${campsite.capacity} guests")
+                                            Text("Rating: ${campsite.rating ?: "Not rated"}")
+                                        }
 
-                                        Spacer(
-                                            modifier = Modifier.height(6.dp)
-                                        )
-
-                                        Text(
-                                            text = "Location: ${campsite.location}"
-                                        )
-
-                                        Text(
-                                            text = "Maximum Occupancy: ${campsite.capacity} guests"
-                                        )
-
-                                        Text(
-                                            text = "Rating: ${campsite.rating ?: "Not rated"}"
+                                        DeleteButton(
+                                            onDelete = {
+                                                itemToDelete = "campsite" to campsite.id
+                                            }
                                         )
                                     }
                                 }
@@ -318,33 +366,46 @@ fun SearchScreen(navController: NavController) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.Top
                                     ) {
-                                        if (bitmap != null) {
-                                            Image(
-                                                bitmap = bitmap,
-                                                contentDescription = "Profile picture",
-                                                modifier = Modifier.size(80.dp),
-                                                contentScale = ContentScale.Crop
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            if (bitmap != null) {
+                                                Image(
+                                                    bitmap = bitmap,
+                                                    contentDescription = "Profile picture",
+                                                    modifier = Modifier.size(80.dp),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Default.AccountCircle,
+                                                    contentDescription = "Default profile picture",
+                                                    modifier = Modifier.size(80.dp)
+                                                )
+                                            }
+
+                                            Text(
+                                                text = profile.name,
+                                                style = MaterialTheme.typography.titleMedium
                                             )
-                                        }
-                                        else{
-                                            Icon(
-                                                imageVector = Icons.Default.AccountCircle,
-                                                contentDescription = "Default profile picture",
-                                                modifier = Modifier.size(80.dp)
-                                            )
+
+                                            Text("Email: ${profile.email}")
+                                            Text("Phone Number: ${profile.phone}")
+                                            Text("Type: ${profile.type}")
                                         }
 
-                                        Text(
-                                            text = profile.name,
-                                            style = MaterialTheme.typography.titleMedium
+                                        DeleteButton(
+                                            onDelete = {
+                                                itemToDelete = "profile" to profile.id
+                                            }
                                         )
-
-                                        Text("Email: ${profile.email}")
-                                        Text("Phone Number: ${profile.phone}")
-                                        Text("Type: ${profile.type}")
                                     }
                                 }
                             }
@@ -356,7 +417,7 @@ fun SearchScreen(navController: NavController) {
                     if (images.isEmpty()) {
 
                         Text(
-                            text = "No profiles available.",
+                            text = "No images available.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
@@ -379,17 +440,27 @@ fun SearchScreen(navController: NavController) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         if (bitmap != null) {
                                             Image(
                                                 bitmap = bitmap,
-                                                contentDescription = "Profile picture",
+                                                contentDescription = "Image",
                                                 modifier = Modifier.size(80.dp),
                                                 contentScale = ContentScale.Crop
                                             )
                                         }
+
+                                        DeleteButton(
+                                            onDelete = {
+                                                itemToDelete = "image" to image.id
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -398,6 +469,24 @@ fun SearchScreen(navController: NavController) {
                 }
             }
         }
+    }
+
+    itemToDelete?.let { (type, id) ->
+        DeleteConfirmationDialog(
+            itemName = type,
+            onConfirm = {
+                when (type) {
+                    "campsite" -> campsiteRepo.deleteCampsite(id)
+                    "profile" -> profileRepo.deleteProfile(id)
+                    "image" -> imageRepo.deleteImage(id)
+                }
+
+                itemToDelete = null
+            },
+            onDismiss = {
+                itemToDelete = null
+            }
+        )
     }
 
 

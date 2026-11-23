@@ -808,6 +808,7 @@ class ProfileRepo : AutoCloseable {
         reservation.rating?.let { put("rating", it) }
     }
 
+
     /**
      * Deletes a profile from the repository.
      *
@@ -815,7 +816,17 @@ class ProfileRepo : AutoCloseable {
      * @param onComplete Called with `null` on success or the error on failure.
      */
     fun deleteProfile(profile: Profile, onComplete: (Exception?) -> Unit = {}) {
-        profileRef.document(profile.id).delete()
+        deleteProfile(profile.id, onComplete)
+    }
+
+    /**
+     * Deletes a profile by its document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun deleteProfile(id: String, onComplete: (Exception?) -> Unit = {}) {
+        profileRef.document(id).delete()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -1097,10 +1108,22 @@ class ImageRepo : AutoCloseable {
      * @param onComplete Called with `null` on success or the error on failure.
      */
     fun deleteImage(image: Image, onComplete: (Exception?) -> Unit = {}) {
-        imageRef.document(image.id).delete()
+        deleteImage(image.id, onComplete)
+    }
+
+    /**
+     * Deletes an image by its document ID.
+     *
+     * @param id The stable document ID.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun deleteImage(id: String, onComplete: (Exception?) -> Unit = {}) {
+        imageRef.document(id).delete()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
+
+
 
     /**
      * Returns the images currently loaded by the compatibility listener.
