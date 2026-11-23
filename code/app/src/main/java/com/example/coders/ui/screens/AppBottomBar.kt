@@ -75,7 +75,10 @@ fun AppBottomBar(navController: NavController) {
         if (viewMode != ViewMode.CAMP_OWNER) {
             NavigationBarItem(
                 selected = false,
-                onClick = { navigateTo("search") },
+                onClick = {
+                    if(viewMode == ViewMode.ENTRANT) navigateTo("entrantsearch")
+                    else if(viewMode == ViewMode.ADMIN) navigateTo("adminsearch")
+                          },
                 icon = {
                     Icon(Icons.Default.Search, contentDescription = "Search")
                 }
