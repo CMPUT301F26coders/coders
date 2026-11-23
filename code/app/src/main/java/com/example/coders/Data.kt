@@ -1317,6 +1317,34 @@ class ProfileImageRepo {
             }
             onUpdate(image)
         }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    /**
+     * Retrieves the image associated with a profile from Firestore.
+     *
+     * @param profileId The ID of the profile whose image should be retrieved.
+     * @param onComplete Called with the Image and null on success,
+     * or null and an Exception on failure.
+     */
+    fun getProfileImage(
+        profileId: String,
+        onComplete: (Image?, Exception?) -> Unit
+    ) {
+        imageRef.document(profileImageId(profileId)).get()
+            .addOnSuccessListener { document ->
+                val image = if (document.exists()) {
+                    document.toObject(Image::class.java)
+                        ?.copy(id = document.id)
+                } else {
+                    null
+                }
+                onComplete(image, null)
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
 }
 
 /**
