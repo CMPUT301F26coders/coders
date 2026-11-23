@@ -6,6 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.coders"
+
     compileSdk {
         version = release(37)
     }
@@ -27,10 +28,12 @@ android {
             }
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
@@ -38,8 +41,10 @@ android {
 
 dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     implementation(platform(libs.firebase.bom))
     implementation(platform(libs.androidx.compose.bom))
+
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
@@ -47,15 +52,22 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.analytics)
+
     testImplementation(libs.junit)
+
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
     implementation("androidx.navigation:navigation-compose:2.9.6")
+    implementation("org.maplibre.gl:android-sdk:13.7.1")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
 }

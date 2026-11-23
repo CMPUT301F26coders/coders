@@ -302,7 +302,9 @@ data class Lottery (
     val waitlistEntrantIds: List<String> = emptyList(),
     val participatingOwnerIds: List<String> = emptyList(),
     val invitedOwnerIds: List<String> = emptyList(),
-    val allowOtherOwners: Boolean = false
+    val allowOtherOwners: Boolean = false,
+    val availabilityStartDate: String = "",
+    val availabilityEndDate: String = ""
 
 )
 
@@ -1834,7 +1836,10 @@ class LotteryRepo {
                     "bookingStartDate" to lottery.bookingStartDate,
                     "bookingEndDate" to lottery.bookingEndDate,
                     "winnerCount" to lottery.winnerCount,
-                    "waitlistCapacity" to lottery.waitlistCapacity
+                    "waitlistCapacity" to lottery.waitlistCapacity,
+                    "availabilityStartDate" to lottery.availabilityStartDate,
+                    "availabilityEndDate" to lottery.availabilityEndDate
+
                 )
             )
         }.addOnSuccessListener {
