@@ -17,11 +17,17 @@ package com.example.coders.ui.screens
 
 import android.app.NotificationManager
 import android.content.Context
+import android.util.Log
 import android.util.Patterns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -29,13 +35,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.AuthManager
+import com.example.coders.Image as ImageRecord
 import com.example.coders.ProfileRepo
+import com.example.coders.ProfileImageRepo
+import com.example.coders.dataUrlToImageBitmap
+import com.example.coders.encodeProfileImage
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -53,6 +66,8 @@ import com.example.coders.Admin
  *
  * @param navController Used to navigate between screens.
  */
+// The following composable was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
+// and remove profile images stored as Firestore data URLs", 2026-11-22.
 @OptIn(ExperimentalMaterial3Api::class) //needed for dropdown menu
 @Composable
 fun ProfileScreen(navController: NavController) {
@@ -60,6 +75,7 @@ fun ProfileScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val auth = remember { AuthManager(context.applicationContext) }
     val repo = remember { ProfileRepo() }
+    val profileImageRepo = remember { ProfileImageRepo() }
     val db = remember { FirebaseFirestore.getInstance() }
 
     var user by remember { mutableStateOf<Profile?>(null) }
@@ -75,6 +91,38 @@ fun ProfileScreen(navController: NavController) {
     var notificationSuccess by remember { mutableStateOf<Boolean?>(null) }
     var deleteConfirm by remember { mutableStateOf(false) }
     var deleteSuccess by remember { mutableStateOf(false) }
+    var profileImage by remember { mutableStateOf<ImageRecord?>(null) }
+    var profileImageMenuExpanded by remember { mutableStateOf(false) }
+
+    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    val profileImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        val profile = user
+        if (uri != null && profile != null) {
+            busy = true
+            error = ""
+            info = ""
+            scope.launch {
+                try {
+                    val dataUrl = encodeProfileImage(context.applicationContext, uri)
+                    profileImageRepo.setProfileImage(profile.id, dataUrl) { exception ->
+                        busy = false
+                        if (exception == null) {
+                            info = "Profile picture updated"
+                            error = ""
+                        } else {
+                            error = exception.message ?: "Failed to update profile picture."
+                        }
+                    }
+                } catch (exception: Exception) {
+                    busy = false
+                    error = exception.message ?: "Failed to encode profile picture."
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         try {
@@ -110,6 +158,24 @@ fun ProfileScreen(navController: NavController) {
         } catch (e: Exception) {
             error = e.message ?: "Failed to load profile."
             loading = false
+        }
+    }
+
+    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    DisposableEffect(user?.id) {
+        val profileId = user?.id
+        if (profileId == null) {
+            onDispose { }
+        } else {
+            val registration = profileImageRepo.listenForProfileImage(
+                profileId = profileId,
+                onUpdate = { image -> profileImage = image },
+                onError = { exception ->
+                    error = exception.message ?: "Failed to load profile picture."
+                }
+            )
+            onDispose { registration.remove() }
         }
     }
 
@@ -151,10 +217,77 @@ fun ProfileScreen(navController: NavController) {
                     Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Default.AccountCircle, "Avatar",
-                        modifier = Modifier.size(110.dp)
-                    )
+                    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
+                    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+                    ProfileAvatar(profileImage?.url)
+
+                    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
+                    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+                    if (profileImage == null) {
+                        TextButton(
+                            onClick = {
+                                profileImagePicker.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
+                            },
+                            enabled = !busy,
+                            modifier = Modifier.testTag("editProfileImageButton")
+                        ) {
+                            Icon(Icons.Default.AddAPhoto, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add photo")
+                        }
+                    } else {
+                        Box {
+                            TextButton(
+                                onClick = { profileImageMenuExpanded = true },
+                                enabled = !busy,
+                                modifier = Modifier.testTag("editProfileImageButton")
+                            ) {
+                                Icon(Icons.Default.Edit, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Edit photo")
+                            }
+                            DropdownMenu(
+                                expanded = profileImageMenuExpanded,
+                                onDismissRequest = { profileImageMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Change photo") },
+                                    onClick = {
+                                        profileImageMenuExpanded = false
+                                        profileImagePicker.launch(
+                                            PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.testTag("changeProfileImageOption")
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Remove photo") },
+                                    onClick = {
+                                        profileImageMenuExpanded = false
+                                        busy = true
+                                        error = ""
+                                        info = ""
+                                        profileImageRepo.removeProfileImage(p.id) { exception ->
+                                            busy = false
+                                            if (exception == null) {
+                                                info = "Profile picture removed"
+                                            } else {
+                                                error = exception.message
+                                                    ?: "Failed to remove profile picture."
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("removeProfileImageOption")
+                                )
+                            }
+                        }
+                    }
                     Text(
                         p.name,
                         style = MaterialTheme.typography.titleLarge,
@@ -459,23 +592,34 @@ fun ProfileScreen(navController: NavController) {
                     busy = true
                     db.collection("profiles").document(p.id).delete()
                         .addOnSuccessListener {
-                            scope.launch {
-                                try {
-                                    auth.clearUserId()
-                                    UserSession.clearSession()
-                                    context.getSharedPreferences(
-                                        "entrant_notification_settings",
-                                        Context.MODE_PRIVATE
-                                    ).edit {
-                                        remove("dnd_${p.id}")
+                            // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
+                            // and remove profile images stored as Firestore data URLs", 2026-11-22.
+                            profileImageRepo.removeProfileImage(p.id) { imageError ->
+                                if (imageError != null) {
+                                    Log.e(
+                                        "ProfileScreen",
+                                        "Profile deleted but profile-image cleanup failed.",
+                                        imageError
+                                    )
+                                }
+                                scope.launch {
+                                    try {
+                                        auth.clearUserId()
+                                        UserSession.clearSession()
+                                        context.getSharedPreferences(
+                                            "entrant_notification_settings",
+                                            Context.MODE_PRIVATE
+                                        ).edit {
+                                            remove("dnd_${p.id}")
+                                        }
+                                        busy = false
+                                        deleteConfirm = false
+                                        deleteSuccess = true
+                                    } catch (_: Exception) {
+                                        busy = false
+                                        deleteConfirm = false
+                                        error = "Profile deleted, but session cleanup failed."
                                     }
-                                    busy = false
-                                    deleteConfirm = false
-                                    deleteSuccess = true
-                                } catch (_: Exception) {
-                                    busy = false
-                                    deleteConfirm = false
-                                    error = "Profile deleted, but session cleanup failed."
                                 }
                             }
                         }
@@ -514,6 +658,36 @@ fun ProfileScreen(navController: NavController) {
                     deleteSuccess = false
                 }) { Text("I Understand") }
             }
+        )
+    }
+}
+
+// The following composable was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+// and remove profile images stored as Firestore data URLs", 2026-11-22.
+/**
+ * Renders a circular profile image or the shared default avatar when no decodable image exists.
+ *
+ * @param dataUrl The selected profile image stored as a data URL, if any.
+ */
+@Composable
+private fun ProfileAvatar(dataUrl: String?) {
+    val bitmap = remember(dataUrl) { dataUrl?.let(::dataUrlToImageBitmap) }
+    val avatarModifier = Modifier
+        .size(110.dp)
+        .clip(CircleShape)
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = "Profile picture",
+            contentScale = ContentScale.Crop,
+            modifier = avatarModifier.testTag("profileAvatarImage")
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Default.AccountCircle,
+            contentDescription = "Default profile picture",
+            modifier = avatarModifier.testTag("profileAvatarDefault")
         )
     }
 }

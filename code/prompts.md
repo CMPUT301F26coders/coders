@@ -6,3 +6,7 @@ OpenAI, Codex, "Implement US 01.04.03: add pending lottery offers, entrant accep
 actions, and their unit and instrumented tests", 2026-11-06, was used to assist with the Pending
 reservation status, lottery-offer persistence helper, entrant reservation screen, and related
 tests. 
+
+OpenAI, Codex, "Implement US 01.08.02: add, update, and remove profile images stored as
+Firestore data URLs", 2026-11-22, was used to assist with profile-image persistence, bounded
+image encoding, profile controls, and related tests.
