@@ -1196,6 +1196,129 @@ class ImageRepo : AutoCloseable {
     override fun close() = cacheListener.remove()
 }
 
+// The following class was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+// and remove profile images stored as Firestore data URLs", 2026-11-22.
+/**
+ * Saves and observes the one image record associated with a profile.
+ *
+ * This repository intentionally observes a single document rather than maintaining an image
+ * collection cache.
+ *
+ * @property imageRef The Firestore collection containing all image records.
+ */
+class ProfileImageRepo {
+    private val imageRef = Firebase.firestore.collection("image")
+
+    // The following block was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    /** Utilities for constructing and recognizing profile image records. */
+    companion object {
+        /** Prefix used for the deterministic Firestore document ID of a profile image. */
+        const val PROFILE_IMAGE_PREFIX = "profile_"
+
+        // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+        // and remove profile images stored as Firestore data URLs", 2026-11-22.
+        /**
+         * Returns the deterministic image document ID for a profile.
+         *
+         * @param profileId The profile document ID.
+         * @return The matching profile image document ID.
+         */
+        fun profileImageId(profileId: String): String = "$PROFILE_IMAGE_PREFIX$profileId"
+
+        // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+        // and remove profile images stored as Firestore data URLs", 2026-11-22.
+        /**
+         * Returns whether an image record follows the profile-image convention.
+         *
+         * @param image The image record to inspect.
+         * @return `true` when the record has a profile ID and no campsite association.
+         */
+        fun isProfileImage(image: Image): Boolean =
+            image.id.startsWith(PROFILE_IMAGE_PREFIX) && image.campsiteId.isBlank()
+
+        // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+        // and remove profile images stored as Firestore data URLs", 2026-11-22.
+        /**
+         * Creates the canonical image record stored for a profile.
+         *
+         * @param profileId The profile document ID that owns the image.
+         * @param dataUrl The JPEG image encoded as a data URL.
+         * @return The Firestore-ready profile image record.
+         */
+        fun profileImageRecord(profileId: String, dataUrl: String): Image = Image(
+            id = profileImageId(profileId),
+            uploaderId = profileId,
+            campsiteId = "",
+            description = "Profile picture",
+            url = dataUrl
+        )
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    /**
+     * Creates or replaces a profile's image record.
+     *
+     * @param profileId The profile document ID that owns the image.
+     * @param dataUrl The JPEG image encoded as a data URL.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun setProfileImage(
+        profileId: String,
+        dataUrl: String,
+        onComplete: (Exception?) -> Unit
+    ) {
+        val image = profileImageRecord(profileId, dataUrl)
+        imageRef.document(image.id).set(image)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    /**
+     * Deletes a profile's image record, including when that record does not exist.
+     *
+     * @param profileId The profile document ID that owns the image.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun removeProfileImage(profileId: String, onComplete: (Exception?) -> Unit) {
+        imageRef.document(profileImageId(profileId)).delete()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
+    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+    /**
+     * Observes one profile image document.
+     *
+     * @param profileId The profile document ID whose image should be observed.
+     * @param onUpdate Called with the decoded image, or `null` when the document is absent.
+     * @param onError Called when the Firestore listener reports an error.
+     * @return The listener registration, which can be removed to stop listening.
+     */
+    fun listenForProfileImage(
+        profileId: String,
+        onUpdate: (Image?) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = imageRef.document(profileImageId(profileId))
+        .addSnapshotListener { document, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+
+            val image = document?.let { snapshot ->
+                snapshot.takeIf { it.exists() }
+                    ?.toObject(Image::class.java)
+                    ?.copy(id = snapshot.id)
+            }
+            onUpdate(image)
+        }
+}
+
 /**
  * Represents a repository of notification.
  *
