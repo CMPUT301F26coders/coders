@@ -39,7 +39,7 @@ import com.example.coders.ui.screens.OwnerCampsitesScreen
 import com.example.coders.ui.screens.OwnerReservationsScreen
 import com.example.coders.ui.screens.PoliciesScreen
 import com.example.coders.ui.screens.SignUpScreen
-import com.example.coders.ui.screens.EntrantSearchScreen
+import com.example.coders.ui.screens.SearchScreen
 import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.CampOwner
@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
 
                     // Search page
                     composable("search") {
-                        EntrantSearchScreen(navController)
+                        SearchScreen(navController)
                     }
 
                     // Campsite Details page
