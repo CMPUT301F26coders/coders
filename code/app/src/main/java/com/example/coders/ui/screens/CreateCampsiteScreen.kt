@@ -1,15 +1,3 @@
-/*
- * Purpose
- * UI layer for Camp Owners to register new campsites
- * primary data collection form, constructs a new Campsite
- * Saved in the database via the CampsiteRepo.
- *
- * Outstanding Issues:
- * - Map coordinates are hardcoded to "0.0,0.0"
- * - Image upload and Tag addition buttons are visual placeholders only
- * - QR code generation is not yet triggered upon campsite creation.
- */
-
 package com.example.coders.ui.screens
 
 import android.widget.Toast
@@ -26,26 +14,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.tooling.preview.Preview
 import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.compose.rememberNavController
 import com.example.coders.SignedInProfile
+import kotlinx.coroutines.launch
 
-
-/**
- * Displays a form to collect information to create a new campsite (name, location, description, capacity)
- * Records that campsite in the database
- *
- * @param navController navigation to return to previous screen
- * @param campsiteRepo the repo for database creation of the new campsite
- */
 @Composable
 fun CreateCampsiteScreen(
     navController: NavController,
@@ -55,7 +36,6 @@ fun CreateCampsiteScreen(
     val campOwner = profile as? CampOwner
     val context = LocalContext.current
 
-
     var name by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -63,28 +43,51 @@ fun CreateCampsiteScreen(
     var rules by remember { mutableStateOf("") }
     var tags by remember { mutableStateOf(listOf<String>()) }
 
+    // Selected map coordinates
+    var selectedLatitude by remember { mutableStateOf<Double?>(null) }
+    var selectedLongitude by remember { mutableStateOf<Double?>(null) }
 
-    var showMissingInfoError by remember { mutableStateOf(false) }
+    // Address search states
+    var isSearchingAddress by remember { mutableStateOf(false) }
+    var addressSearchMessage by remember { mutableStateOf<String?>(null) }
 
+    val coroutineScope = rememberCoroutineScope()
 
-    // missing req info message screen
+    var showMissingInfoError by remember {
+        mutableStateOf(false)
+    }
+
+    // Missing information dialog
     if (showMissingInfoError) {
         AlertDialog(
-            onDismissRequest = {  },
-            title = { Text("Missing Information") },
-            text = { Text("You did not provide all required information (Name, Location, Description, and Occupancy).") },
+            onDismissRequest = {
+                showMissingInfoError = false
+            },
+            title = {
+                Text("Missing Information")
+            },
+            text = {
+                Text(
+                    "Please provide the campsite name, location, description, " +
+                            "occupancy, and select a location on the map."
+                )
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    showMissingInfoError = false
-                }) {
+                TextButton(
+                    onClick = {
+                        showMissingInfoError = false
+                    }
+                ) {
                     Text("Retry")
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showMissingInfoError = false
-                    navController.popBackStack()
-                }) {
+                TextButton(
+                    onClick = {
+                        showMissingInfoError = false
+                        navController.popBackStack()
+                    }
+                ) {
                     Text("Cancel")
                 }
             }
@@ -96,6 +99,7 @@ fun CreateCampsiteScreen(
             AppBottomBar(navController = navController)
         }
     ) { innerPadding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -104,13 +108,22 @@ fun CreateCampsiteScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
 
+            // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(onClick = { navController.popBackStack() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                IconButton(
+                    onClick = {
+                        navController.popBackStack()
+                    }
+                ) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Back"
+                    )
                 }
+
                 Text(
                     text = "Create Campsite",
                     fontSize = 20.sp,
@@ -120,7 +133,7 @@ fun CreateCampsiteScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // the collection form
+            // Campsite Name
             CampsiteInputField(
                 label = "Enter Campsite Name",
                 placeholder = "Name",
@@ -128,17 +141,105 @@ fun CreateCampsiteScreen(
                 onValueChange = { name = it },
                 testTag = "input_Name"
             )
+
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Campsite Address
             CampsiteInputField(
                 label = "Enter Campsite Location",
-                placeholder = "Location",
+                placeholder = "e.g. Pine Lake, Alberta, Canada",
                 value = location,
-                onValueChange = { location = it },
+                onValueChange = {
+                    location = it
+
+                    // Address changed: old coordinates are no longer valid
+                    selectedLatitude = null
+                    selectedLongitude = null
+                    addressSearchMessage = null
+                },
                 testTag = "input_Location"
             )
+
+            // Find Address Button
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+
+                    isSearchingAddress = true
+                    addressSearchMessage = null
+
+                    coroutineScope.launch {
+
+                        try {
+                            val coordinates =
+                                AddressGeocoder.findCoordinates(
+                                    context = context,
+                                    address = location
+                                )
+
+                            if (coordinates != null) {
+
+                                selectedLatitude = coordinates.first
+                                selectedLongitude = coordinates.second
+
+                                addressSearchMessage =
+                                    "Address found! You can adjust the location on the map."
+
+                            } else {
+
+                                selectedLatitude = null
+                                selectedLongitude = null
+
+                                addressSearchMessage =
+                                    "Address not found. Try adding the city and province."
+                            }
+
+                        } catch (e: Exception) {
+
+                            selectedLatitude = null
+                            selectedLongitude = null
+
+                            addressSearchMessage =
+                                "Unable to find this address. Please try again."
+
+                        } finally {
+                            isSearchingAddress = false
+                        }
+                    }
+                },
+                enabled = location.isNotBlank() && !isSearchingAddress
+            ) {
+
+                if (isSearchingAddress) {
+
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text("Searching...")
+
+                } else {
+                    Text("Find on Map")
+                }
+            }
+
+            addressSearchMessage?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = it,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Description
             CampsiteInputField(
                 label = "Enter Campsite Description",
                 placeholder = "Description",
@@ -146,8 +247,10 @@ fun CreateCampsiteScreen(
                 onValueChange = { description = it },
                 testTag = "input_Description"
             )
+
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Maximum Occupancy
             CampsiteInputField(
                 label = "Enter Maximum Occupancy",
                 placeholder = "Value",
@@ -156,77 +259,215 @@ fun CreateCampsiteScreen(
                 testTag = "input_Occupancy"
             )
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Map
+            Text(
+                text = "Select Campsite Location",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Search for an address first, then tap the map to adjust the exact campsite location.",
+                fontSize = 13.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            CampsiteMapPicker(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp),
+                initialLatitude = selectedLatitude,
+                initialLongitude = selectedLongitude,
+                onLocationSelected = { latitude, longitude ->
+                    selectedLatitude = latitude
+                    selectedLongitude = longitude
+                }
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Map data © OpenStreetMap contributors",
+                fontSize = 11.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (selectedLatitude != null && selectedLongitude != null) {
+
+                Text(
+                    text = "Selected Location: %.6f, %.6f".format(
+                        selectedLatitude!!,
+                        selectedLongitude!!
+                    ),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+            } else {
+
+                Text(
+                    text = "No location selected yet.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Rules and Policies
             CampsiteInputField(
                 label = "Enter Campsite Rules & Policies",
                 placeholder = "Rules & Policies",
                 value = rules,
                 onValueChange = { rules = it }
             )
+
             Spacer(modifier = Modifier.height(20.dp))
 
-            // stuff for images and tags (buttons dont work right now):
-            Text(text = "Optional: Campsite Image and Tags", fontSize = 14.sp)
+            // Images and Tags
+            Text(
+                text = "Optional: Campsite Image and Tags",
+                fontSize = 14.sp
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
+
                 Button(
-                    onClick = { },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    onClick = {},
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Upload, contentDescription = "Upload", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                    Icon(
+                        Icons.Default.Upload,
+                        contentDescription = "Upload",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(16.dp)
+                    )
+
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Upload Images", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 12.sp)
+
+                    Text(
+                        "Upload Images",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 12.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
+                OutlinedButton(
+                    onClick = {},
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text("Tag", fontSize = 12.sp)
+                }
 
-                OutlinedButton(onClick = {}, shape = RoundedCornerShape(8.dp), modifier = Modifier.height(36.dp)) { Text("Tag", fontSize = 12.sp) }
-                Spacer(modifier = Modifier.width(4.dp))
-                OutlinedButton(onClick = {}, shape = RoundedCornerShape(8.dp), modifier = Modifier.height(36.dp)) { Text("Tag", fontSize = 12.sp) }
                 Spacer(modifier = Modifier.width(4.dp))
 
-                IconButton(onClick = {  }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Tag")
+                OutlinedButton(
+                    onClick = {},
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text("Tag", fontSize = 12.sp)
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                IconButton(
+                    onClick = {},
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Add Tag"
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // submit button
+            // Confirm Campsite
             Button(
                 onClick = {
+
                     val capacityInt = occupancy.toIntOrNull()
 
-                    //making sure nothing left blank
-                    if (name.isBlank() || location.isBlank() || description.isBlank() || capacityInt == null || campOwner == null) {
+                    if (
+                        name.isBlank() ||
+                        location.isBlank() ||
+                        description.isBlank() ||
+                        capacityInt == null ||
+                        capacityInt <= 0 ||
+                        campOwner == null ||
+                        selectedLatitude == null ||
+                        selectedLongitude == null
+                    ) {
                         showMissingInfoError = true
+
                     } else {
-                        // creating campsite
+
                         val newCampsite = Campsite(
                             name = name,
                             location = location,
-
-                            description = if (rules.isNotBlank()) "$description\n\nRules: $rules" else description,
+                            description = if (rules.isNotBlank()) {
+                                "$description\n\nRules: $rules"
+                            } else {
+                                description
+                            },
                             capacity = capacityInt,
-                            mapLocation = "0.0,0.0", //place holder coords, logic not implemented yet
+
+                            // Save the actual selected coordinates
+                            mapLocation = "${selectedLatitude},${selectedLongitude}",
+
                             campOwner = campOwner,
                             campOwnerId = campOwner.id,
                             tags = tags
                         )
+
                         if (campsiteRepo == null) {
-                            Toast.makeText(context, "Campsite repository unavailable", Toast.LENGTH_SHORT).show()
+
+                            Toast.makeText(
+                                context,
+                                "Campsite repository unavailable",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
                         } else {
+
                             campsiteRepo.addCampsite(newCampsite) { error ->
+
                                 if (error == null) {
-                                    Toast.makeText(context, "Campsite Registered", Toast.LENGTH_SHORT).show()
+
+                                    Toast.makeText(
+                                        context,
+                                        "Campsite Registered",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+
                                     navController.popBackStack()
+
                                 } else {
-                                    Toast.makeText(context, "Failed to save campsite", Toast.LENGTH_SHORT).show()
+
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to save campsite",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             }
                         }
@@ -236,41 +477,51 @@ fun CreateCampsiteScreen(
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onSurface
+                )
             ) {
-                Text("Confirm Campsite", color = MaterialTheme.colorScheme.surface, fontSize = 16.sp)
+                Text(
+                    "Confirm Campsite",
+                    color = MaterialTheme.colorScheme.surface,
+                    fontSize = 16.sp
+                )
             }
         }
     }
 }
 
-/**
- * text input field used in the form for campsite creation
- *
- * @param label The label text displayed above the input field.
- * @param placeholder the text thats inside the input field before the user types anything
- * @param value the string
- * @param onValueChange when the users input changes
- * @param testTag for testing
- */
-
-//logic for input field assisted by Google, Gemini, "How do I create an input field for a campsite so that I am able to test it"
-// 2026-11-06
+// Reusable input field
 @Composable
 fun CampsiteInputField(
     label: String,
     placeholder: String,
     value: String,
     onValueChange: (String) -> Unit,
-    testTag: String = "" // for test
+    testTag: String = ""
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = label, fontSize = 14.sp)
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+
+        Text(
+            text = label,
+            fontSize = 14.sp
+        )
+
         Spacer(modifier = Modifier.height(4.dp))
+
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+            placeholder = {
+                Text(
+                    placeholder,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                        alpha = 0.5f
+                    )
+                )
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(testTag),
@@ -280,13 +531,10 @@ fun CampsiteInputField(
     }
 }
 
-/**
- * UI preview of the CreateCampsiteScreen
- */
+// Preview
 @Preview(showBackground = true)
 @Composable
 fun PreviewCreateCampsiteScreen() {
-    //  dummy NavController, dummy owner, and null for the repo
     CreateCampsiteScreen(
         navController = rememberNavController(),
         campsiteRepo = null
