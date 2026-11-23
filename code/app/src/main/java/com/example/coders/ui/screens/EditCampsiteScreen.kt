@@ -59,7 +59,35 @@ fun EditCampsiteScreen(
     var description by remember { mutableStateOf(campsite.description) }
     var occupancy by remember { mutableStateOf(campsite.capacity.toString()) }
     var rules by remember { mutableStateOf("") }
+    val initialCoordinates = remember(campsite.mapLocation) {
+        val parts = campsite.mapLocation.split(",")
 
+        if (parts.size == 2) {
+            val latitude = parts[0].trim().toDoubleOrNull()
+            val longitude = parts[1].trim().toDoubleOrNull()
+
+            if (
+                latitude != null &&
+                longitude != null &&
+                latitude in -90.0..90.0 &&
+                longitude in -180.0..180.0
+            ) {
+                latitude to longitude
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    var selectedLatitude by remember(campsite.id, campsite.mapLocation) {
+        mutableStateOf<Double?>(initialCoordinates?.first)
+    }
+
+    var selectedLongitude by remember(campsite.id, campsite.mapLocation) {
+        mutableStateOf<Double?>(initialCoordinates?.second)
+    }
     Scaffold(
         bottomBar = {
             AppBottomBar(navController = navController)
@@ -127,6 +155,57 @@ fun EditCampsiteScreen(
                         onValueChange = { occupancy = it },
                         testTag = "edit_Occupancy"
                     )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = "Edit Campsite Location",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Tap on the map to change your campsite's location.",
+                        fontSize = 13.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    CampsiteMapPicker(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp),
+                        initialLatitude = selectedLatitude,
+                        initialLongitude = selectedLongitude,
+                        onLocationSelected = { latitude, longitude ->
+                            selectedLatitude = latitude
+                            selectedLongitude = longitude
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (selectedLatitude != null && selectedLongitude != null) {
+                        Text(
+                            text = "Selected Location: %.6f, %.6f".format(
+                                selectedLatitude,
+                                selectedLongitude
+                            ),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            text = "No coordinates saved. Tap the map to select a location.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     EditCampsiteInputField(
@@ -173,8 +252,19 @@ fun EditCampsiteScreen(
                             val updatedCampsite = campsite.copy(
                                 name = name,
                                 location = location,
-                                description = if (rules.isNotBlank()) "$description\n\nRules: $rules" else description,
-                                capacity = occupancy.toIntOrNull() ?: campsite.capacity
+                                description = if (rules.isNotBlank()) {
+                                    "$description\n\nRules: $rules"
+                                } else {
+                                    description
+                                },
+                                capacity = occupancy.toIntOrNull() ?: campsite.capacity,
+                                mapLocation = if (
+                                    selectedLatitude != null && selectedLongitude != null
+                                ) {
+                                    "$selectedLatitude,$selectedLongitude"
+                                } else {
+                                    campsite.mapLocation
+                                }
                             )
                             campsiteRepo?.updateCampsite(updatedCampsite)
 

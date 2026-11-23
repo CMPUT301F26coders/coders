@@ -39,6 +39,27 @@ fun CampsiteDetailsScreen(
     navController: NavController,
     campsite: Campsite
 ) {
+    val coordinates = remember(campsite.mapLocation) {
+        val parts = campsite.mapLocation.split(",")
+
+        if (parts.size == 2) {
+            val latitude = parts[0].trim().toDoubleOrNull()
+            val longitude = parts[1].trim().toDoubleOrNull()
+
+            if (
+                latitude != null &&
+                longitude != null &&
+                latitude in -90.0..90.0 &&
+                longitude in -180.0..180.0
+            ) {
+                latitude to longitude
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    }
     // Prevent multiple back navigation requests from this screen.
     var backClicked by remember { mutableStateOf(false) }
     var editClicked by remember { mutableStateOf(false) }
@@ -165,6 +186,54 @@ fun CampsiteDetailsScreen(
                 Text(
                     text = "Campsite Owner: ${campsite.campOwner.name}"
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Campsite Location",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (coordinates != null) {
+
+                    Text(
+                        text = "Latitude: %.6f\nLongitude: %.6f".format(
+                            coordinates.first,
+                            coordinates.second
+                        ),
+                        fontSize = 13.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    CampsiteMapPicker(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(250.dp),
+                        initialLatitude = coordinates.first,
+                        initialLongitude = coordinates.second,
+                        interactive = false,
+                        onLocationSelected = { _, _ -> }
+                    )
+
+                } else {
+                    Text(
+                        text = "Map location is not available for this campsite.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
 
