@@ -1835,7 +1835,10 @@ class LotteryRepo {
                     "bookingStartDate" to lottery.bookingStartDate,
                     "bookingEndDate" to lottery.bookingEndDate,
                     "winnerCount" to lottery.winnerCount,
-                    "waitlistCapacity" to lottery.waitlistCapacity
+                    "waitlistCapacity" to lottery.waitlistCapacity,
+                    "availabilityStartDate" to lottery.availabilityStartDate,
+                    "availabilityEndDate" to lottery.availabilityEndDate
+
                 )
             )
         }.addOnSuccessListener {
