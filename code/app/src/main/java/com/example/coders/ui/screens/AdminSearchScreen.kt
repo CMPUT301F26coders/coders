@@ -27,14 +27,11 @@ import com.example.coders.SignedInProfile
 import com.example.coders.Image as ImageRecord
 import com.example.coders.ProfileImageRepo
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
 import com.example.coders.dataUrlToImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.Alignment
 
@@ -96,9 +93,7 @@ fun DeleteConfirmationDialog(
 }
 
 @Composable
-fun SearchScreen(navController: NavController) {
-
-
+fun AdminSearchScreen(navController: NavController) {
 
     val campsiteRepo = remember { CampsiteRepo() }
     val profileRepo = remember { ProfileRepo() }
