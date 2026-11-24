@@ -45,7 +45,7 @@ class CampsiteTest {
             lotteries = emptyList(),
             reservations = emptyList(),
             notificationsSent = emptyList(),
-            notificationsReceived = emptyList()
+            notifications = emptyList()
         )
     }
 

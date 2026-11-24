@@ -37,6 +37,7 @@ import com.example.coders.ui.screens.MiniMapScreen
 import com.example.coders.ui.screens.MyStuffScreen
 import com.example.coders.ui.screens.OwnerCampsitesScreen
 import com.example.coders.ui.screens.OwnerReservationsScreen
+import com.example.coders.ui.screens.OwnerLotteriesScreen
 import com.example.coders.ui.screens.PoliciesScreen
 import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.AdminSearchScreen
@@ -185,6 +186,9 @@ class MainActivity : ComponentActivity() {
 
                     composable("ownerreservations") {
                         OwnerReservationsScreen(navController)
+                    }
+                    composable("ownerlotteries") {
+                        OwnerLotteriesScreen(navController)
                     }
 
                     composable("minimap") {

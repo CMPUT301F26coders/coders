@@ -92,7 +92,7 @@ data class Entrant(
  * @property lotteries A list of lotteries managed by the camp owner.
  * @property reservations A list of reservations made by the camp owner.
  * @property notificationsSent A list of notifications sent by the camp owner.
- * @property notificationsReceived A list of notifications received by the camp owner.
+ * @property notifications A list of notifications received by the camp owner.
  * @property conversations Conversations associated with this camp owner.
  */
 data class CampOwner(
@@ -103,7 +103,7 @@ data class CampOwner(
     val lotteries : List<Lottery> = emptyList(),
     val reservations : List<Reservation> = emptyList(),
     val notificationsSent : List<Notification> = emptyList(),
-    val notificationsReceived : List<Notification> = emptyList(),
+    val notifications : List<Notification> = emptyList(),
     val conversations: MutableList<Conversation> = mutableListOf(),
     override val type: String = "CampOwner",
     override val id: String = UUID.randomUUID().toString()
@@ -772,6 +772,15 @@ class ProfileRepo : AutoCloseable {
 
         val winnerDocument = profileRef.document(winnerId)
         val reservationDocument = reservationRef.document(reservation.id)
+        val notification = Notification(
+            title = "Lottery Won!",
+            content = "You won the campsite lottery. Review your pending reservation offer.",
+            date = java.time.LocalDate.now().toString(),
+            id = "lottery-win-${reservation.id}",
+            recipientId = winnerId,
+            senderId = reservation.campOwnerId
+        )
+        val notificationDocument = db.collection("notification").document(notification.id)
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(winnerDocument)
@@ -795,6 +804,7 @@ class ProfileRepo : AutoCloseable {
                 updatedWinner.reservations.map(::reservationStorageRecord)
             )
             transaction.set(reservationDocument, reservationStorageRecord(pendingOffer))
+            transaction.set(notificationDocument, notification)
         }.addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -1961,6 +1971,133 @@ class LotteryRepo {
     }
 
     /**
+     * Sends an owner-authored notification to every entrant on one of the owner's lottery waitlists.
+     *
+     * @param ownerId The signed-in campsite owner's profile ID.
+     * @param lotteryId The lottery document ID.
+     * @param title Notification title.
+     * @param content Notification message.
+     * @param onComplete Receives the number of recipients and no error, or `null` and the error.
+     */
+    fun sendWaitlistNotification(
+        ownerId: String,
+        lotteryId: String,
+        title: String,
+        content: String,
+        onComplete: (Int?, Exception?) -> Unit
+    ) {
+        if (ownerId.isBlank() || lotteryId.isBlank() || title.isBlank() || content.isBlank()) {
+            onComplete(null, IllegalArgumentException("Owner, lottery, title, and message are required."))
+            return
+        }
+
+        lotteryRef.document(lotteryId).get()
+            .addOnSuccessListener { snapshot ->
+                val lottery = snapshot.toObject(Lottery::class.java)?.copy(id = snapshot.id)
+                if (lottery == null) {
+                    onComplete(null, IllegalArgumentException("Lottery not found."))
+                    return@addOnSuccessListener
+                }
+                if (lottery.campOwnerId != ownerId) {
+                    onComplete(null, SecurityException("You can only message entrants on your own lotteries."))
+                    return@addOnSuccessListener
+                }
+
+                val entrantIds = lottery.waitlistEntrantIds.filter(String::isNotBlank).distinct()
+                if (entrantIds.size > 500) {
+                    onComplete(null, IllegalStateException("This waitlist is too large to notify in one send."))
+                    return@addOnSuccessListener
+                }
+                if (entrantIds.isEmpty()) {
+                    onComplete(0, null)
+                    return@addOnSuccessListener
+                }
+
+                val batch = db.batch()
+                val notificationCollection = db.collection("notification")
+                entrantIds.forEach { entrantId ->
+                    val notification = Notification(
+                        title = title.trim(),
+                        content = content.trim(),
+                        date = java.time.LocalDate.now().toString(),
+                        recipientId = entrantId,
+                        senderId = ownerId
+                    )
+                    batch.set(notificationCollection.document(notification.id), notification)
+                }
+                batch.commit()
+                    .addOnSuccessListener { onComplete(entrantIds.size, null) }
+                    .addOnFailureListener { error -> onComplete(null, error) }
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
+
+    /**
+     * Finalizes a lottery draw and notifies every entrant who was not selected.
+     *
+     * The winner selection is supplied by the caller. This transaction marks the lottery drawn
+     * and creates stable, profile-addressed notifications for the remaining waitlisted entrants.
+     *
+     * @param lotteryId The lottery document ID.
+     * @param winnerIds Entrant profile IDs selected by the draw.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun completeLotteryDraw(
+        lotteryId: String,
+        winnerIds: Collection<String>,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+        val winners = winnerIds.toSet()
+        if (lotteryId.isBlank() || winners.any(String::isBlank)) {
+            onComplete(IllegalArgumentException("A lottery and valid winner IDs are required."))
+            return
+        }
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(lotteryDocument)
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Lottery not found.")
+            check(lottery.status != CampOwnerLotteryStatus.Drawn) {
+                "This lottery has already been drawn."
+            }
+            check(winners.size <= lottery.winnerCount) {
+                "The winner count exceeds this lottery's configured limit."
+            }
+            val entrants = lottery.waitlistEntrantIds.filter(String::isNotBlank).distinct()
+            check(winners.all { it in entrants }) {
+                "Every winner must be on this lottery's waitlist."
+            }
+            val losers = entrants.filterNot { it in winners }
+            check(losers.size < 500) {
+                "This lottery has too many entrants to notify in one draw."
+            }
+
+            transaction.update(lotteryDocument, "status", CampOwnerLotteryStatus.Drawn.name)
+            val notifications = db.collection("notification")
+            losers.forEach { entrantId ->
+                val notificationId = UUID.nameUUIDFromBytes(
+                    "lottery-loss:$lotteryId:$entrantId".toByteArray()
+                ).toString()
+                val notificationDocument = notifications.document(notificationId)
+                transaction.set(
+                    notificationDocument,
+                    Notification(
+                        title = "Lottery Result",
+                        content = "You were not selected in the campsite lottery. Better luck next time!",
+                        date = java.time.LocalDate.now().toString(),
+                        id = notificationId,
+                        recipientId = entrantId,
+                        senderId = lottery.campOwnerId
+                    )
+                )
+            }
+            true
+        }.addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    /**
      * Deletes a lottery by ID.
      *
      * @param id The stable document ID.
@@ -2017,9 +2154,24 @@ class ReservationRepo {
         onComplete: (Exception?) -> Unit = {}
     ) {
         val record = withRelationshipIds(reservation)
+        val batch = db.batch()
+        batch.set(reservationRef.document(record.id), record)
+        val notificationRef = db.collection("notification")
+        record.entrantIds.forEach { entrantId ->
+            if (entrantId.isNotBlank()) {
+                val notification = Notification(
+                    title = "Reservation Received",
+                    content = "A reservation is available for ${record.campsite.name.ifBlank { "the campsite" }} (${record.dates}).",
+                    date = java.time.LocalDate.now().toString(),
+                    id = UUID.nameUUIDFromBytes("${record.id}:$entrantId".toByteArray()).toString(),
+                    recipientId = entrantId,
+                    senderId = record.campOwnerId
+                )
+                batch.set(notificationRef.document(notification.id), notification)
+            }
+        }
 
-        reservationRef.document(record.id)
-            .set(record)
+        batch.commit()
             .addOnSuccessListener {
                 ConversationRepo().createConversationsForReservation(record)
                 onComplete(null)
@@ -2053,10 +2205,15 @@ class ReservationRepo {
     fun updateReservationStatus(
         reservationId: String,
         status: ReservationStatus,
+        notification: Notification? = null,
         onComplete: (Exception?) -> Unit = {}
     ) {
-        reservationRef.document(reservationId)
-            .update("status", status.name)
+        val batch = db.batch()
+        batch.update(reservationRef.document(reservationId), "status", status.name)
+        notification?.let {
+            batch.set(db.collection("notification").document(it.id), it)
+        }
+        batch.commit()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
