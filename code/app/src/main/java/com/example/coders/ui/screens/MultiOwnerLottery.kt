@@ -44,7 +44,8 @@ fun MultiOwnerLotteryScreen(
         String,
         String,
         String,
-        Int
+        Int,
+        Int?
     ) -> Unit
 ) {
     val context = LocalContext.current
@@ -121,6 +122,17 @@ fun MultiOwnerLotteryScreen(
         mutableStateOf("")
     }
 
+    // NEW: Stores the optional maximum waitlist capacity.
+    var maximumCapacity by remember {
+        mutableStateOf("")
+    }
+
+    // NEW: Empty means no limit. Otherwise, capacity must be positive.
+    val capacity = maximumCapacity.toIntOrNull()
+
+    val validCapacity = maximumCapacity.isBlank() ||
+            (capacity != null && capacity > 0)
+
     val availableCampsiteIds = campsites.map { it.id }.toSet()
 
     LaunchedEffect(availableCampsiteIds) {
@@ -179,6 +191,7 @@ fun MultiOwnerLotteryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
@@ -255,7 +268,7 @@ fun MultiOwnerLotteryScreen(
 
                 /**
                  * Displays the campsite name and location
-                 * vertically beside its checkbox.
+                 * vertically beside the checkbox.
                  */
                 Column {
                     Text(campsite.name)
@@ -529,6 +542,46 @@ fun MultiOwnerLotteryScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // NEW: OPTIONAL MAXIMUM WAITLIST CAPACITY
+
+        Text(
+            text = "Set Maximum Capacity",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = "Leave empty for no maximum capacity."
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
+            value = maximumCapacity,
+            onValueChange = {
+                maximumCapacity = it
+            },
+            label = {
+                Text("Set Maximum Capacity")
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number
+            ),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (!validCapacity) {
+            Text("Enter a positive whole number.")
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        HorizontalDivider()
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         // 6. CHOOSE CAMPSITE OWNERS
 
         Text(
@@ -585,7 +638,8 @@ fun MultiOwnerLotteryScreen(
                         registrationEndDate,
                         bookingStartDate,
                         bookingEndDate,
-                        count
+                        count,
+                        capacity
                     )
                 }
             },
@@ -594,7 +648,8 @@ fun MultiOwnerLotteryScreen(
                     validRegistrationDates &&
                     validBookingDates &&
                     validPeriodOrder &&
-                    validWinnerCount,
+                    validWinnerCount &&
+                    validCapacity,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Create Lottery")
