@@ -343,8 +343,6 @@ data class Reservation (
     val campsiteId: String = "",
     val campOwnerId: String = "",
     val entrantIds: List<String> = emptyList(),
-    /** The entrant's one-to-five rating, kept independent from [status]. */
-    val rating: Int? = null,
     val lotteryId: String = "",
     val startDate: String = "",
     val endDate: String = ""
@@ -447,6 +445,35 @@ data class Conversation (
     val participantIds: List<String> = emptyList()
 )
 
+/**
+ * Represents a rating submitted for a past reservation.
+ *
+ * @property reservationId ID of the associated reservation.
+ * @property entrantId ID of the entrant who submitted the rating.
+ * @property campsiteId ID of the campsite being rated.
+ * @property score The score the entrant gave the reservation.
+ */
+data class ReservationRating(
+    val reservationId: String = "",
+    val entrantId: String = "",
+    val campsiteId: String = "",
+    val score: Int = 0
+)
+
+/**
+ * Represents a written review submitted for a past reservation.
+ *
+ * @property reservationId ID of the associated reservation.
+ * @property entrantId ID of the entrant who submitted the review.
+ * @property campsiteId ID of the campsite being reviewed.
+ * @property content The written review.
+ */
+data class ReservationReview(
+    val reservationId: String = "",
+    val entrantId: String = "",
+    val campsiteId: String = "",
+    val content: String = ""
+)
 
 /**
  * Decodes documents from a Firestore listener and forwards results or errors.
@@ -475,6 +502,9 @@ private fun <T> Query.listenForDecodedDocuments(
  */
 private fun Profile.hasStoredIdentity(): Boolean =
     name.isNotBlank() || email.isNotBlank() || phone.isNotBlank()
+
+
+
 
 /**
  * Provides campsite storage, search, and owner-scoped live queries.
@@ -628,7 +658,16 @@ class CampsiteRepo : AutoCloseable {
         val record = campsite.copy(
             campOwnerId = campsiteOwnerId(campsite)
         )
-        campsiteRef.document(record.id).set(record)
+        campsiteRef.document(campsite.id).update(
+            mapOf(
+                "name" to campsite.name,
+                "location" to campsite.location,
+                "description" to campsite.description,
+                "capacity" to campsite.capacity,
+                "mapLocation" to campsite.mapLocation,
+                "tags" to campsite.tags
+            )
+        )
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -818,7 +857,6 @@ class ProfileRepo : AutoCloseable {
         put("dates", reservation.dates)
         put("guestNumber", reservation.guestNumber)
         put("status", reservation.status.name)
-        reservation.rating?.let { put("rating", it) }
     }
 
 
@@ -940,29 +978,32 @@ class ProfileRepo : AutoCloseable {
     override fun close() = cacheListener.remove()
 }
 
+
+
 // The following repository was added using OpenAI, Codex, "Implement US 01.13.01: rate a past
 // campsite reservation with an ID-based campsite lookup and atomic average update", 2026-11-06.
 /**
- * Saves an entrant's rating for a past reservation.
+ * Manages the submission, retrieval and deletion of reservation ratings.
  *
- * A `reservationRatings/{reservationId}` record is the one-time rating guard. The entrant's
- * reservation keeps the selected score for display, while a campsite only keeps the derived
- * total, count, and average. All records are updated in one transaction.
+ * Maintains the aggregate rating of each campsite and ensures
+ * that reservations cannot have multiple ratings simultaneously.
+ *
+ * Outstanding issues: None known.
  */
 class ReservationRatingRepo {
+
     private val db = Firebase.firestore
-    private val profileRef = db.collection("profiles")
     private val reservationRef = db.collection("reservation")
     private val campsiteRef = db.collection("campsites")
     private val ratingRef = db.collection("reservationRatings")
 
     /**
-     * Rates a past reservation from one to five.
+     * Submits a rating for a past reservation.
      *
-     * @param entrantId ID of the signed-in entrant who owns the reservation.
+     * @param entrantId ID of the entrant submitting the rating.
      * @param reservationId ID of the reservation being rated.
-     * @param score The selected score, from 1 through 5.
-     * @param onComplete Called with `null` after both records save, or the failure.
+     * @param score Rating between 1 and 5.
+     * @param onComplete Called with null on success or an exception on failure.
      */
     fun submitRating(
         entrantId: String,
@@ -971,92 +1012,345 @@ class ReservationRatingRepo {
         onComplete: (Exception?) -> Unit = {}
     ) {
         if (score !in 1..5) {
-            onComplete(IllegalArgumentException("A rating must be between 1 and 5."))
-            return
-        }
-        if (entrantId.isBlank() || reservationId.isBlank()) {
-            onComplete(IllegalArgumentException("A reservation and entrant are required."))
+            onComplete(
+                IllegalArgumentException("Rating must be between 1 and 5.")
+            )
             return
         }
 
-        val entrantDocument = profileRef.document(entrantId)
+        if (entrantId.isBlank() || reservationId.isBlank()) {
+            onComplete(
+                IllegalArgumentException("Entrant and reservation IDs are required.")
+            )
+            return
+        }
+
+        val reservationDocument = reservationRef.document(reservationId)
+        val ratingDocument = ratingRef.document(reservationId)
 
         db.runTransaction { transaction ->
-            val entrantSnapshot = transaction.get(entrantDocument)
-            val entrant = entrantSnapshot.toObject(Entrant::class.java)?.copy(id = entrantDocument.id)
-                ?: throw IllegalArgumentException("Entrant profile was not found.")
-            val reservation = entrant.reservations.firstOrNull { it.id == reservationId }
-                ?: throw IllegalArgumentException("Reservation was not found.")
+
+            val reservation = transaction.get(reservationDocument)
+                .toObject(Reservation::class.java)
+                ?: error("Reservation was not found.")
+
+            check(entrantId in reservation.entrantIds) {
+                "Entrant is not associated with this reservation."
+            }
 
             check(reservation.status == ReservationStatus.Past) {
                 "Only past reservations can be rated."
             }
-            check(reservation.rating == null) {
-                "This reservation has already been rated."
-            }
+
             check(reservation.campsiteId.isNotBlank()) {
                 "Reservation does not have a campsite ID."
             }
 
-            // Never obtain the campsite from Reservation.campsite: the relationship is by ID.
-            val campsiteDocument = campsiteRef.document(reservation.campsiteId)
-            val campsiteSnapshot = transaction.get(campsiteDocument)
-            val campsite = campsiteSnapshot.toObject(Campsite::class.java)
-                ?.copy(id = campsiteDocument.id)
-                ?: throw IllegalArgumentException("Campsite was not found.")
-            val reservationDocument = reservationRef.document(reservationId)
-            check(transaction.get(reservationDocument).exists()) {
-                "Reservation record was not found."
-            }
-            val ratingDocument = ratingRef.document(reservationId)
+
+            val campsiteDocument =
+                campsiteRef.document(reservation.campsiteId)
+
+            val campsite = transaction.get(campsiteDocument)
+                .toObject(Campsite::class.java)
+                ?: error("Campsite was not found.")
+
+
             check(!transaction.get(ratingDocument).exists()) {
-                "This reservation has already been rated."
+                "Reservation has already been rated."
             }
 
-            val updatedReservations = entrant.reservations.map {
-                if (it.id == reservationId) it.copy(rating = score) else it
-            }
-            val updatedTotal = campsite.ratingTotal + score
-            val updatedCount = campsite.ratingCount + 1
-            val updatedAverage = updatedTotal.toDouble() / updatedCount
+            val rating = ReservationRating(
+                reservationId = reservationId,
+                entrantId = entrantId,
+                campsiteId = reservation.campsiteId,
+                score = score
+            )
 
-            transaction.update(
-                entrantDocument,
-                "reservations",
-                updatedReservations.map(::reservationStorageRecord)
-            )
-            transaction.set(
-                ratingDocument,
-                mapOf(
-                    "reservationId" to reservationId,
-                    "entrantId" to entrantId,
-                    "campsiteId" to reservation.campsiteId,
-                    "score" to score
-                )
-            )
+            transaction.set(ratingDocument, rating)
+
+
             transaction.update(
                 campsiteDocument,
-                mapOf(
-                    "ratingTotal" to updatedTotal,
-                    "ratingCount" to updatedCount,
-                    "rating" to updatedAverage
+                calculateRating(
+                    campsite.ratingTotal + score,
+                    campsite.ratingCount + 1
                 )
             )
-            transaction.update(reservationDocument, "rating", score)
-        }.addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
 
-    /** Serializes reservation relationships by ID rather than embedded Firestore objects. */
-    private fun reservationStorageRecord(reservation: Reservation): Map<String, Any> = buildMap {
-        put("id", reservation.id)
-        put("campsiteId", reservation.campsiteId)
-        put("campOwnerId", reservation.campOwnerId)
-        put("entrantIds", reservation.entrantIds)
-        put("dates", reservation.dates)
-        put("guestNumber", reservation.guestNumber)
-        put("status", reservation.status.name)
-        reservation.rating?.let { put("rating", it) }
+    /**
+     * Retrieves all individual ratings for a campsite.
+     *
+     * @param campsiteId ID of the campsite.
+     * @param onComplete Returns the ratings or an exception.
+     */
+    fun getRatingsByCampsite(
+        campsiteId: String,
+        onComplete: (List<ReservationRating>?, Exception?) -> Unit
+    ) {
+        ratingRef
+            .whereEqualTo("campsiteId", campsiteId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObjects(ReservationRating::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+
+    /**
+     * Deletes a rating and recalculates the campsite's aggregate rating.
+     *
+     * @param reservationId ID of the reservation associated with the rating.
+     * @param onComplete Called with null on success or an exception on failure.
+     */
+    fun deleteRating(
+        reservationId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+
+        val ratingDocument = ratingRef.document(reservationId)
+
+        db.runTransaction { transaction ->
+
+            val rating = transaction.get(ratingDocument)
+                .toObject(ReservationRating::class.java)
+                ?: error("Rating was not found.")
+
+            val campsiteDocument =
+                campsiteRef.document(rating.campsiteId)
+
+            val campsite = transaction.get(campsiteDocument)
+                .toObject(Campsite::class.java)
+                ?: error("Campsite was not found.")
+
+            check(campsite.ratingCount > 0) {
+                "Campsite rating count is invalid."
+            }
+
+            check(campsite.ratingTotal >= rating.score) {
+                "Campsite rating total is invalid."
+            }
+
+            transaction.delete(ratingDocument)
+
+            transaction.update(
+                campsiteDocument,
+                calculateRating(
+                    campsite.ratingTotal - rating.score,
+                    campsite.ratingCount - 1
+                )
+            )
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
+    /**
+     * Calculates the campsite's aggregate rating.
+     */
+    private fun calculateRating(
+        total: Int,
+        count: Int
+    ): Map<String, Any?> {
+        val average = if (count > 0) {
+            total.toDouble() / count
+        } else {
+            null
+        }
+
+        return mapOf(
+            "ratingTotal" to total,
+            "ratingCount" to count,
+            "rating" to average
+        )
+    }
+
+    /**
+     * Retrieves the rating associated with a reservation.
+     *
+     * @param reservationId ID of the reservation.
+     * @param onComplete Returns the rating or an exception.
+     */
+    fun getRatingByReservation(
+        reservationId: String,
+        onComplete: (ReservationRating?, Exception?) -> Unit
+    ) {
+        ratingRef.document(reservationId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObject(ReservationRating::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+}
+
+/**
+ * Manages the submission, retrieval and deletion of reservation reviews.
+ *
+ * Ensures that only past reservations can be reviewed and that
+ * each reservation can have at most one review.
+ */
+class ReservationReviewRepo {
+
+    private val db = Firebase.firestore
+    private val reservationRef = db.collection("reservation")
+    private val reviewRef = db.collection("reservationReviews")
+
+    /**
+     * Submits a written review for a past reservation.
+     *
+     * @param entrantId ID of the entrant submitting the review.
+     * @param reservationId ID of the reservation being reviewed.
+     * @param content The written review.
+     * @param onComplete Called with null on success or an exception on failure.
+     */
+    fun submitReview(
+        entrantId: String,
+        reservationId: String,
+        content: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        if (content.isBlank()) {
+            onComplete(
+                IllegalArgumentException("Review cannot be empty.")
+            )
+            return
+        }
+
+        if (entrantId.isBlank() || reservationId.isBlank()) {
+            onComplete(
+                IllegalArgumentException(
+                    "Entrant and reservation IDs are required."
+                )
+            )
+            return
+        }
+
+        val reservationDocument = reservationRef.document(reservationId)
+        val reviewDocument = reviewRef.document(reservationId)
+
+        db.runTransaction { transaction ->
+
+            val reservation = transaction.get(reservationDocument)
+                .toObject(Reservation::class.java)
+                ?: error("Reservation was not found.")
+
+            check(entrantId in reservation.entrantIds) {
+                "Entrant is not associated with this reservation."
+            }
+
+            check(reservation.status == ReservationStatus.Past) {
+                "Only past reservations can be reviewed."
+            }
+
+            check(reservation.campsiteId.isNotBlank()) {
+                "Reservation does not have a campsite ID."
+            }
+
+            check(!transaction.get(reviewDocument).exists()) {
+                "Reservation has already been reviewed."
+            }
+
+            val review = ReservationReview(
+                reservationId = reservationId,
+                entrantId = entrantId,
+                campsiteId = reservation.campsiteId,
+                content = content.trim()
+            )
+
+            transaction.set(reviewDocument, review)
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
+    /**
+     * Retrieves all written reviews for a campsite.
+     *
+     * @param campsiteId ID of the campsite.
+     * @param onComplete Returns the reviews or an exception.
+     */
+    fun getReviewsByCampsite(
+        campsiteId: String,
+        onComplete: (List<ReservationReview>?, Exception?) -> Unit
+    ) {
+        reviewRef
+            .whereEqualTo("campsiteId", campsiteId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObjects(ReservationReview::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+
+    /**
+     * Retrieves the review associated with a reservation.
+     *
+     * @param reservationId ID of the reservation.
+     * @param onComplete Returns the review or an exception.
+     */
+    fun getReviewByReservation(
+        reservationId: String,
+        onComplete: (ReservationReview?, Exception?) -> Unit
+    ) {
+        reviewRef.document(reservationId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObject(ReservationReview::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+
+    /**
+     * Deletes a review using its associated reservation ID.
+     *
+     * @param reservationId ID of the reservation associated with the review.
+     * @param onComplete Called with null on success or an exception on failure.
+     */
+    fun deleteReview(
+        reservationId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        reviewRef.document(reservationId)
+            .delete()
+            .addOnSuccessListener {
+                onComplete(null)
+            }
+            .addOnFailureListener { error ->
+                onComplete(error)
+            }
     }
 }
 

@@ -64,7 +64,7 @@ fun EntrantReservationsScreen(navController: NavController) {
     val profileRepo = remember { ProfileRepo() }
 
     val profile by SignedInProfile().rememberSignedInProfile()
-    val entrant = profile as? Entrant
+    val entrantId = profile?.id
 
     val campsiteRepo = remember { CampsiteRepo() }
     val reservationRepo = remember { ReservationRepo() }
@@ -78,43 +78,20 @@ fun EntrantReservationsScreen(navController: NavController) {
         mutableStateOf<Map<String, Profile>>(emptyMap())
     }
 
-    var reservations by remember(entrant?.id) {
+    var reservations by remember(entrantId) {
         mutableStateOf<List<Reservation>>(emptyList())
     }
 
-    var isLoading by remember(entrant?.id) {
+    var isLoading by remember(entrantId) {
         mutableStateOf(true)
     }
 
 
-    DisposableEffect(reservations, profileRepo) {
-        var disposed = false
+    DisposableEffect(entrantId, reservationRepo) {
 
-        campOwners = emptyMap()
-
-        reservations.map { it.campOwnerId }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .forEach { ownerId ->
-
-                profileRepo.getProfileById(ownerId) { owner, _ ->
-                    if (!disposed && owner != null) {
-                        campOwners = campOwners + (ownerId to owner)
-                    }
-                }
-            }
-
-        onDispose {
-            disposed = true
-        }
-    }
-
-    // Listen for reservations associated with the signed-in entrant
-    DisposableEffect(entrant?.id, reservationRepo) {
-
-        val listener = entrant?.id?.let { entrantId ->
+        val listener = entrantId?.let { id ->
             reservationRepo.listenForEntrantReservations(
-                entrantId = entrantId,
+                entrantId = id,
 
                 onUpdate = { updatedReservations ->
                     reservations = updatedReservations
@@ -166,6 +143,27 @@ fun EntrantReservationsScreen(navController: NavController) {
         }
     }
 
+    DisposableEffect(reservations, profileRepo) {
+        var disposed = false
+
+        campOwners = emptyMap()
+
+        reservations.map { it.campOwnerId }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .forEach { ownerId ->
+                profileRepo.getProfileById(ownerId) { owner, _ ->
+                    if (!disposed && owner != null) {
+                        campOwners = campOwners + (ownerId to owner)
+                    }
+                }
+            }
+
+        onDispose {
+            disposed = true
+        }
+    }
+
     val visibleReservations = reservations.filter { it.status == selectedTab.status }
 
     /** Resolves a reservation's campsite name from the campsite document loaded by ID. */
@@ -184,33 +182,47 @@ fun EntrantReservationsScreen(navController: NavController) {
         status: ReservationStatus,
         onComplete: (Exception?) -> Unit
     ) {
-        val currentEntrant = entrant
-        if (currentEntrant == null) {
-            onComplete(IllegalStateException("An entrant profile is required to update a reservation."))
+        if (entrantId == null || entrantId !in reservation.entrantIds) {
+            onComplete(
+                IllegalStateException("You do not own this reservation.")
+            )
             return
         }
 
-        if (currentEntrant.reservations.none { it.id == reservation.id }) {
-            onComplete(IllegalStateException("Reservation was not found in the entrant profile."))
-            return
-        }
+        val currentEntrant = profile as? Entrant
 
-        val updatedEntrant = currentEntrant.copy(
-            reservations = currentEntrant.reservations.map {
-                if (it.id == reservation.id) it.copy(status = status) else it
+        if (currentEntrant != null) {
+            val updatedEntrant = currentEntrant.copy(
+                reservations = currentEntrant.reservations.map {
+                    if (it.id == reservation.id) {
+                        it.copy(status = status)
+                    } else {
+                        it
+                    }
+                }
+            )
+
+            profileRepo.updateProfile(
+                currentEntrant,
+                updatedEntrant
+            ) { profileError ->
+                if (profileError != null) {
+                    onComplete(profileError)
+                    return@updateProfile
+                }
+
+                reservationRepo.updateReservationStatus(
+                    reservation.id,
+                    status,
+                    onComplete
+                )
             }
-        )
-
-        // Keep the entrant's profile history and the reservation document in sync. The active
-        // screen is driven by the reservation document; the profile retains the entrant-facing
-        // reservation history required by the user story.
-        profileRepo.updateProfile(currentEntrant, updatedEntrant) { profileError ->
-            if (profileError != null) {
-                onComplete(profileError)
-                return@updateProfile
-            }
-
-            reservationRepo.updateReservationStatus(reservation.id, status, onComplete)
+        } else {
+            reservationRepo.updateReservationStatus(
+                reservation.id,
+                status,
+                onComplete
+            )
         }
     }
 
@@ -269,12 +281,8 @@ fun EntrantReservationsScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(20.dp))
 
         when {
-            profile == null || (entrant != null && isLoading) -> {
+            profile == null || isLoading -> {
                 CircularProgressIndicator()
-            }
-
-            entrant == null -> {
-                Text("Reservations are available to entrant profiles only.")
             }
 
             visibleReservations.isEmpty() -> {
