@@ -43,7 +43,10 @@ import com.example.coders.Entrant
 import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
-
+import com.example.coders.ReservationRating
+import com.example.coders.ReservationRatingRepo
+import com.example.coders.ReservationRepo
+import android.util.Log
 
 //The code for filtering past reservations is from Google, Gemini, "How can I make sure this code only displays past reservations and not all reservations"
 //2026-11-06
@@ -61,12 +64,65 @@ fun EntrantPastReservationsScreen(
     testEntrant: Entrant? = null
 ) {
     val profile by SignedInProfile().rememberSignedInProfile()
-    val entrant = testEntrant ?: (profile as? Entrant)
-    val pastReservations = entrant?.reservations.orEmpty().filter {
-        it.status == ReservationStatus.Past
+    val entrantId = testEntrant?.id ?: profile?.id
+
+    val reservationRepo = remember { ReservationRepo() }
+
+    var reservations by remember(entrantId) {
+        mutableStateOf<List<Reservation>>(emptyList())
     }
+
+    var isLoading by remember(entrantId) {
+        mutableStateOf(true)
+    }
+
+    DisposableEffect(entrantId, reservationRepo) {
+
+        reservationRepo.debugReservations()
+        Log.d("PastReservations", "Profile ID: $entrantId")
+        Log.d("PastReservations", "Profile type: ${profile?.type}")
+
+        val listener = entrantId?.let { id ->
+            reservationRepo.listenForEntrantReservations(
+                entrantId = id,
+
+                onUpdate = { updatedReservations ->
+                    reservations = updatedReservations
+                    isLoading = false
+
+                    Log.d(
+                        "PastReservations",
+                        "Total reservations: ${updatedReservations.size}"
+                    )
+
+                    updatedReservations.forEach {
+                        Log.d(
+                            "PastReservations",
+                            "ID: ${it.id}, Status: ${it.status}"
+                        )
+                    }
+                },
+
+                onError = { error ->
+                    isLoading = false
+                    Log.e("PastReservations", "Query failed", error)
+                }
+            )
+        }
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    val pastReservations = (testEntrant?.reservations ?: reservations)
+        .filter { it.status == ReservationStatus.Past }
+
     val campsiteRepo = remember { CampsiteRepo() }
     var campsites by remember { mutableStateOf<Map<String, Campsite>>(emptyMap()) }
+
+    val ratingRepo = remember { ReservationRatingRepo() }
+
 
     DisposableEffect(pastReservations, campsiteRepo) {
         var disposed = false
@@ -90,6 +146,7 @@ fun EntrantPastReservationsScreen(
         onDispose { campsiteRepo.close() }
     }
 
+    var backClicked by remember {mutableStateOf(false)}
     val context = LocalContext.current
     var reservationToExport by remember { mutableStateOf<Reservation?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
@@ -97,15 +154,42 @@ fun EntrantPastReservationsScreen(
     ) { uri ->
         val reservation = reservationToExport
         reservationToExport = null
+
         if (uri != null && reservation != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use {
-                    it.write(reservation.asCsv(campsites[reservation.campsiteId]))
-                } ?: error("Unable to open the selected file.")
-            }.onSuccess {
-                Toast.makeText(context, "Reservation CSV exported", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, "Unable to export reservation CSV", Toast.LENGTH_SHORT).show()
+            ratingRepo.getRatingByReservation(reservation.id) { rating, error ->
+                if (error == null) {
+                    runCatching {
+                        context.contentResolver
+                            .openOutputStream(uri)
+                            ?.bufferedWriter()
+                            ?.use {
+                                it.write(
+                                    reservation.asCsv(
+                                        campsites[reservation.campsiteId],
+                                        rating
+                                    )
+                                )
+                            } ?: error("Unable to open the selected file.")
+                    }.onSuccess {
+                        Toast.makeText(
+                            context,
+                            "Reservation CSV exported",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure {
+                        Toast.makeText(
+                            context,
+                            "Unable to export reservation CSV",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Unable to retrieve rating",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
@@ -120,7 +204,12 @@ fun EntrantPastReservationsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(onClick = {
+                if (!backClicked) {
+                    backClicked = true
+                    navController.popBackStack()
+                }
+            }) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
 
@@ -158,6 +247,9 @@ fun EntrantPastReservationsScreen(
                         onRate = {
                             navController.navigate("rate_campsite/${Uri.encode(reservation.id)}")
                         },
+                        onReview = {
+                            navController.navigate("review_campsite/${Uri.encode(reservation.id)}")
+                        },
                         onExportCsv = {
                             reservationToExport = reservation
                             csvExportLauncher.launch("reservation-${reservation.id}.csv")
@@ -181,20 +273,20 @@ fun EntrantPastReservationsScreen(
 }
 
 /**
- * Renders a summary card for a single past reservation.
+ * Displays a summary card for a past reservation.
  *
- * This card displays the campsite's name, location, and guest count, alongside
- * interactive buttons for rating the campsite and downloading the reservation details as a CSV.
- *
- * @param campsiteName name of reserved campsite
- * @param location location of campsite
- * @param guests number of guests in the reservatoin
+ * @param reservation The past reservation to display.
+ * @param campsite The campsite associated with the reservation.
+ * @param onRate Called when the rating button is pressed.
+ * @param onReview Called when the review button is pressed.
+ * @param onExportCsv Called when the CSV export button is pressed.
  */
 @Composable
 fun PastReservationCard(
     reservation: Reservation,
     campsite: Campsite?,
     onRate: () -> Unit,
+    onReview: () -> Unit,
     onExportCsv: () -> Unit
 ) {
     Card(
@@ -238,13 +330,28 @@ fun PastReservationCard(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Button(
-                    onClick = onRate,
-                    modifier = Modifier.height(28.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                ) {
-                    Text("Rate", fontSize = 10.sp, color = Color.White)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+
+                    Button(
+                        onClick = onRate,
+                        modifier = Modifier.height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                    ) {
+                        Text("Rate", fontSize = 10.sp, color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = onReview,
+                        modifier = Modifier.height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                    ) {
+                        Text("Review", fontSize = 10.sp, color = Color.White)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -267,12 +374,16 @@ fun PastReservationCard(
 //Functions for CSVs created by Google, Gemini "How do i convert a Reservation object into a CSV format" 2026-11-05
 
 /**
- * converts reservation and its details into formatted csv string
+ * Converts a reservation and its details into a formatted CSV string.
  *
  * @param campsite Campsite associated with this reservation.
- * @return string formatted as a standard CSV
+ * @param rating Rating associated with this reservation.
+ * @return String formatted as a standard CSV.
  */
-private fun Reservation.asCsv(campsite: Campsite?): String = buildString {
+fun Reservation.asCsv(
+    campsite: Campsite?,
+    rating: ReservationRating?
+): String = buildString {
     appendLine("reservation_id,campsite_id,campsite_name,location,dates,guests,status,rating")
     appendCsvValue(id)
     append(',')
@@ -288,7 +399,7 @@ private fun Reservation.asCsv(campsite: Campsite?): String = buildString {
     append(',')
     appendCsvValue(status.name)
     append(',')
-    appendCsvValue(rating?.toString().orEmpty())
+    appendCsvValue(rating?.score?.toString().orEmpty())
     appendLine()
 }
 

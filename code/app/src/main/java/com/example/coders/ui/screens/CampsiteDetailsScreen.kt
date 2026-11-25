@@ -1,17 +1,20 @@
 
 package com.example.coders.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
+import com.example.coders.SignedInProfile
 
 /**
  * Displays detailed information about a selected campsite.
@@ -39,6 +42,9 @@ fun CampsiteDetailsScreen(
     navController: NavController,
     campsite: Campsite
 ) {
+
+    val signedInProfile by SignedInProfile().rememberSignedInProfile()
+
     val coordinates = remember(campsite.mapLocation) {
         val parts = campsite.mapLocation.split(",")
 
@@ -88,19 +94,21 @@ fun CampsiteDetailsScreen(
             Text("Back")
         }
 
-        Button(
-            onClick = {
-                if (!editClicked) {
-                    editClicked = true
-                    navController.navigate("edit_campsite/${campsite.id}")
-                }
-            },
-            enabled = !editClicked
-        ) {
-            Text("Edit Campsite")
-        }
-        Spacer(modifier = Modifier.height(12.dp))
 
+        if(signedInProfile?.id == campsite.campOwnerId) {
+            Button(
+                onClick = {
+                    if (!editClicked) {
+                        editClicked = true
+                        navController.navigate("edit_campsite/${campsite.id}")
+                    }
+                },
+                enabled = !editClicked
+            ) {
+                Text("Edit Campsite")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
         /**
          * US 02.06.01: View Booked Dates
          *
@@ -186,6 +194,25 @@ fun CampsiteDetailsScreen(
                 Text(
                     text = "Campsite Owner: ${campsite.campOwner.name}"
                 )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+        ){
+            Button(
+                onClick = {
+                    navController.navigate("campsite_ratings/${campsite.id}")
+                }
+            ) {
+                Text("View all ratings")
+            }
+            Button(
+                onClick = {
+                    navController.navigate("campsite_reviews/${campsite.id}")
+                }
+            ) {
+                Text("View all reviews")
             }
         }
 

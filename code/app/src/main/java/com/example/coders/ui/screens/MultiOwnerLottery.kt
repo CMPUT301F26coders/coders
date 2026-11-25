@@ -175,6 +175,7 @@ fun MultiOwnerLotteryScreen(
 
     val validWinnerCount =
         winnerCount != null && winnerCount > 0
+    var backClicked by remember {mutableStateOf(false)}
 
     Column(
         modifier = Modifier
@@ -186,7 +187,10 @@ fun MultiOwnerLotteryScreen(
 
         TextButton(
             onClick = {
-                navController.popBackStack()
+                if (!backClicked) {
+                    backClicked = true
+                    navController.popBackStack()
+                }
             }
         ) {
             Text("Back")

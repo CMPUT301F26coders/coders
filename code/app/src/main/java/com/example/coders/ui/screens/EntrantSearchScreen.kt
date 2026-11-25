@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.CampsiteRepo
 import com.example.coders.filterCampsites
-
+import com.example.coders.SignedInProfile
 
 /**
  * Displays searchable and filterable list of all available campsites for entrants
@@ -33,6 +33,9 @@ import com.example.coders.filterCampsites
  */
 @Composable
 fun EntrantSearchScreen(navController: NavController) {
+
+
+    val signedInProfile by SignedInProfile().rememberSignedInProfile()
 
     val campsiteRepo = remember { CampsiteRepo() }
     val campsites = campsiteRepo.getAllCampsites()
@@ -54,7 +57,8 @@ fun EntrantSearchScreen(navController: NavController) {
         startDate = selectedStartDate,
         endDate = selectedEndDate
     ).filter { campsite ->
-        searchText.isBlank() ||
+        signedInProfile?.id != campsite.campOwnerId &&
+                searchText.isBlank() ||
                 campsite.name.contains(
                     searchText.trim(),
                     ignoreCase = true

@@ -48,9 +48,12 @@ import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
 import com.example.coders.ui.screens.EntrantPastReservationsScreen
 import com.example.coders.ui.screens.RateCampsiteScreen
+import com.example.coders.ui.screens.CampsiteRatingsScreen
+import com.example.coders.ui.screens.CampsiteReviewsScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.example.coders.ui.screens.ReviewCampsiteScreen
 
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
@@ -175,6 +178,51 @@ class MainActivity : ComponentActivity() {
                             navController = navController,
                             reservationId = backStackEntry.arguments
                                 ?.getString("reservationId")
+                                .orEmpty()
+                        )
+                    }
+
+                    //routed the rate campsite screen
+                    composable(
+                        route = "review_campsite/{reservationId}",
+                        arguments = listOf(
+                            navArgument("reservationId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        ReviewCampsiteScreen(
+                            navController = navController,
+                            reservationId = backStackEntry.arguments
+                                ?.getString("reservationId")
+                                .orEmpty()
+                        )
+                    }
+
+                    //routed the campsite ratings screen
+                    composable(
+                        route = "campsite_ratings/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        CampsiteRatingsScreen(
+                            navController = navController,
+                            campsiteId = backStackEntry.arguments
+                                ?.getString("campsiteId")
+                                .orEmpty()
+                        )
+                    }
+
+                    //routed the campsite reviews screen
+                    composable(
+                        route = "campsite_reviews/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        CampsiteReviewsScreen(
+                            navController = navController,
+                            campsiteId = backStackEntry.arguments
+                                ?.getString("campsiteId")
                                 .orEmpty()
                         )
                     }
