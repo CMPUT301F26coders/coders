@@ -62,6 +62,7 @@ fun CampsiteReviewsScreen(
     val reviewRepo = remember { ReservationReviewRepo() }
     val profileRepo = remember { ProfileRepo() }
     val campsiteRepo = remember { CampsiteRepo() }
+    val deletionRepo = remember { DeletionRepo() }
 
     var isLoadingReview by remember(campsiteId) {
         mutableStateOf(true)
@@ -175,18 +176,28 @@ fun CampsiteReviewsScreen(
         }
 
         reviewToDelete?.let { review ->
-            DeleteConfirmationDialog(
+            DeleteConfirmationDialogAdmin(
                 itemName = "this review",
 
-                onConfirm = {
+                onConfirm = { reason ->
                     reviewToDelete = null
 
-                    if (profile is Admin) {
+                    val currentProfile = profile
+                    if (currentProfile is Admin) {
                         reviewRepo.deleteReview(review.reservationId) { error ->
                             if (error == null) {
                                 reviews = reviews.orEmpty().filterNot {
                                     it.reservationId == review.reservationId
                                 }
+                                    val deletion = Deletion(
+                                        deletedObjectId = review.reservationId,
+                                        collectionName = "reservationReviews",
+                                        reason = reason,
+                                        deletedBy = currentProfile.id
+                                    )
+
+                                    deletionRepo.addDeletion(deletion)
+
                             } else {
                                 reviewError = error
                             }
