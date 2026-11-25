@@ -101,6 +101,18 @@ fun MyStuffScreen(navController: NavController) {
                     }
                 )
 
+                Spacer(modifier = Modifier.height(20.dp))
+
+                MyStuffMenuButton(
+                    title = "My Lotteries",
+                    subtitle = "View and manage lotteries",
+                    icon = Icons.Default.Event,
+                    onClick = {
+                        navController.navigate("ownerlotteries")
+                    }
+                )
+
+
             } else {
 
                 // ENTRANT BUTTONS

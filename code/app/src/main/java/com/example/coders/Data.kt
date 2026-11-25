@@ -23,6 +23,7 @@ import com.google.firebase.firestore.firestore
 import java.util.UUID
 import com.google.android.gms.tasks.Tasks
 import android.util.Log
+import java.time.LocalDate
 
 /**
  * Common interface for all profiles.
@@ -304,7 +305,16 @@ data class Lottery (
     val invitedOwnerIds: List<String> = emptyList(),
     val allowOtherOwners: Boolean = false,
     val availabilityStartDate: String = "",
-    val availabilityEndDate: String = ""
+    val availabilityEndDate: String = "",
+    
+    // Stores the IDs of entrants selected as winners.
+    val winnerEntrantIds: List<String> = emptyList(),
+    
+    // True once the lottery draw is completed.
+    val drawCompleted: Boolean = false,
+    
+    // Stores the date each entrant joined the waitlist.
+    val waitlistJoinedDates: Map<String, String> = emptyMap()
 
 )
 
@@ -1795,6 +1805,75 @@ class LotteryRepo {
             .addOnFailureListener { error -> onComplete(error) }
     }
 
+    
+    fun joinOwnerLottery(
+        lotteryId: String,
+        ownerId: String,
+        campsiteIds: List<String>,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+    
+        db.runTransaction { transaction ->
+            val lotterySnapshot = transaction.get(lotteryDocument)
+    
+            if (!lotterySnapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+    
+            val lottery = lotterySnapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+    
+            if (!lottery.allowOtherOwners) {
+                throw IllegalStateException("This lottery does not allow other owners.")
+            }
+    
+            if (lottery.campOwnerId == ownerId) {
+                throw IllegalStateException("You cannot join your own lottery.")
+            }
+    
+            if (ownerId in lottery.participatingOwnerIds) {
+                throw IllegalStateException("You already joined this lottery.")
+            }
+    
+            if (campsiteIds.isEmpty()) {
+                throw IllegalArgumentException("Select at least one campsite.")
+            }
+    
+            val campsiteSnapshots = campsiteIds.distinct().map { id ->
+                transaction.get(db.collection("campsites").document(id))
+            }
+    
+            for (snapshot in campsiteSnapshots) {
+                if (!snapshot.exists() ||
+                    snapshot.getString("campOwnerId") != ownerId
+                ) {
+                    throw IllegalArgumentException(
+                        "You can only add campsites that you own."
+                    )
+                }
+            }
+    
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "campsiteIds" to
+                        (lottery.campsiteIds + campsiteIds).distinct(),
+                    "participatingOwnerIds" to
+                        (lottery.participatingOwnerIds +
+                            lottery.campOwnerId + ownerId)
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                )
+            )
+    
+            true
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
 
     
     /**
@@ -1809,7 +1888,8 @@ class LotteryRepo {
             return
         }
     
-        val lotteryDocument = lotteryRef.document(lottery.id)
+        val record = withRelationshipIds(lottery)
+        val lotteryDocument = lotteryRef.document(record.id)
     
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
@@ -1818,11 +1898,18 @@ class LotteryRepo {
                 throw IllegalArgumentException("Lottery not found.")
             }
     
+            val existing = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+    
+            if (existing.drawCompleted) {
+                throw IllegalStateException("Cannot edit a completed lottery.")
+            }
+    
             val registrationEndDate = snapshot.getString("registrationEndDate")
                 ?: throw IllegalStateException("Registration end date is missing.")
     
-            val closingDate = java.time.LocalDate.parse(registrationEndDate)
-            val today = java.time.LocalDate.now()
+            val closingDate = LocalDate.parse(registrationEndDate)
+            val today = LocalDate.now()
     
             if (!today.isBefore(closingDate)) {
                 throw IllegalStateException("Registration has already ended.")
@@ -1831,23 +1918,27 @@ class LotteryRepo {
             transaction.update(
                 lotteryDocument,
                 mapOf(
-                    "registrationStartDate" to lottery.registrationStartDate,
-                    "registrationEndDate" to lottery.registrationEndDate,
-                    "bookingStartDate" to lottery.bookingStartDate,
-                    "bookingEndDate" to lottery.bookingEndDate,
-                    "winnerCount" to lottery.winnerCount,
-                    "waitlistCapacity" to lottery.waitlistCapacity,
-                    "availabilityStartDate" to lottery.availabilityStartDate,
-                    "availabilityEndDate" to lottery.availabilityEndDate
-
+                    "campsiteIds" to record.campsiteIds,
+                    "registrationStartDate" to record.registrationStartDate,
+                    "registrationEndDate" to record.registrationEndDate,
+                    "bookingStartDate" to record.bookingStartDate,
+                    "bookingEndDate" to record.bookingEndDate,
+                    "winnerCount" to record.winnerCount,
+                    "waitlistCapacity" to record.waitlistCapacity,
+                    "availabilityStartDate" to record.availabilityStartDate,
+                    "availabilityEndDate" to record.availabilityEndDate,
+                    "allowOtherOwners" to record.allowOtherOwners
                 )
             )
+    
+            true
         }.addOnSuccessListener {
             onComplete(null)
         }.addOnFailureListener { error ->
             onComplete(error)
         }
     }
+
 
 
     /**
@@ -1926,25 +2017,69 @@ class LotteryRepo {
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
+    
     fun joinWaitlist(
         lotteryId: String,
         entrantId: String,
         onComplete: (Exception?) -> Unit = {}
     ) {
         val lotteryDocument = lotteryRef.document(lotteryId)
+    
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-            if (!snapshot.exists()) throw IllegalArgumentException("Lottery not found.")
-            val entrants = snapshot.get("waitlistEntrantIds") as? List<*> ?: emptyList<Any>()
-            val capacity = snapshot.getLong("waitlistCapacity")?.toInt()
-            if (entrantId !in entrants && capacity != null && entrants.size >= capacity) {
+    
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+    
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+    
+            val entrants = lottery.waitlistEntrantIds
+            val capacity = lottery.waitlistCapacity
+    
+            // Prevent joining after the draw.
+            if (lottery.drawCompleted) {
+                throw IllegalStateException("Lottery has already been drawn.")
+            }
+    
+            // Make sure registration is currently open.
+            val today = LocalDate.now()
+            val start = LocalDate.parse(lottery.registrationStartDate)
+            val end = LocalDate.parse(lottery.registrationEndDate)
+    
+            if (today.isBefore(start) || today.isAfter(end)) {
+                throw IllegalStateException("Registration is not open.")
+            }
+    
+            // Prevent duplicate entries.
+            if (entrantId in entrants) {
+                throw IllegalStateException("You already joined this lottery.")
+            }
+    
+            // Check maximum capacity.
+            if (capacity != null && entrants.size >= capacity) {
                 throw IllegalStateException("The lottery waitlist is full.")
             }
-            transaction.update(lotteryDocument, "waitlistEntrantIds", FieldValue.arrayUnion(entrantId))
+    
+            // Add entrant and save joining date together.
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "waitlistEntrantIds" to FieldValue.arrayUnion(entrantId),
+                    "waitlistJoinedDates" to
+                        (lottery.waitlistJoinedDates + (entrantId to today.toString()))
+                )
+            )
+    
             true
-        }.addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
+
 
     /**
      * Removes an entrant from a lottery waitlist.
@@ -1953,12 +2088,121 @@ class LotteryRepo {
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun leaveWaitlist(lotteryId: String, entrantId: String, onComplete: (Exception?) -> Unit = {}) {
-        lotteryRef.document(lotteryId)
-            .update("waitlistEntrantIds", FieldValue.arrayRemove(entrantId))
-            .addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+    
+    fun leaveWaitlist(
+        lotteryId: String,
+        entrantId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+    
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(lotteryDocument)
+    
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+    
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+    
+            if (lottery.drawCompleted) {
+                throw IllegalStateException("Cannot leave after winners are drawn.")
+            }
+    
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "waitlistEntrantIds" to FieldValue.arrayRemove(entrantId),
+                    "waitlistJoinedDates" to
+                        (lottery.waitlistJoinedDates - entrantId)
+                )
+            )
+    
+            true
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
+
+
+    
+    /**
+     * Randomly selects winners after lottery registration closes.
+     */
+    fun drawWinners(
+        lotteryId: String,
+        ownerId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+    
+        db.runTransaction { transaction ->
+    
+            // 1. Get the lottery from Firebase.
+            val snapshot = transaction.get(lotteryDocument)
+    
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+    
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+    
+            // 2. Make sure the correct owner is drawing winners.
+            if (lottery.campOwnerId != ownerId) {
+                throw IllegalStateException("Only the lottery owner can draw winners.")
+            }
+    
+            // 3. Prevent drawing winners twice.
+            if (lottery.drawCompleted) {
+                throw IllegalStateException("Winners have already been drawn.")
+            }
+    
+            // 4. Make sure registration has ended.
+            val endDate = LocalDate.parse(lottery.registrationEndDate)
+    
+            if (!LocalDate.now().isAfter(endDate)) {
+                throw IllegalStateException("Registration has not ended yet.")
+            }
+    
+            // 5. Get all entrants.
+            val entrants = lottery.waitlistEntrantIds.distinct()
+    
+            if (entrants.isEmpty()) {
+                throw IllegalStateException("No entrants are on the waitlist.")
+            }
+    
+            if (lottery.winnerCount <= 0) {
+                throw IllegalStateException("Winner count must be positive.")
+            }
+    
+            // 6. Randomly select winners.
+            val winners = entrants
+                .shuffled()
+                .take(lottery.winnerCount)
+    
+            // 7. Save the results to Firebase.
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "winnerEntrantIds" to winners,
+                    "drawCompleted" to true,
+                    "status" to CampOwnerLotteryStatus.Drawn.name
+                )
+            )
+    
+            true
+    
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
 
     /**
      * Deletes a lottery by ID.
