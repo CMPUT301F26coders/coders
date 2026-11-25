@@ -77,8 +77,6 @@ fun EntrantPastReservationsScreen(
     }
 
     DisposableEffect(entrantId, reservationRepo) {
-
-        reservationRepo.debugReservations()
         Log.d("PastReservations", "Profile ID: $entrantId")
         Log.d("PastReservations", "Profile type: ${profile?.type}")
 
