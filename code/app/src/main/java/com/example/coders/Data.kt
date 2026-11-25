@@ -23,6 +23,7 @@ import com.google.firebase.firestore.firestore
 import java.util.UUID
 import com.google.android.gms.tasks.Tasks
 import android.util.Log
+import java.time.LocalDate
 
 /**
  * Common interface for all profiles.
@@ -304,7 +305,16 @@ data class Lottery (
     val invitedOwnerIds: List<String> = emptyList(),
     val allowOtherOwners: Boolean = false,
     val availabilityStartDate: String = "",
-    val availabilityEndDate: String = ""
+    val availabilityEndDate: String = "",
+
+    // Stores the IDs of entrants selected as winners.
+    val winnerEntrantIds: List<String> = emptyList(),
+
+    // True once the lottery draw is completed.
+    val drawCompleted: Boolean = false,
+
+    // Stores the date each entrant joined the waitlist.
+    val waitlistJoinedDates: Map<String, String> = emptyMap()
 
 )
 
@@ -333,8 +343,6 @@ data class Reservation (
     val campsiteId: String = "",
     val campOwnerId: String = "",
     val entrantIds: List<String> = emptyList(),
-    /** The entrant's one-to-five rating, kept independent from [status]. */
-    val rating: Int? = null,
     val lotteryId: String = "",
     val startDate: String = "",
     val endDate: String = ""
@@ -437,6 +445,35 @@ data class Conversation (
     val participantIds: List<String> = emptyList()
 )
 
+/**
+ * Represents a rating submitted for a past reservation.
+ *
+ * @property reservationId ID of the associated reservation.
+ * @property entrantId ID of the entrant who submitted the rating.
+ * @property campsiteId ID of the campsite being rated.
+ * @property score The score the entrant gave the reservation.
+ */
+data class ReservationRating(
+    val reservationId: String = "",
+    val entrantId: String = "",
+    val campsiteId: String = "",
+    val score: Int = 0
+)
+
+/**
+ * Represents a written review submitted for a past reservation.
+ *
+ * @property reservationId ID of the associated reservation.
+ * @property entrantId ID of the entrant who submitted the review.
+ * @property campsiteId ID of the campsite being reviewed.
+ * @property content The written review.
+ */
+data class ReservationReview(
+    val reservationId: String = "",
+    val entrantId: String = "",
+    val campsiteId: String = "",
+    val content: String = ""
+)
 
 /**
  * Decodes documents from a Firestore listener and forwards results or errors.
@@ -465,6 +502,9 @@ private fun <T> Query.listenForDecodedDocuments(
  */
 private fun Profile.hasStoredIdentity(): Boolean =
     name.isNotBlank() || email.isNotBlank() || phone.isNotBlank()
+
+
+
 
 /**
  * Provides campsite storage, search, and owner-scoped live queries.
@@ -618,7 +658,16 @@ class CampsiteRepo : AutoCloseable {
         val record = campsite.copy(
             campOwnerId = campsiteOwnerId(campsite)
         )
-        campsiteRef.document(record.id).set(record)
+        campsiteRef.document(campsite.id).update(
+            mapOf(
+                "name" to campsite.name,
+                "location" to campsite.location,
+                "description" to campsite.description,
+                "capacity" to campsite.capacity,
+                "mapLocation" to campsite.mapLocation,
+                "tags" to campsite.tags
+            )
+        )
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -776,7 +825,9 @@ class ProfileRepo : AutoCloseable {
             title = "Lottery Won!",
             content = "You won the campsite lottery. Review your pending reservation offer.",
             date = java.time.LocalDate.now().toString(),
-            id = "lottery-win-${reservation.id}",
+            id = reservation.lotteryId.takeIf(String::isNotBlank)?.let { lotteryId ->
+                UUID.nameUUIDFromBytes("lottery-result:$lotteryId:$winnerId".toByteArray()).toString()
+            } ?: "lottery-win-${reservation.id}",
             recipientId = winnerId,
             senderId = reservation.campOwnerId
         )
@@ -818,7 +869,6 @@ class ProfileRepo : AutoCloseable {
         put("dates", reservation.dates)
         put("guestNumber", reservation.guestNumber)
         put("status", reservation.status.name)
-        reservation.rating?.let { put("rating", it) }
     }
 
 
@@ -940,29 +990,32 @@ class ProfileRepo : AutoCloseable {
     override fun close() = cacheListener.remove()
 }
 
+
+
 // The following repository was added using OpenAI, Codex, "Implement US 01.13.01: rate a past
 // campsite reservation with an ID-based campsite lookup and atomic average update", 2026-11-06.
 /**
- * Saves an entrant's rating for a past reservation.
+ * Manages the submission, retrieval and deletion of reservation ratings.
  *
- * A `reservationRatings/{reservationId}` record is the one-time rating guard. The entrant's
- * reservation keeps the selected score for display, while a campsite only keeps the derived
- * total, count, and average. All records are updated in one transaction.
+ * Maintains the aggregate rating of each campsite and ensures
+ * that reservations cannot have multiple ratings simultaneously.
+ *
+ * Outstanding issues: None known.
  */
 class ReservationRatingRepo {
+
     private val db = Firebase.firestore
-    private val profileRef = db.collection("profiles")
     private val reservationRef = db.collection("reservation")
     private val campsiteRef = db.collection("campsites")
     private val ratingRef = db.collection("reservationRatings")
 
     /**
-     * Rates a past reservation from one to five.
+     * Submits a rating for a past reservation.
      *
-     * @param entrantId ID of the signed-in entrant who owns the reservation.
+     * @param entrantId ID of the entrant submitting the rating.
      * @param reservationId ID of the reservation being rated.
-     * @param score The selected score, from 1 through 5.
-     * @param onComplete Called with `null` after both records save, or the failure.
+     * @param score Rating between 1 and 5.
+     * @param onComplete Called with null on success or an exception on failure.
      */
     fun submitRating(
         entrantId: String,
@@ -971,98 +1024,351 @@ class ReservationRatingRepo {
         onComplete: (Exception?) -> Unit = {}
     ) {
         if (score !in 1..5) {
-            onComplete(IllegalArgumentException("A rating must be between 1 and 5."))
-            return
-        }
-        if (entrantId.isBlank() || reservationId.isBlank()) {
-            onComplete(IllegalArgumentException("A reservation and entrant are required."))
+            onComplete(
+                IllegalArgumentException("Rating must be between 1 and 5.")
+            )
             return
         }
 
-        val entrantDocument = profileRef.document(entrantId)
+        if (entrantId.isBlank() || reservationId.isBlank()) {
+            onComplete(
+                IllegalArgumentException("Entrant and reservation IDs are required.")
+            )
+            return
+        }
+
+        val reservationDocument = reservationRef.document(reservationId)
+        val ratingDocument = ratingRef.document(reservationId)
 
         db.runTransaction { transaction ->
-            val entrantSnapshot = transaction.get(entrantDocument)
-            val entrant = entrantSnapshot.toObject(Entrant::class.java)?.copy(id = entrantDocument.id)
-                ?: throw IllegalArgumentException("Entrant profile was not found.")
-            val reservation = entrant.reservations.firstOrNull { it.id == reservationId }
-                ?: throw IllegalArgumentException("Reservation was not found.")
+
+            val reservation = transaction.get(reservationDocument)
+                .toObject(Reservation::class.java)
+                ?: error("Reservation was not found.")
+
+            check(entrantId in reservation.entrantIds) {
+                "Entrant is not associated with this reservation."
+            }
 
             check(reservation.status == ReservationStatus.Past) {
                 "Only past reservations can be rated."
             }
-            check(reservation.rating == null) {
-                "This reservation has already been rated."
-            }
+
             check(reservation.campsiteId.isNotBlank()) {
                 "Reservation does not have a campsite ID."
             }
 
-            // Never obtain the campsite from Reservation.campsite: the relationship is by ID.
-            val campsiteDocument = campsiteRef.document(reservation.campsiteId)
-            val campsiteSnapshot = transaction.get(campsiteDocument)
-            val campsite = campsiteSnapshot.toObject(Campsite::class.java)
-                ?.copy(id = campsiteDocument.id)
-                ?: throw IllegalArgumentException("Campsite was not found.")
-            val reservationDocument = reservationRef.document(reservationId)
-            check(transaction.get(reservationDocument).exists()) {
-                "Reservation record was not found."
-            }
-            val ratingDocument = ratingRef.document(reservationId)
+
+            val campsiteDocument =
+                campsiteRef.document(reservation.campsiteId)
+
+            val campsite = transaction.get(campsiteDocument)
+                .toObject(Campsite::class.java)
+                ?: error("Campsite was not found.")
+
+
             check(!transaction.get(ratingDocument).exists()) {
-                "This reservation has already been rated."
+                "Reservation has already been rated."
             }
 
-            val updatedReservations = entrant.reservations.map {
-                if (it.id == reservationId) it.copy(rating = score) else it
-            }
-            val updatedTotal = campsite.ratingTotal + score
-            val updatedCount = campsite.ratingCount + 1
-            val updatedAverage = updatedTotal.toDouble() / updatedCount
+            val rating = ReservationRating(
+                reservationId = reservationId,
+                entrantId = entrantId,
+                campsiteId = reservation.campsiteId,
+                score = score
+            )
 
-            transaction.update(
-                entrantDocument,
-                "reservations",
-                updatedReservations.map(::reservationStorageRecord)
-            )
-            transaction.set(
-                ratingDocument,
-                mapOf(
-                    "reservationId" to reservationId,
-                    "entrantId" to entrantId,
-                    "campsiteId" to reservation.campsiteId,
-                    "score" to score
-                )
-            )
+            transaction.set(ratingDocument, rating)
+
+
             transaction.update(
                 campsiteDocument,
-                mapOf(
-                    "ratingTotal" to updatedTotal,
-                    "ratingCount" to updatedCount,
-                    "rating" to updatedAverage
+                calculateRating(
+                    campsite.ratingTotal + score,
+                    campsite.ratingCount + 1
                 )
             )
-            transaction.update(reservationDocument, "rating", score)
-        }.addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
 
-    /** Serializes reservation relationships by ID rather than embedded Firestore objects. */
-    private fun reservationStorageRecord(reservation: Reservation): Map<String, Any> = buildMap {
-        put("id", reservation.id)
-        put("campsiteId", reservation.campsiteId)
-        put("campOwnerId", reservation.campOwnerId)
-        put("entrantIds", reservation.entrantIds)
-        put("dates", reservation.dates)
-        put("guestNumber", reservation.guestNumber)
-        put("status", reservation.status.name)
-        reservation.rating?.let { put("rating", it) }
+    /**
+     * Retrieves all individual ratings for a campsite.
+     *
+     * @param campsiteId ID of the campsite.
+     * @param onComplete Returns the ratings or an exception.
+     */
+    fun getRatingsByCampsite(
+        campsiteId: String,
+        onComplete: (List<ReservationRating>?, Exception?) -> Unit
+    ) {
+        ratingRef
+            .whereEqualTo("campsiteId", campsiteId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObjects(ReservationRating::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+
+    /**
+     * Deletes a rating and recalculates the campsite's aggregate rating.
+     *
+     * @param reservationId ID of the reservation associated with the rating.
+     * @param onComplete Called with null on success or an exception on failure.
+     */
+    fun deleteRating(
+        reservationId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+
+        val ratingDocument = ratingRef.document(reservationId)
+
+        db.runTransaction { transaction ->
+
+            val rating = transaction.get(ratingDocument)
+                .toObject(ReservationRating::class.java)
+                ?: error("Rating was not found.")
+
+            val campsiteDocument =
+                campsiteRef.document(rating.campsiteId)
+
+            val campsite = transaction.get(campsiteDocument)
+                .toObject(Campsite::class.java)
+                ?: error("Campsite was not found.")
+
+            check(campsite.ratingCount > 0) {
+                "Campsite rating count is invalid."
+            }
+
+            check(campsite.ratingTotal >= rating.score) {
+                "Campsite rating total is invalid."
+            }
+
+            transaction.delete(ratingDocument)
+
+            transaction.update(
+                campsiteDocument,
+                calculateRating(
+                    campsite.ratingTotal - rating.score,
+                    campsite.ratingCount - 1
+                )
+            )
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
+    /**
+     * Calculates the campsite's aggregate rating.
+     */
+    private fun calculateRating(
+        total: Int,
+        count: Int
+    ): Map<String, Any?> {
+        val average = if (count > 0) {
+            total.toDouble() / count
+        } else {
+            null
+        }
+
+        return mapOf(
+            "ratingTotal" to total,
+            "ratingCount" to count,
+            "rating" to average
+        )
+    }
+
+    /**
+     * Retrieves the rating associated with a reservation.
+     *
+     * @param reservationId ID of the reservation.
+     * @param onComplete Returns the rating or an exception.
+     */
+    fun getRatingByReservation(
+        reservationId: String,
+        onComplete: (ReservationRating?, Exception?) -> Unit
+    ) {
+        ratingRef.document(reservationId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObject(ReservationRating::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+}
+
+/**
+ * Manages the submission, retrieval and deletion of reservation reviews.
+ *
+ * Ensures that only past reservations can be reviewed and that
+ * each reservation can have at most one review.
+ */
+class ReservationReviewRepo {
+
+    private val db = Firebase.firestore
+    private val reservationRef = db.collection("reservation")
+    private val reviewRef = db.collection("reservationReviews")
+
+    /**
+     * Submits a written review for a past reservation.
+     *
+     * @param entrantId ID of the entrant submitting the review.
+     * @param reservationId ID of the reservation being reviewed.
+     * @param content The written review.
+     * @param onComplete Called with null on success or an exception on failure.
+     */
+    fun submitReview(
+        entrantId: String,
+        reservationId: String,
+        content: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        if (content.isBlank()) {
+            onComplete(
+                IllegalArgumentException("Review cannot be empty.")
+            )
+            return
+        }
+
+        if (entrantId.isBlank() || reservationId.isBlank()) {
+            onComplete(
+                IllegalArgumentException(
+                    "Entrant and reservation IDs are required."
+                )
+            )
+            return
+        }
+
+        val reservationDocument = reservationRef.document(reservationId)
+        val reviewDocument = reviewRef.document(reservationId)
+
+        db.runTransaction { transaction ->
+
+            val reservation = transaction.get(reservationDocument)
+                .toObject(Reservation::class.java)
+                ?: error("Reservation was not found.")
+
+            check(entrantId in reservation.entrantIds) {
+                "Entrant is not associated with this reservation."
+            }
+
+            check(reservation.status == ReservationStatus.Past) {
+                "Only past reservations can be reviewed."
+            }
+
+            check(reservation.campsiteId.isNotBlank()) {
+                "Reservation does not have a campsite ID."
+            }
+
+            check(!transaction.get(reviewDocument).exists()) {
+                "Reservation has already been reviewed."
+            }
+
+            val review = ReservationReview(
+                reservationId = reservationId,
+                entrantId = entrantId,
+                campsiteId = reservation.campsiteId,
+                content = content.trim()
+            )
+
+            transaction.set(reviewDocument, review)
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
+    /**
+     * Retrieves all written reviews for a campsite.
+     *
+     * @param campsiteId ID of the campsite.
+     * @param onComplete Returns the reviews or an exception.
+     */
+    fun getReviewsByCampsite(
+        campsiteId: String,
+        onComplete: (List<ReservationReview>?, Exception?) -> Unit
+    ) {
+        reviewRef
+            .whereEqualTo("campsiteId", campsiteId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObjects(ReservationReview::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+
+    /**
+     * Retrieves the review associated with a reservation.
+     *
+     * @param reservationId ID of the reservation.
+     * @param onComplete Returns the review or an exception.
+     */
+    fun getReviewByReservation(
+        reservationId: String,
+        onComplete: (ReservationReview?, Exception?) -> Unit
+    ) {
+        reviewRef.document(reservationId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onComplete(
+                    snapshot.toObject(ReservationReview::class.java),
+                    null
+                )
+            }
+            .addOnFailureListener { error ->
+                onComplete(null, error)
+            }
+    }
+
+    /**
+     * Deletes a review using its associated reservation ID.
+     *
+     * @param reservationId ID of the reservation associated with the review.
+     * @param onComplete Called with null on success or an exception on failure.
+     */
+    fun deleteReview(
+        reservationId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        reviewRef.document(reservationId)
+            .delete()
+            .addOnSuccessListener {
+                onComplete(null)
+            }
+            .addOnFailureListener { error ->
+                onComplete(error)
+            }
     }
 }
 
 /**
  * Represents an image associated with a campsite.
- * 
+ *
 * @property url The URL of the image.
  * @property description A description of the image.
  * @property id The unique identifier of the image.
@@ -1776,12 +2082,12 @@ class LotteryRepo {
         if (lottery.winnerCount <= 0) {
             return false
         }
-    
+
         if (lottery.waitlistCapacity != null &&
             lottery.waitlistCapacity <= 0) {
             return false
         }
-    
+
         return true
     }
 
@@ -1792,13 +2098,13 @@ class LotteryRepo {
      * @param lottery The lottery record to save or add.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    
+
     fun addLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
         if (!validateLottery(lottery)) {
             onComplete(IllegalArgumentException("Invalid lottery settings."))
             return
         }
-    
+
         val record = withRelationshipIds(lottery)
         lotteryRef.document(record.id).set(record)
             .addOnSuccessListener { onComplete(null) }
@@ -1806,7 +2112,76 @@ class LotteryRepo {
     }
 
 
-    
+    fun joinOwnerLottery(
+        lotteryId: String,
+        ownerId: String,
+        campsiteIds: List<String>,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+
+        db.runTransaction { transaction ->
+            val lotterySnapshot = transaction.get(lotteryDocument)
+
+            if (!lotterySnapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+
+            val lottery = lotterySnapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+
+            if (!lottery.allowOtherOwners) {
+                throw IllegalStateException("This lottery does not allow other owners.")
+            }
+
+            if (lottery.campOwnerId == ownerId) {
+                throw IllegalStateException("You cannot join your own lottery.")
+            }
+
+            if (ownerId in lottery.participatingOwnerIds) {
+                throw IllegalStateException("You already joined this lottery.")
+            }
+
+            if (campsiteIds.isEmpty()) {
+                throw IllegalArgumentException("Select at least one campsite.")
+            }
+
+            val campsiteSnapshots = campsiteIds.distinct().map { id ->
+                transaction.get(db.collection("campsites").document(id))
+            }
+
+            for (snapshot in campsiteSnapshots) {
+                if (!snapshot.exists() ||
+                    snapshot.getString("campOwnerId") != ownerId
+                ) {
+                    throw IllegalArgumentException(
+                        "You can only add campsites that you own."
+                    )
+                }
+            }
+
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "campsiteIds" to
+                        (lottery.campsiteIds + campsiteIds).distinct(),
+                    "participatingOwnerIds" to
+                        (lottery.participatingOwnerIds +
+                            lottery.campOwnerId + ownerId)
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                )
+            )
+
+            true
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
+
     /**
      * Updates a lottery only before registration closes.
      *
@@ -1818,46 +2193,58 @@ class LotteryRepo {
             onComplete(IllegalArgumentException("Invalid lottery settings."))
             return
         }
-    
-        val lotteryDocument = lotteryRef.document(lottery.id)
-    
+
+        val record = withRelationshipIds(lottery)
+        val lotteryDocument = lotteryRef.document(record.id)
+
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-    
+
             if (!snapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-    
+
+            val existing = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+
+            if (existing.drawCompleted) {
+                throw IllegalStateException("Cannot edit a completed lottery.")
+            }
+
             val registrationEndDate = snapshot.getString("registrationEndDate")
                 ?: throw IllegalStateException("Registration end date is missing.")
-    
-            val closingDate = java.time.LocalDate.parse(registrationEndDate)
-            val today = java.time.LocalDate.now()
-    
+
+            val closingDate = LocalDate.parse(registrationEndDate)
+            val today = LocalDate.now()
+
             if (!today.isBefore(closingDate)) {
                 throw IllegalStateException("Registration has already ended.")
             }
-    
+
             transaction.update(
                 lotteryDocument,
                 mapOf(
-                    "registrationStartDate" to lottery.registrationStartDate,
-                    "registrationEndDate" to lottery.registrationEndDate,
-                    "bookingStartDate" to lottery.bookingStartDate,
-                    "bookingEndDate" to lottery.bookingEndDate,
-                    "winnerCount" to lottery.winnerCount,
-                    "waitlistCapacity" to lottery.waitlistCapacity,
-                    "availabilityStartDate" to lottery.availabilityStartDate,
-                    "availabilityEndDate" to lottery.availabilityEndDate
-
+                    "campsiteIds" to record.campsiteIds,
+                    "registrationStartDate" to record.registrationStartDate,
+                    "registrationEndDate" to record.registrationEndDate,
+                    "bookingStartDate" to record.bookingStartDate,
+                    "bookingEndDate" to record.bookingEndDate,
+                    "winnerCount" to record.winnerCount,
+                    "waitlistCapacity" to record.waitlistCapacity,
+                    "availabilityStartDate" to record.availabilityStartDate,
+                    "availabilityEndDate" to record.availabilityEndDate,
+                    "allowOtherOwners" to record.allowOtherOwners
                 )
             )
+
+            true
         }.addOnSuccessListener {
             onComplete(null)
         }.addOnFailureListener { error ->
             onComplete(error)
         }
     }
+
 
 
     /**
@@ -1936,25 +2323,69 @@ class LotteryRepo {
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
+
     fun joinWaitlist(
         lotteryId: String,
         entrantId: String,
         onComplete: (Exception?) -> Unit = {}
     ) {
         val lotteryDocument = lotteryRef.document(lotteryId)
+
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-            if (!snapshot.exists()) throw IllegalArgumentException("Lottery not found.")
-            val entrants = snapshot.get("waitlistEntrantIds") as? List<*> ?: emptyList<Any>()
-            val capacity = snapshot.getLong("waitlistCapacity")?.toInt()
-            if (entrantId !in entrants && capacity != null && entrants.size >= capacity) {
+
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+
+            val entrants = lottery.waitlistEntrantIds
+            val capacity = lottery.waitlistCapacity
+
+            // Prevent joining after the draw.
+            if (lottery.drawCompleted) {
+                throw IllegalStateException("Lottery has already been drawn.")
+            }
+
+            // Make sure registration is currently open.
+            val today = LocalDate.now()
+            val start = LocalDate.parse(lottery.registrationStartDate)
+            val end = LocalDate.parse(lottery.registrationEndDate)
+
+            if (today.isBefore(start) || today.isAfter(end)) {
+                throw IllegalStateException("Registration is not open.")
+            }
+
+            // Prevent duplicate entries.
+            if (entrantId in entrants) {
+                throw IllegalStateException("You already joined this lottery.")
+            }
+
+            // Check maximum capacity.
+            if (capacity != null && entrants.size >= capacity) {
                 throw IllegalStateException("The lottery waitlist is full.")
             }
-            transaction.update(lotteryDocument, "waitlistEntrantIds", FieldValue.arrayUnion(entrantId))
+
+            // Add entrant and save joining date together.
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "waitlistEntrantIds" to FieldValue.arrayUnion(entrantId),
+                    "waitlistJoinedDates" to
+                        (lottery.waitlistJoinedDates + (entrantId to today.toString()))
+                )
+            )
+
             true
-        }.addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
+
 
     /**
      * Removes an entrant from a lottery waitlist.
@@ -1963,12 +2394,151 @@ class LotteryRepo {
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    fun leaveWaitlist(lotteryId: String, entrantId: String, onComplete: (Exception?) -> Unit = {}) {
-        lotteryRef.document(lotteryId)
-            .update("waitlistEntrantIds", FieldValue.arrayRemove(entrantId))
-            .addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
+
+    fun leaveWaitlist(
+        lotteryId: String,
+        entrantId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(lotteryDocument)
+
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+
+            if (lottery.drawCompleted) {
+                throw IllegalStateException("Cannot leave after winners are drawn.")
+            }
+
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "waitlistEntrantIds" to FieldValue.arrayRemove(entrantId),
+                    "waitlistJoinedDates" to
+                        (lottery.waitlistJoinedDates - entrantId)
+                )
+            )
+
+            true
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
     }
+
+
+
+    /**
+     * Randomly selects winners after lottery registration closes.
+     */
+    fun drawWinners(
+        lotteryId: String,
+        ownerId: String,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val lotteryDocument = lotteryRef.document(lotteryId)
+
+        db.runTransaction { transaction ->
+
+            // 1. Get the lottery from Firebase.
+            val snapshot = transaction.get(lotteryDocument)
+
+            if (!snapshot.exists()) {
+                throw IllegalArgumentException("Lottery not found.")
+            }
+
+            val lottery = snapshot.toObject(Lottery::class.java)
+                ?: throw IllegalArgumentException("Invalid lottery.")
+
+            // 2. Make sure the correct owner is drawing winners.
+            if (lottery.campOwnerId != ownerId) {
+                throw IllegalStateException("Only the lottery owner can draw winners.")
+            }
+
+            // 3. Prevent drawing winners twice.
+            if (lottery.drawCompleted) {
+                throw IllegalStateException("Winners have already been drawn.")
+            }
+
+            // 4. Make sure registration has ended.
+            val endDate = LocalDate.parse(lottery.registrationEndDate)
+
+            if (!LocalDate.now().isAfter(endDate)) {
+                throw IllegalStateException("Registration has not ended yet.")
+            }
+
+            // 5. Get all entrants.
+            val entrants = lottery.waitlistEntrantIds
+                .filter(String::isNotBlank)
+                .distinct()
+
+            if (entrants.isEmpty()) {
+                throw IllegalStateException("No entrants are on the waitlist.")
+            }
+
+            if (lottery.winnerCount <= 0) {
+                throw IllegalStateException("Winner count must be positive.")
+            }
+
+            // 6. Randomly select winners.
+            val winners = entrants
+                .shuffled()
+                .take(lottery.winnerCount)
+            if (entrants.size >= 500) {
+                throw IllegalStateException("This waitlist is too large to finalize in one draw.")
+            }
+            val winnerIds = winners.toSet()
+            val notifications = db.collection("notification")
+
+            // 7. Save the results to Firebase.
+            transaction.update(
+                lotteryDocument,
+                mapOf(
+                    "winnerEntrantIds" to winners,
+                    "drawCompleted" to true,
+                    "status" to CampOwnerLotteryStatus.Drawn.name
+                )
+            )
+
+            // Send each entrant their result as part of the same draw transaction.
+            entrants.forEach { entrantId ->
+                val won = entrantId in winnerIds
+                val notificationId = UUID.nameUUIDFromBytes(
+                    "lottery-result:$lotteryId:$entrantId".toByteArray()
+                ).toString()
+                transaction.set(
+                    notifications.document(notificationId),
+                    Notification(
+                        title = if (won) "Lottery Won!" else "Lottery Result",
+                        content = if (won) {
+                            "You were selected in the campsite lottery. Check your reservations for the pending offer."
+                        } else {
+                            "You were not selected in the campsite lottery. Better luck next time!"
+                        },
+                        date = LocalDate.now().toString(),
+                        id = notificationId,
+                        recipientId = entrantId,
+                        senderId = ownerId
+                    )
+                )
+            }
+
+            true
+
+        }.addOnSuccessListener {
+            onComplete(null)
+        }.addOnFailureListener { error ->
+            onComplete(error)
+        }
+    }
+
 
     /**
      * Sends an owner-authored notification to every entrant on one of the owner's lottery waitlists.
@@ -2030,71 +2600,6 @@ class LotteryRepo {
                     .addOnFailureListener { error -> onComplete(null, error) }
             }
             .addOnFailureListener { error -> onComplete(null, error) }
-    }
-
-    /**
-     * Finalizes a lottery draw and notifies every entrant who was not selected.
-     *
-     * The winner selection is supplied by the caller. This transaction marks the lottery drawn
-     * and creates stable, profile-addressed notifications for the remaining waitlisted entrants.
-     *
-     * @param lotteryId The lottery document ID.
-     * @param winnerIds Entrant profile IDs selected by the draw.
-     * @param onComplete Called with `null` on success or the error on failure.
-     */
-    fun completeLotteryDraw(
-        lotteryId: String,
-        winnerIds: Collection<String>,
-        onComplete: (Exception?) -> Unit = {}
-    ) {
-        val lotteryDocument = lotteryRef.document(lotteryId)
-        val winners = winnerIds.toSet()
-        if (lotteryId.isBlank() || winners.any(String::isBlank)) {
-            onComplete(IllegalArgumentException("A lottery and valid winner IDs are required."))
-            return
-        }
-
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(lotteryDocument)
-            val lottery = snapshot.toObject(Lottery::class.java)
-                ?: throw IllegalArgumentException("Lottery not found.")
-            check(lottery.status != CampOwnerLotteryStatus.Drawn) {
-                "This lottery has already been drawn."
-            }
-            check(winners.size <= lottery.winnerCount) {
-                "The winner count exceeds this lottery's configured limit."
-            }
-            val entrants = lottery.waitlistEntrantIds.filter(String::isNotBlank).distinct()
-            check(winners.all { it in entrants }) {
-                "Every winner must be on this lottery's waitlist."
-            }
-            val losers = entrants.filterNot { it in winners }
-            check(losers.size < 500) {
-                "This lottery has too many entrants to notify in one draw."
-            }
-
-            transaction.update(lotteryDocument, "status", CampOwnerLotteryStatus.Drawn.name)
-            val notifications = db.collection("notification")
-            losers.forEach { entrantId ->
-                val notificationId = UUID.nameUUIDFromBytes(
-                    "lottery-loss:$lotteryId:$entrantId".toByteArray()
-                ).toString()
-                val notificationDocument = notifications.document(notificationId)
-                transaction.set(
-                    notificationDocument,
-                    Notification(
-                        title = "Lottery Result",
-                        content = "You were not selected in the campsite lottery. Better luck next time!",
-                        date = java.time.LocalDate.now().toString(),
-                        id = notificationId,
-                        recipientId = entrantId,
-                        senderId = lottery.campOwnerId
-                    )
-                )
-            }
-            true
-        }.addOnSuccessListener { onComplete(null) }
-            .addOnFailureListener { error -> onComplete(error) }
     }
 
     /**

@@ -1,4 +1,6 @@
-/** Provides the entrant-facing screen for submitting a one-time campsite rating. */
+/**
+ * Provides the entrant-facing screen for submitting a one-time campsite rating.
+ */
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +20,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,13 +35,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.CampsiteRepo
-import com.example.coders.Entrant
+import com.example.coders.Reservation
+import com.example.coders.ReservationRepo
 import com.example.coders.ReservationRatingRepo
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
+import com.example.coders.ReservationRating
 
 // The following composable was added using OpenAI, Codex, "Implement US 01.13.01: add a
 // one-to-five rating screen for a past campsite reservation", 2026-11-06.
+
 /**
  * Displays the one-time rating form for a past reservation.
  *
@@ -51,25 +57,78 @@ fun RateCampsiteScreen(
     reservationId: String
 ) {
     val profile by SignedInProfile().rememberSignedInProfile()
-    val entrant = profile as? Entrant
-    val reservation = entrant?.reservations?.firstOrNull { it.id == reservationId }
+    val entrantId = profile?.id
+
+    val reservationRepo = remember { ReservationRepo() }
+
+    var reservation by remember(reservationId) {
+        mutableStateOf<Reservation?>(null)
+    }
+
+    var isLoadingReservation by remember(reservationId) {
+        mutableStateOf(true)
+    }
+
+    var reservationError by remember(reservationId) {
+        mutableStateOf<Exception?>(null)
+    }
+
+    LaunchedEffect(reservationId) {
+        reservationRepo.getReservationById(reservationId) { result, error ->
+            reservation = result
+            reservationError = error
+            isLoadingReservation = false
+        }
+    }
+
     val campsiteRepo = remember { CampsiteRepo() }
     val ratingRepo = remember { ReservationRatingRepo() }
 
-    var campsiteName by remember { mutableStateOf("Loading campsite…") }
+    var campsiteName by remember {
+        mutableStateOf("Loading campsite…")
+    }
+
     var selectedRating by remember { mutableIntStateOf(0) }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
 
-    // The campsite is intentionally fetched by campsiteId; no Reservation.campsite object is used.
+    var rating by remember(reservationId) {
+        mutableStateOf<ReservationRating?>(null)
+    }
+
+    var isLoadingRating by remember(reservationId) {
+        mutableStateOf(true)
+    }
+
+    var ratingError by remember(reservationId) {
+        mutableStateOf<Exception?>(null)
+    }
+
+    // Fetches the campsite using its document ID.
     LaunchedEffect(reservation?.campsiteId) {
         val campsiteId = reservation?.campsiteId.orEmpty()
+
         if (campsiteId.isBlank()) {
             campsiteName = "Campsite unavailable"
         } else {
             campsiteRepo.getCampsiteById(campsiteId) { campsite, _ ->
                 campsiteName = campsite?.name ?: "Campsite unavailable"
             }
+        }
+    }
+
+    // Checks for a pre-existing rating.
+    LaunchedEffect(reservationId) {
+        ratingRepo.getRatingByReservation(reservationId) { result, error ->
+            rating = result
+            ratingError = error
+            isLoadingRating = false
+        }
+    }
+
+    DisposableEffect(campsiteRepo) {
+        onDispose {
+            campsiteRepo.close()
         }
     }
 
@@ -94,20 +153,44 @@ fun RateCampsiteScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        val currentReservation = reservation
+
         when {
-            profile == null -> CircularProgressIndicator()
-            entrant == null -> Text("Ratings are available to entrant profiles only.")
-            reservation == null -> Text("This reservation is no longer available.")
-            reservation.status != ReservationStatus.Past -> {
+            entrantId == null || isLoadingReservation ->
+                CircularProgressIndicator()
+
+            reservationError != null ->
+                Text("Unable to retrieve reservation.")
+
+            currentReservation == null ->
+                Text("This reservation is no longer available.")
+
+            entrantId !in currentReservation.entrantIds ->
+                Text("This reservation does not belong to you.")
+
+            currentReservation.status != ReservationStatus.Past ->
                 Text("Only past reservations can be rated.")
-            }
-            reservation.rating != null -> {
-                Text("You already rated this campsite ${reservation.rating}/5.")
-            }
+
+            isLoadingRating ->
+                CircularProgressIndicator()
+
+            ratingError != null ->
+                Text("Unable to retrieve rating.")
+
+            rating != null ->
+                Text("You already rated this campsite ${rating?.score}/5.")
+
             else -> {
-                Text(campsiteName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    campsiteName,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Spacer(modifier = Modifier.height(12.dp))
+
                 Text("Choose a rating from 1 to 5")
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
@@ -116,13 +199,16 @@ fun RateCampsiteScreen(
                 ) {
                     (1..5).forEach { score ->
                         OutlinedButton(
+                            enabled = !isSaving,
                             onClick = {
                                 selectedRating = score
                                 saveError = null
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .semantics { contentDescription = "Rating $score" },
+                                .semantics {
+                                    contentDescription = "Rating $score"
+                                },
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = if (selectedRating == score) {
                                     MaterialTheme.colorScheme.primaryContainer
@@ -138,7 +224,11 @@ fun RateCampsiteScreen(
 
                 saveError?.let { error ->
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(error, color = MaterialTheme.colorScheme.error)
+
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -148,16 +238,19 @@ fun RateCampsiteScreen(
                     onClick = {
                         isSaving = true
                         saveError = null
+
                         ratingRepo.submitRating(
-                            entrantId = entrant.id,
-                            reservationId = reservation.id,
+                            entrantId = entrantId,
+                            reservationId = currentReservation.id,
                             score = selectedRating
                         ) { error ->
                             isSaving = false
+
                             if (error == null) {
                                 navController.popBackStack()
                             } else {
-                                saveError = error.message ?: "Unable to save your rating."
+                                saveError = error.message
+                                    ?: "Unable to save your rating."
                             }
                         }
                     },

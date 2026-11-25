@@ -55,44 +55,6 @@ private enum class SearchTab(
 
 
 @Composable
-fun DeleteButton(onDelete: () -> Unit) {
-    IconButton(onClick = onDelete) {
-        Icon(
-            imageVector = Icons.Default.Delete,
-            contentDescription = "Delete",
-            tint = MaterialTheme.colorScheme.error
-        )
-    }
-}
-
-@Composable
-fun DeleteConfirmationDialog(
-    itemName: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("Confirm Deletion")
-        },
-        text = {
-            Text("Are you sure you want to delete $itemName?")
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Delete")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
 fun AdminSearchScreen(navController: NavController) {
 
     val campsiteRepo = remember { CampsiteRepo() }
@@ -483,8 +445,6 @@ fun AdminSearchScreen(navController: NavController) {
             }
         )
     }
-
-
 
     if (showFilterDialog) {
         CampsiteFilterDialog(

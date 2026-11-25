@@ -47,12 +47,6 @@ fun OwnerLotteriesScreen(navController: NavController) {
     var lotteries by remember { mutableStateOf<List<Lottery>>(emptyList()) }
     var campsites by remember { mutableStateOf<List<Campsite>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var lotteryToNotify by remember { mutableStateOf<Lottery?>(null) }
-    var notificationTitle by remember { mutableStateOf("Lottery Update") }
-    var notificationContent by remember { mutableStateOf("") }
-    var isSendingNotification by remember { mutableStateOf(false) }
-    var notificationError by remember { mutableStateOf<String?>(null) }
-    var notificationResult by remember { mutableStateOf<String?>(null) }
 
     /**
      * Gets the currently signed-in campsite owner's ID.
@@ -150,11 +144,6 @@ fun OwnerLotteriesScreen(navController: NavController) {
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
 
-        notificationResult?.let { result ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(result, color = MaterialTheme.colorScheme.primary)
-        }
-
         Spacer(modifier = Modifier.height(30.dp))
 
         // Area where lotteries appear.
@@ -203,7 +192,7 @@ fun OwnerLotteriesScreen(navController: NavController) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        // Lottery details will be added next.
+                                        navController.navigate("ownerLotteryDetails/${lottery.id}")
                                     },
                                 shape = RoundedCornerShape(15.dp)
                             ) {
@@ -231,18 +220,6 @@ fun OwnerLotteriesScreen(navController: NavController) {
                                             text = campsiteNames
                                         )
 
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("${lottery.waitlistEntrantIds.filter(String::isNotBlank).distinct().size} entrants on waitlist")
-                                        TextButton(
-                                            onClick = {
-                                                lotteryToNotify = lottery
-                                                notificationTitle = "Lottery Update"
-                                                notificationContent = ""
-                                                notificationError = null
-                                            }
-                                        ) {
-                                            Text("Notify entrants")
-                                        }
                                     }
 
                                     Text(
@@ -273,71 +250,4 @@ fun OwnerLotteriesScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(20.dp))
     }
 
-    lotteryToNotify?.let { lottery ->
-        AlertDialog(
-            onDismissRequest = {
-                if (!isSendingNotification) lotteryToNotify = null
-            },
-            title = { Text("Notify waitlisted entrants") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("This message will be sent to ${lottery.waitlistEntrantIds.filter(String::isNotBlank).distinct().size} entrants on this lottery's waitlist.")
-                    OutlinedTextField(
-                        value = notificationTitle,
-                        onValueChange = { notificationTitle = it },
-                        label = { Text("Title") },
-                        singleLine = true,
-                        enabled = !isSendingNotification
-                    )
-                    OutlinedTextField(
-                        value = notificationContent,
-                        onValueChange = { notificationContent = it },
-                        label = { Text("Message") },
-                        enabled = !isSendingNotification,
-                        minLines = 3
-                    )
-                    notificationError?.let { error ->
-                        Text(error, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !isSendingNotification && notificationTitle.isNotBlank() && notificationContent.isNotBlank(),
-                    onClick = {
-                        isSendingNotification = true
-                        notificationError = null
-                        lotteryRepo.sendWaitlistNotification(
-                            ownerId = ownerId,
-                            lotteryId = lottery.id,
-                            title = notificationTitle,
-                            content = notificationContent
-                        ) { recipientCount, error ->
-                            isSendingNotification = false
-                            if (error != null) {
-                                notificationError = error.message ?: "Unable to send notification."
-                            } else {
-                                notificationResult = if (recipientCount == 0) {
-                                    "There are no entrants on this waitlist yet."
-                                } else {
-                                    "Notification sent to $recipientCount entrants."
-                                }
-                                lotteryToNotify = null
-                            }
-                        }
-                    }
-                ) {
-                    Text(if (isSendingNotification) "Sending…" else "Send")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !isSendingNotification,
-                    onClick = { lotteryToNotify = null }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }

@@ -86,6 +86,7 @@ fun EditLotteryScreen(
     var loading by remember { mutableStateOf(true) }
     var saving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var backClicked by remember {mutableStateOf(false)}
 
     /**
      * Loads the selected lottery and campsite details from Firebase.
@@ -181,6 +182,7 @@ fun EditLotteryScreen(
         onPick: (String) -> Unit
     ) {
 
+
         val calendar = Calendar.getInstance()
 
         if (date.isNotEmpty()) {
@@ -232,6 +234,8 @@ fun EditLotteryScreen(
 
         false
 
+
+
     } else {
 
         currentLottery.registrationEndDate.isEmpty() ||
@@ -259,7 +263,10 @@ fun EditLotteryScreen(
 
             Button(
                 onClick = {
-                    navController.popBackStack()
+                    if (!backClicked) {
+                        backClicked = true
+                        navController.popBackStack()
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF6750A4)

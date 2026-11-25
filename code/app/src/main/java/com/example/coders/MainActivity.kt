@@ -38,6 +38,8 @@ import com.example.coders.ui.screens.MyStuffScreen
 import com.example.coders.ui.screens.OwnerCampsitesScreen
 import com.example.coders.ui.screens.OwnerReservationsScreen
 import com.example.coders.ui.screens.OwnerLotteriesScreen
+import com.example.coders.ui.screens.OwnerLotteryDetailsScreen
+import com.example.coders.ui.screens.OwnerLotteryWaitlistScreen
 import com.example.coders.ui.screens.PoliciesScreen
 import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.AdminSearchScreen
@@ -45,13 +47,17 @@ import com.example.coders.ui.screens.EntrantSearchScreen
 import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.CampOwner
+import com.example.coders.LotteryRepo
 import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
 import com.example.coders.ui.screens.EntrantPastReservationsScreen
 import com.example.coders.ui.screens.RateCampsiteScreen
+import com.example.coders.ui.screens.CampsiteRatingsScreen
+import com.example.coders.ui.screens.CampsiteReviewsScreen
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.example.coders.ui.screens.ReviewCampsiteScreen
 
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
@@ -77,6 +83,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val campsiteRepo = remember { CampsiteRepo() }
                 val profileRepo = remember { ProfileRepo() }
+                val lotteryRepo = remember { LotteryRepo() }
                 val mainScope = rememberCoroutineScope()
 
                 NavHost(
@@ -180,6 +187,51 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    //routed the rate campsite screen
+                    composable(
+                        route = "review_campsite/{reservationId}",
+                        arguments = listOf(
+                            navArgument("reservationId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        ReviewCampsiteScreen(
+                            navController = navController,
+                            reservationId = backStackEntry.arguments
+                                ?.getString("reservationId")
+                                .orEmpty()
+                        )
+                    }
+
+                    //routed the campsite ratings screen
+                    composable(
+                        route = "campsite_ratings/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        CampsiteRatingsScreen(
+                            navController = navController,
+                            campsiteId = backStackEntry.arguments
+                                ?.getString("campsiteId")
+                                .orEmpty()
+                        )
+                    }
+
+                    //routed the campsite reviews screen
+                    composable(
+                        route = "campsite_reviews/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        CampsiteReviewsScreen(
+                            navController = navController,
+                            campsiteId = backStackEntry.arguments
+                                ?.getString("campsiteId")
+                                .orEmpty()
+                        )
+                    }
+
                     composable("entrantpastreservations") {
                         EntrantPastReservationsScreen(navController)
                     }
@@ -189,6 +241,42 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("ownerlotteries") {
                         OwnerLotteriesScreen(navController)
+                    }
+
+                    composable(
+                        route = "ownerLotteryDetails/{lotteryId}",
+                        arguments = listOf(
+                            navArgument("lotteryId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        OwnerLotteryDetailsScreen(
+                            navController = navController,
+                            lotteryId = backStackEntry.arguments?.getString("lotteryId").orEmpty()
+                        )
+                    }
+
+                    composable(
+                        route = "ownerLotteryWaitlist/{lotteryId}",
+                        arguments = listOf(
+                            navArgument("lotteryId") { type = NavType.StringType }
+                        )
+                    ) { backStackEntry ->
+                        OwnerLotteryWaitlistScreen(
+                            navController = navController,
+                            lotteryId = backStackEntry.arguments?.getString("lotteryId").orEmpty(),
+                            onDrawWinners = { requestedLotteryId, onComplete ->
+                                mainScope.launch {
+                                    val ownerId = authManager.getCurrentUserId()
+                                    if (ownerId.isNullOrBlank()) {
+                                        onComplete("Please sign in as a campsite owner.")
+                                    } else {
+                                        lotteryRepo.drawWinners(requestedLotteryId, ownerId) { error ->
+                                            onComplete(error?.message)
+                                        }
+                                    }
+                                }
+                            }
+                        )
                     }
 
                     composable("minimap") {
