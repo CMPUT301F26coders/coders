@@ -14,3 +14,9 @@ image encoding, profile controls, and related tests.
 OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional
 encoded image, and tags", 2026-11-25, was used to assist with registration validation, atomic
 campsite and image persistence, registration controls, and related tests.
+
+OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26, was used to assist
+with deterministic campsite-image persistence, owner-list image controls, and related tests.
+
+OpenAI, Codex, "Enable image selection while creating a campsite", 2026-11-26, was used to assist
+with connecting the creation-form image picker to campsite-image persistence.
