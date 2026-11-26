@@ -134,10 +134,12 @@ class MainActivity : ComponentActivity() {
                         MyStuffScreen(navController)
                     }
 
-                    composable("ownercampsites") {
+                    // The following block was modified using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+                    composable("ownercampsites") { backStackEntry ->
                         OwnerCampsitesScreen(
                             navController = navController,
-                            campsiteRepo = campsiteRepo
+                            campsiteRepo = campsiteRepo,
+                            savedStateHandle = backStackEntry.savedStateHandle
                         )
                     }
                     composable("create_campsite") {

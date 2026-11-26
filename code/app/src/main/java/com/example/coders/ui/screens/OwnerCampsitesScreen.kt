@@ -17,25 +17,32 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.NavController
 import com.example.coders.CampOwner
+import com.example.coders.CAMPSITE_REGISTERED_RESULT_KEY
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.SignedInProfile
+import kotlinx.coroutines.flow.collect
 /**
  * Displays a list of campsites
  *
  */
+// The following composable was modified using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
 @Composable
 fun OwnerCampsitesScreen(
     navController: NavController,
-    campsiteRepo: CampsiteRepo? = null
+    campsiteRepo: CampsiteRepo? = null,
+    savedStateHandle: SavedStateHandle? = null
 ) {
 
     val repo = remember { campsiteRepo ?: CampsiteRepo() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
 
     val profile by SignedInProfile().rememberSignedInProfile()
@@ -72,12 +79,25 @@ fun OwnerCampsitesScreen(
         }
     }
 
+    // The following block was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+    LaunchedEffect(savedStateHandle) {
+        savedStateHandle
+            ?.getStateFlow<String?>(CAMPSITE_REGISTERED_RESULT_KEY, null)
+            ?.collect { message ->
+                if (message != null) {
+                    savedStateHandle[CAMPSITE_REGISTERED_RESULT_KEY] = null
+                    snackbarHostState.showSnackbar(message)
+                }
+            }
+    }
+
     Scaffold(
         bottomBar = {
             AppBottomBar(
                 navController = navController
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -118,12 +138,13 @@ fun OwnerCampsitesScreen(
                 onClick = { navController.navigate("create_campsite") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(32.dp),
+                    .height(32.dp)
+                    .testTag("registerCampsiteButton"),
                 shape = RoundedCornerShape(0.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Create", modifier = Modifier.size(12.dp))
+                Icon(Icons.Default.Add, contentDescription = "Register", modifier = Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(18.dp))
-                Text("Create Campsite", fontSize = 11.sp, fontWeight = FontWeight.Normal)
+                Text("Register a Campsite", fontSize = 11.sp, fontWeight = FontWeight.Normal)
             }
         }
 

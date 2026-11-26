@@ -10,3 +10,7 @@ tests.
 OpenAI, Codex, "Implement US 01.08.02: add, update, and remove profile images stored as
 Firestore data URLs", 2026-11-22, was used to assist with profile-image persistence, bounded
 image encoding, profile controls, and related tests.
+
+OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional
+encoded image, and tags", 2026-11-25, was used to assist with registration validation, atomic
+campsite and image persistence, registration controls, and related tests.

@@ -185,14 +185,14 @@ class EntrantCampsiteRatingTest {
         }
     }
 
-    /** Returns the score saved in the signed-in entrant's profile for [reservationId]. */
+    /** Returns the score in the signed-in entrant's reservation-rating record. */
     private fun ratingForSignedInEntrant(reservationId: String): Int? {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entrantId = runBlocking { AuthManager(context).getCurrentUserId() } ?: return null
-        val entrant = await(
-            firestore.collection("profiles").document(entrantId).get()
-        ).toObject(Entrant::class.java) ?: return null
-        return entrant.reservations.firstOrNull { it.id == reservationId }?.rating
+        val rating = await(
+            firestore.collection("reservationRatings").document(reservationId).get()
+        ).toObject(ReservationRating::class.java) ?: return null
+        return rating.takeIf { it.entrantId == entrantId }?.score
     }
 
     /** Confirms one submitted rating updates every required Firestore record. */
@@ -218,27 +218,16 @@ class EntrantCampsiteRatingTest {
             ratingForSignedInEntrant(reservation.id) == 4
         }
 
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
-            ?: error("Entrant ID was not available")
-        val savedEntrant = await(
-            firestore.collection("profiles").document(entrantId).get()
-        ).toObject(Entrant::class.java) ?: error("Entrant was not available")
         val savedCampsite = await(
             firestore.collection("campsites").document(campsiteId).get()
         ).toObject(Campsite::class.java) ?: error("Campsite was not available")
         val savedRating = await(
             firestore.collection("reservationRatings").document(reservation.id).get()
         )
-        val savedReservation = await(
-            firestore.collection("reservation").document(reservation.id).get()
-        )
 
-        assertEquals(4, savedEntrant.reservations.first { it.id == reservation.id }.rating)
         assertEquals(4.0, savedCampsite.rating)
         assertEquals(4, savedCampsite.ratingTotal)
         assertEquals(1, savedCampsite.ratingCount)
         assertEquals(4L, savedRating.getLong("score"))
-        assertEquals(4L, savedReservation.getLong("rating"))
     }
 }

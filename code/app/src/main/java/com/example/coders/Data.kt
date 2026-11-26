@@ -638,6 +638,37 @@ class CampsiteRepo : AutoCloseable {
             .addOnFailureListener { error -> onComplete(error) }
     }
 
+    // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+    /**
+     * Atomically registers a campsite and, when supplied, its one optional image record.
+     *
+     * Keeping encoded image data in the `images` collection prevents it from approaching the
+     * Firestore document-size limit for the campsite itself.
+     *
+     * @param campsite The campsite record to register.
+     * @param imageDataUrl The optional bounded image data URL selected by the owner.
+     * @param onComplete Called once with `null` on success or the write error on failure.
+     */
+    fun registerCampsite(
+        campsite: Campsite,
+        imageDataUrl: String? = null,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite),
+            images = emptyList()
+        )
+        val batch = db.batch()
+        batch.set(campsiteRef.document(record.id), record)
+        if (imageDataUrl != null) {
+            val image = campsiteImageRecord(record.id, record.campOwnerId, imageDataUrl)
+            batch.set(db.collection("images").document(image.id), image)
+        }
+        batch.commit()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
     /**
      * Updates a campsite in the repository.
      *
