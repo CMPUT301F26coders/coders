@@ -1380,7 +1380,7 @@ data class Image(
  */
 class ImageRepo : AutoCloseable {
     private val db = Firebase.firestore
-    private val imageRef = db.collection("image")
+    private val imageRef = db.collection("images")
 
     private val _images = mutableStateListOf<Image>()
 
@@ -1537,7 +1537,7 @@ class ImageRepo : AutoCloseable {
  * @property imageRef The Firestore collection containing all image records.
  */
 class ProfileImageRepo {
-    private val imageRef = Firebase.firestore.collection("image")
+    private val imageRef = Firebase.firestore.collection("images")
 
     // The following block was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
     // and remove profile images stored as Firestore data URLs", 2026-11-22.
@@ -2731,3 +2731,4 @@ class ReservationRepo {
     private fun reservationFromDocument(document: DocumentSnapshot): Reservation? =
         document.toObject(Reservation::class.java)?.copy(id = document.id)
 }
+
