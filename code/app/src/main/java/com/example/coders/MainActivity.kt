@@ -1,3 +1,4 @@
+
 /**
  * Main entry point for the application.
  *
@@ -11,6 +12,7 @@
 package com.example.coders
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -18,6 +20,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -55,6 +61,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.coders.ui.screens.ReviewCampsiteScreen
 
+// Lottery screen imports.
+import com.example.coders.ui.screens.OwnerLotteriesScreen
+import com.example.coders.ui.screens.OwnerLotteryDetailsScreen
+import com.example.coders.ui.screens.MultiOwnerLotteryScreen
+import com.example.coders.ui.screens.OwnerLotteryWaitlistScreen
+import com.example.coders.ui.screens.EditLotteryScreen
+import com.example.coders.ui.screens.ViewBookedDatesScreen
+
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
 
@@ -80,6 +94,9 @@ class MainActivity : ComponentActivity() {
                 val campsiteRepo = remember { CampsiteRepo() }
                 val profileRepo = remember { ProfileRepo() }
                 val mainScope = rememberCoroutineScope()
+
+                // Repository used to create and manage lotteries.
+                val lotteryRepo = remember { LotteryRepo() }
 
                 NavHost(
                     navController = navController,
@@ -133,6 +150,308 @@ class MainActivity : ComponentActivity() {
                     composable("mystuff") {
                         MyStuffScreen(navController)
                     }
+
+                    // OWNER LOTTERY SCREENS
+
+                    /**
+                     * Displays all lotteries belonging to the
+                     * signed-in campsite owner.
+                     */
+                    composable("ownerlotteries") {
+                        OwnerLotteriesScreen(navController)
+                    }
+
+                    composable("ownerLotteries") {
+                        OwnerLotteriesScreen(navController)
+                    }
+
+                    /**
+                     * Displays the details of a selected lottery.
+                     */
+                    composable(
+                        route = "ownerLotteryDetails/{lotteryId}",
+                        arguments = listOf(
+                            navArgument("lotteryId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+
+                        val lotteryId = backStackEntry.arguments
+                            ?.getString("lotteryId")
+                            .orEmpty()
+
+                        OwnerLotteryDetailsScreen(
+                            navController = navController,
+                            lotteryId = lotteryId
+                        )
+                    }
+
+                    /**
+                     * Displays the lottery creation screen.
+                     *
+                     * Loads campsites belonging to the signed-in owner
+                     * and saves the lottery information to Firebase.
+                     */
+                    composable("multiOwnerLottery") {
+
+                        var ownerId by remember {
+                            mutableStateOf("")
+                        }
+
+                        var campsites by remember {
+                            mutableStateOf<List<Campsite>>(emptyList())
+                        }
+
+                        var loading by remember {
+                            mutableStateOf(true)
+                        }
+
+                        var errorMessage by remember {
+                            mutableStateOf("")
+                        }
+
+                        LaunchedEffect(Unit) {
+
+                            val id = authManager.getCurrentUserId()
+
+                            if (id.isNullOrBlank()) {
+
+                                errorMessage =
+                                    "Please sign in as a campsite owner."
+
+                                loading = false
+
+                            } else {
+
+                                profileRepo.getProfileById(id) { profile, _ ->
+
+                                    if (profile is CampOwner) {
+
+                                        ownerId = profile.id
+
+                                    } else {
+
+                                        errorMessage =
+                                            "Please sign in as a campsite owner."
+
+                                        loading = false
+                                    }
+                                }
+                            }
+                        }
+
+                        DisposableEffect(ownerId) {
+
+                            val listener = if (ownerId.isNotEmpty()) {
+
+                                campsiteRepo.listenForCampsites(
+                                    onUpdate = { updatedCampsites ->
+
+                                        campsites = updatedCampsites.filter {
+                                            it.campOwnerId == ownerId
+                                        }
+
+                                        loading = false
+                                    }
+                                )
+
+                            } else {
+                                null
+                            }
+
+                            onDispose {
+                                if (listener != null) {
+                                    listener.remove()
+                                }
+                            }
+                        }
+
+                        if (loading) {
+
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+
+                        } else if (errorMessage.isNotEmpty()) {
+
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(errorMessage)
+                            }
+
+                        } else {
+
+                            MultiOwnerLotteryScreen(
+                                navController = navController,
+                                campsites = campsites,
+                                onCreateLottery = {
+                                        campsiteIds,
+                                        invitedOwnerIds,
+                                        availabilityStartDate,
+                                        availabilityEndDate,
+                                        registrationStartDate,
+                                        registrationEndDate,
+                                        bookingStartDate,
+                                        bookingEndDate,
+                                        winnerCount,
+                                        capacity ->
+
+                                    val lottery = Lottery(
+                                        campOwnerId = ownerId,
+                                        campsiteIds = campsiteIds,
+                                        availabilityStartDate = availabilityStartDate,
+                                        availabilityEndDate = availabilityEndDate,
+                                        registrationStartDate = registrationStartDate,
+                                        registrationEndDate = registrationEndDate,
+                                        bookingStartDate = bookingStartDate,
+                                        bookingEndDate = bookingEndDate,
+                                        winnerCount = winnerCount,
+                                        waitlistCapacity = capacity,
+                                        invitedOwnerIds = invitedOwnerIds,
+                                        participatingOwnerIds = listOf(ownerId),
+                                        allowOtherOwners = invitedOwnerIds.isNotEmpty()
+                                    )
+
+                                    lotteryRepo.addLottery(lottery) { error ->
+
+                                        mainScope.launch(Dispatchers.Main.immediate) {
+
+                                            if (error == null) {
+
+                                                Toast.makeText(
+                                                    applicationContext,
+                                                    "Lottery created successfully.",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+
+                                                navController.popBackStack()
+
+                                            } else {
+
+                                                Toast.makeText(
+                                                    applicationContext,
+                                                    error.message
+                                                        ?: "Unable to create lottery.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    /**
+                     * Displays the entrants registered for a lottery
+                     * and connects winner selection to the repository.
+                     */
+                    composable(
+                        route = "ownerLotteryWaitlist/{lotteryId}",
+                        arguments = listOf(
+                            navArgument("lotteryId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+
+                        val lotteryId = backStackEntry.arguments
+                            ?.getString("lotteryId")
+                            .orEmpty()
+
+                        OwnerLotteryWaitlistScreen(
+                            navController = navController,
+                            lotteryId = lotteryId,
+                            onDrawWinners = { selectedLotteryId, onComplete ->
+
+                                mainScope.launch(Dispatchers.Main.immediate) {
+
+                                    val ownerId = authManager.getCurrentUserId()
+
+                                    if (ownerId.isNullOrBlank()) {
+
+                                        onComplete(
+                                            "Please sign in as a campsite owner."
+                                        )
+
+                                    } else {
+
+                                        lotteryRepo.drawWinners(
+                                            lotteryId = selectedLotteryId,
+                                            ownerId = ownerId
+                                        ) { error ->
+
+                                            mainScope.launch(Dispatchers.Main.immediate) {
+
+                                                onComplete(
+                                                    if (error == null) {
+                                                        null
+                                                    } else {
+                                                        error.message
+                                                            ?: "Unable to draw winners."
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    /**
+                     * Allows the campsite owner to edit
+                     * an existing lottery.
+                     */
+                    composable(
+                        route = "editLottery/{lotteryId}",
+                        arguments = listOf(
+                            navArgument("lotteryId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+
+                        val lotteryId = backStackEntry.arguments
+                            ?.getString("lotteryId")
+                            .orEmpty()
+
+                        EditLotteryScreen(
+                            navController = navController,
+                            lotteryId = lotteryId
+                        )
+                    }
+
+                    /**
+                     * Displays the booked and available dates
+                     * for the selected campsite.
+                     */
+                    composable(
+                        route = "booked_dates/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+
+                        val campsiteId = backStackEntry.arguments
+                            ?.getString("campsiteId")
+                            .orEmpty()
+
+                        ViewBookedDatesScreen(
+                            navController = navController,
+                            campsiteId = campsiteId
+                        )
+                    }
+
+                    // END OF OWNER LOTTERY SCREENS
 
                     composable("ownercampsites") {
                         OwnerCampsitesScreen(
