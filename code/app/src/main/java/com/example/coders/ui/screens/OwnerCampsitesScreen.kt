@@ -192,6 +192,19 @@ fun OwnerCampsiteCard(
                 Text(text = "${campsite.capacity} guests", fontSize = 14.sp)
             }
 
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = campsite.name, fontSize = 22.sp)
+                Text(text = campsite.location, fontSize = 10.sp)
+                Text(text = "${campsite.capacity} guests", fontSize = 14.sp)
+            }
+
+            CampsiteQrCodeImage(
+                campsite = campsite,
+                size = 56.dp
+            )
+
+            Spacer(modifier = Modifier.width(6.dp))
+
             IconButton(onClick = onDeleteClick, modifier = Modifier.size(20.dp)) {
                 Icon(Icons.Default.Remove, contentDescription = "Delete")
             }
