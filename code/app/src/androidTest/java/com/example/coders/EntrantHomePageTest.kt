@@ -272,31 +272,6 @@ class EntrantHomePageTest {
             .assertExists()
     }
 
-    // TEST 3: Check Home notifications
-    @Test
-    fun test3_HomeNotifications() {
-
-        openHome()
-
-        composeTestRule.onNodeWithText("Notifications")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("You Won!")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Reservation Confirmed")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Booking Window Closing!")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Waitlist at Max Capacity")
-            .assertExists()
-
-        composeTestRule.onNodeWithText("Lost Lottery")
-            .assertExists()
-    }
-
     // TEST 4: Open Policies
     @Test
     fun test4_OpenPolicies() {

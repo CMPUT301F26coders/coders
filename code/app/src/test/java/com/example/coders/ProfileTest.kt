@@ -70,7 +70,7 @@ class ProfileTest {
             lotteries = emptyList(),
             reservations = emptyList(),
             notificationsSent = emptyList(),
-            notificationsReceived = emptyList()
+            notifications = emptyList()
         )
 
         assertEquals("Bob Owner", owner.name)

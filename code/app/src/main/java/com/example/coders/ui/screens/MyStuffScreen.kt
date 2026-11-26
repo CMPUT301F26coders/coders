@@ -105,14 +105,12 @@ fun MyStuffScreen(navController: NavController) {
 
                 MyStuffMenuButton(
                     title = "My Lotteries",
-                    subtitle = "View and manage lotteries",
+                    subtitle = "View lotteries and message waitlisted entrants",
                     icon = Icons.Default.Event,
                     onClick = {
                         navController.navigate("ownerlotteries")
                     }
                 )
-
-
             } else {
 
                 // ENTRANT BUTTONS

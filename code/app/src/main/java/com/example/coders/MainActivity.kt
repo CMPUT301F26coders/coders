@@ -43,6 +43,9 @@ import com.example.coders.ui.screens.MiniMapScreen
 import com.example.coders.ui.screens.MyStuffScreen
 import com.example.coders.ui.screens.OwnerCampsitesScreen
 import com.example.coders.ui.screens.OwnerReservationsScreen
+import com.example.coders.ui.screens.OwnerLotteriesScreen
+import com.example.coders.ui.screens.OwnerLotteryDetailsScreen
+import com.example.coders.ui.screens.OwnerLotteryWaitlistScreen
 import com.example.coders.ui.screens.PoliciesScreen
 import com.example.coders.ui.screens.SignUpScreen
 import com.example.coders.ui.screens.AdminSearchScreen
@@ -50,6 +53,7 @@ import com.example.coders.ui.screens.EntrantSearchScreen
 import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
 import com.example.coders.CampOwner
+import com.example.coders.LotteryRepo
 import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
 import com.example.coders.ui.screens.EntrantPastReservationsScreen
@@ -109,10 +113,8 @@ class MainActivity : ComponentActivity() {
                 }
                 val campsiteRepo = remember { CampsiteRepo() }
                 val profileRepo = remember { ProfileRepo() }
-                val mainScope = rememberCoroutineScope()
-
-                // Repository used to create and manage lotteries.
                 val lotteryRepo = remember { LotteryRepo() }
+                val mainScope = rememberCoroutineScope()
 
                 NavHost(
                     navController = navController,
@@ -571,7 +573,6 @@ class MainActivity : ComponentActivity() {
                     composable("ownerreservations") {
                         OwnerReservationsScreen(navController)
                     }
-
                     composable("minimap") {
                         MiniMapScreen(navController)
                     }

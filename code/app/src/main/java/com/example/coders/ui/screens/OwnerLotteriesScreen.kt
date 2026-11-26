@@ -219,6 +219,7 @@ fun OwnerLotteriesScreen(navController: NavController) {
                                         Text(
                                             text = campsiteNames
                                         )
+
                                     }
 
                                     Text(
@@ -248,4 +249,5 @@ fun OwnerLotteriesScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(20.dp))
     }
+
 }

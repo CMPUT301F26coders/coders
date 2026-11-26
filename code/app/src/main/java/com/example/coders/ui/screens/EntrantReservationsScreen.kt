@@ -24,6 +24,7 @@ import com.example.coders.ReservationRepo
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Profile
+import com.example.coders.Notification
 
 // The following enum was added using OpenAI, Codex, "Implement US 01.04.03: add Pending and
 // Active reservation tabs for entrant lottery offers", 2026-11-06.
@@ -211,17 +212,31 @@ fun EntrantReservationsScreen(navController: NavController) {
                     return@updateProfile
                 }
 
+                val confirmation = if (status == ReservationStatus.Cancelled) {
+                    Notification(
+                        title = "Cancellation Confirmed",
+                        content = "Your reservation at ${campsiteName(reservation)} for ${reservation.dates} has been cancelled.",
+                        date = java.time.LocalDate.now().toString(),
+                        id = java.util.UUID.nameUUIDFromBytes(
+                            "cancellation:${reservation.id}:${currentEntrant.id}".toByteArray()
+                        ).toString(),
+                        recipientId = currentEntrant.id
+                    )
+                } else {
+                    null
+                }
                 reservationRepo.updateReservationStatus(
-                    reservation.id,
-                    status,
-                    onComplete
+                    reservationId = reservation.id,
+                    status = status,
+                    notification = confirmation,
+                    onComplete = onComplete
                 )
             }
         } else {
             reservationRepo.updateReservationStatus(
                 reservation.id,
                 status,
-                onComplete
+                onComplete = onComplete
             )
         }
     }

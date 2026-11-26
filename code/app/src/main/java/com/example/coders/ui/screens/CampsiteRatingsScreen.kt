@@ -87,7 +87,7 @@ fun CampsiteRatingsScreen(
             campsiteRepo.close()
         }
     }
-    
+
     LaunchedEffect(campsiteId) {
 
         campsiteRepo.getCampsiteById(campsiteId) { campsite, error ->
