@@ -365,7 +365,8 @@ data class Notification (
     val date : String = "",
     val id: String = UUID.randomUUID().toString(),
     val recipientId: String = "",
-    val senderId: String = ""
+    val senderId: String = "",
+    val sendGroupId: String = ""
 )
 
 /**
@@ -2715,13 +2716,15 @@ class LotteryRepo {
 
                 val batch = db.batch()
                 val notificationCollection = db.collection("notification")
+                val sendGroupId = UUID.randomUUID().toString()
                 entrantIds.forEach { entrantId ->
                     val notification = Notification(
                         title = title.trim(),
                         content = content.trim(),
                         date = java.time.LocalDate.now().toString(),
                         recipientId = entrantId,
-                        senderId = ownerId
+                        senderId = ownerId,
+                        sendGroupId = sendGroupId
                     )
                     batch.set(notificationCollection.document(notification.id), notification)
                 }
@@ -2792,6 +2795,7 @@ class ReservationRepo {
         val batch = db.batch()
         batch.set(reservationRef.document(record.id), record)
         val notificationRef = db.collection("notification")
+        val sendGroupId = UUID.randomUUID().toString()
         record.entrantIds.forEach { entrantId ->
             if (entrantId.isNotBlank()) {
                 val notification = Notification(
@@ -2800,7 +2804,8 @@ class ReservationRepo {
                     date = java.time.LocalDate.now().toString(),
                     id = UUID.nameUUIDFromBytes("${record.id}:$entrantId".toByteArray()).toString(),
                     recipientId = entrantId,
-                    senderId = record.campOwnerId
+                    senderId = record.campOwnerId,
+                    sendGroupId = sendGroupId
                 )
                 batch.set(notificationRef.document(notification.id), notification)
             }

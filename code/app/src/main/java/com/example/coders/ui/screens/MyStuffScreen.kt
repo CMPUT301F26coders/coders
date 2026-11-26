@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -109,6 +110,17 @@ fun MyStuffScreen(navController: NavController) {
                     icon = Icons.Default.Event,
                     onClick = {
                         navController.navigate("ownerlotteries")
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                MyStuffMenuButton(
+                    title = "Sent Notifications",
+                    subtitle = "View notifications sent to entrants",
+                    icon = Icons.Default.Notifications,
+                    onClick = {
+                        navController.navigate("ownerSentNotifications")
                     }
                 )
             } else {

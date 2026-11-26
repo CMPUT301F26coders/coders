@@ -23,6 +23,8 @@ import com.example.coders.filterCampsites
 import com.example.coders.ProfileRepo
 import com.example.coders.ImageRepo
 import com.example.coders.Profile
+import com.example.coders.Reservation
+import com.example.coders.ReservationRepo
 import com.example.coders.SignedInProfile
 import com.example.coders.Image as ImageRecord
 import com.example.coders.ProfileImageRepo
@@ -58,6 +60,7 @@ private enum class SearchTab(
 fun AdminSearchScreen(navController: NavController) {
 
     val campsiteRepo = remember { CampsiteRepo() }
+    val reservationRepo = remember { ReservationRepo() }
     val profileRepo = remember { ProfileRepo() }
     val imageRepo = remember { ImageRepo() }
     val profileImageRepo = remember { ProfileImageRepo() }
@@ -66,6 +69,25 @@ fun AdminSearchScreen(navController: NavController) {
 
     val campsites = campsiteRepo.getAllCampsites()
     val images = imageRepo.getAllImages()
+
+    var reservations by remember { mutableStateOf<List<Reservation>>(emptyList()) }
+    var reservationsLoaded by remember { mutableStateOf(false) }
+    var reservationsError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(reservationRepo) {
+        val registration = reservationRepo.listenForAllReservations(
+            onUpdate = { currentReservations ->
+                reservations = currentReservations
+                reservationsLoaded = true
+                reservationsError = null
+            },
+            onError = { error ->
+                reservationsError = error.message ?: "Unable to check reservation availability."
+                reservationsLoaded = true
+            }
+        )
+        onDispose { registration.remove() }
+    }
 
     var profiles by remember {
         mutableStateOf<List<Profile>>(emptyList())
@@ -152,12 +174,20 @@ fun AdminSearchScreen(navController: NavController) {
 
                     // Apply location, date, and guest filters,
                     // then search by campsite name or location.
-                    val filteredCampsites = filterCampsites(
+                    val hasAvailabilityDates =
+                        selectedStartDate.isNotBlank() || selectedEndDate.isNotBlank()
+                    val availabilityMessage = when {
+                        hasAvailabilityDates && reservationsError != null -> reservationsError
+                        hasAvailabilityDates && !reservationsLoaded -> "Checking reservation availability..."
+                        else -> null
+                    }
+                    val filteredCampsites = if (availabilityMessage == null) filterCampsites(
                         campsites = campsites,
                         location = selectedLocation,
                         guests = selectedGuests,
                         startDate = selectedStartDate,
-                        endDate = selectedEndDate
+                        endDate = selectedEndDate,
+                        reservations = reservations
                     ).filter { campsite ->
                         searchText.isBlank() ||
                                 campsite.name.contains(
@@ -168,7 +198,7 @@ fun AdminSearchScreen(navController: NavController) {
                                     searchText.trim(),
                                     ignoreCase = true
                                 )
-                    }
+                    } else emptyList()
 
                     OutlinedTextField(
                         value = searchText,
@@ -203,7 +233,16 @@ fun AdminSearchScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    if (filteredCampsites.isEmpty()) {
+                    if (availabilityMessage != null) {
+                        Text(
+                            text = availabilityMessage,
+                            color = if (reservationsError != null) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    } else if (filteredCampsites.isEmpty()) {
 
                         Text(
                             text = "No campsites available.",
