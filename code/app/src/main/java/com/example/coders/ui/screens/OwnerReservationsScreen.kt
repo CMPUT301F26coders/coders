@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.coders.CampOwner
 import com.example.coders.Reservation
 import com.example.coders.ReservationRepo
 import com.example.coders.ReservationStatus
@@ -78,8 +77,8 @@ fun OwnerReservationsScreen(navController: NavController) {
     }
 
     // Listen to the current camp owner's reservations in Firestore
-    DisposableEffect(profile?.id, profile is CampOwner, reservationRepo) {
-        val ownerId = (profile as? CampOwner)?.id
+    DisposableEffect(profile?.id, reservationRepo) {
+        val ownerId = profile?.id
 
         val listener = if (!ownerId.isNullOrBlank()) {
             reservationRepo.listenForOwnerReservations(

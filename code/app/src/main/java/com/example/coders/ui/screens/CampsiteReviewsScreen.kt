@@ -20,7 +20,7 @@ import com.example.coders.ReservationReview
 import com.example.coders.ReservationReviewRepo
 import com.example.coders.ProfileRepo
 import com.example.coders.CampsiteRepo
-import com.example.coders.Admin
+import com.example.coders.UserRole
 import com.example.coders.SignedInProfile
 
 @Composable
@@ -161,7 +161,7 @@ fun CampsiteReviewsScreen(
                                 ?: "Unknown"
                         )
 
-                        if (profile is Admin) {
+                        if (profile?.role == UserRole.ADMIN) {
                             DeleteButton(
                                 onDelete = {
                                     reviewToDelete = review
@@ -183,7 +183,7 @@ fun CampsiteReviewsScreen(
                     reviewToDelete = null
 
                     val currentProfile = profile
-                    if (currentProfile is Admin) {
+                    if (currentProfile?.role == UserRole.ADMIN) {
                         reviewRepo.deleteReview(review.reservationId) { error ->
                             if (error == null) {
                                 reviews = reviews.orEmpty().filterNot {

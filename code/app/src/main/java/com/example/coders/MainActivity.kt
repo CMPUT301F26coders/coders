@@ -53,7 +53,6 @@ import com.example.coders.ui.screens.AdminSearchScreen
 import com.example.coders.ui.screens.EntrantSearchScreen
 import com.example.coders.ui.screens.CampsiteDetailsScreen
 import com.example.coders.ui.theme.CodersTheme
-import com.example.coders.CampOwner
 import com.example.coders.LotteryRepo
 import com.example.coders.ui.screens.CreateCampsiteScreen
 import com.example.coders.ui.screens.EditCampsiteScreen
@@ -237,7 +236,7 @@ class MainActivity : ComponentActivity() {
                             if (id.isNullOrBlank()) {
 
                                 errorMessage =
-                                    "Please sign in as a campsite owner."
+                                    "Please sign in."
 
                                 loading = false
 
@@ -245,14 +244,14 @@ class MainActivity : ComponentActivity() {
 
                                 profileRepo.getProfileById(id) { profile, _ ->
 
-                                    if (profile is CampOwner) {
+                                    if (profile != null) {
 
                                         ownerId = profile.id
 
                                     } else {
 
                                         errorMessage =
-                                            "Please sign in as a campsite owner."
+                                            "Please sign in."
 
                                         loading = false
                                     }
@@ -309,6 +308,7 @@ class MainActivity : ComponentActivity() {
                             MultiOwnerLotteryScreen(
                                 navController = navController,
                                 campsites = campsites,
+                                currentOwnerId = ownerId,
                                 onCreateLottery = {
                                         campsiteIds,
                                         invitedOwnerIds,
@@ -334,7 +334,7 @@ class MainActivity : ComponentActivity() {
                                         waitlistCapacity = capacity,
                                         invitedOwnerIds = invitedOwnerIds,
                                         participatingOwnerIds = listOf(ownerId),
-                                        allowOtherOwners = invitedOwnerIds.isNotEmpty()
+                                        allowOtherOwners = invitedOwnerIds.isNotEmpty(),
                                     )
 
                                     lotteryRepo.addLottery(lottery) { error ->
@@ -396,7 +396,7 @@ class MainActivity : ComponentActivity() {
                                     if (ownerId.isNullOrBlank()) {
 
                                         onComplete(
-                                            "Please sign in as a campsite owner."
+                                            "Please sign in."
                                         )
 
                                     } else {
@@ -576,7 +576,7 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("ownerSentNotifications") {
                         OwnerSentNotificationsScreen(navController)
-                    }
+                        }
                     composable("minimap") {
                         MiniMapScreen(navController)
                     }

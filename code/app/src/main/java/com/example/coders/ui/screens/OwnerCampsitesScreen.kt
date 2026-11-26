@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.NavController
-import com.example.coders.CampOwner
 import com.example.coders.CAMPSITE_REGISTERED_RESULT_KEY
 import com.example.coders.Campsite
 import com.example.coders.CampsiteListingImageRepo
@@ -65,7 +64,7 @@ fun OwnerCampsitesScreen(
         mutableStateOf<List<Campsite>>(emptyList())
     }
     DisposableEffect(profile?.id, repo) {
-        val ownerId = (profile as? CampOwner)?.id
+        val ownerId = profile?.id
 
         val listener = if (!ownerId.isNullOrBlank()) {
             repo.listenForOwnerCampsites(

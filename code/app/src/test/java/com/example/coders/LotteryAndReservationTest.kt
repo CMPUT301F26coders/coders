@@ -28,9 +28,9 @@ import org.junit.Test
  */
 class LotteryAndReservationTest {
 
-    private lateinit var owner: CampOwner
+    private lateinit var owner: Profile
     private lateinit var campsite: Campsite
-    private lateinit var entrant: Entrant
+    private lateinit var entrant: Profile
 
     /**
      * Creates sample objects before each test.
@@ -41,9 +41,9 @@ class LotteryAndReservationTest {
      */
     @Before
     fun setUp() {
-        owner = CampOwner("Owner", "owner@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
+        owner = Profile("Owner", "owner@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
         campsite = Campsite("Jasper Spot", "Jasper", "Desc", 4, "0,0", owner)
-        entrant = Entrant("Jane", "jane@test.com", "456", emptyList(), emptyList())
+        entrant = Profile("Jane", "jane@test.com", "456", emptyList(), emptyList())
     }
 
     /**

@@ -23,7 +23,7 @@ sealed interface CampsiteRegistrationAccess {
 
     // The following class was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
     /** Indicates that a registered campsite owner may register a campsite. */
-    data class Allowed(val owner: CampOwner) : CampsiteRegistrationAccess
+    data class Allowed(val owner: Profile) : CampsiteRegistrationAccess
 
     // The following class was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
     /** Indicates that the current account cannot register a campsite. */
@@ -42,9 +42,14 @@ fun campsiteRegistrationAccess(
     savedProfileId: String?,
     profile: Profile?
 ): CampsiteRegistrationAccess = when {
-    savedProfileId.isNullOrBlank() -> CampsiteRegistrationAccess.Rejected(false)
-    profile is CampOwner -> CampsiteRegistrationAccess.Allowed(profile)
-    else -> CampsiteRegistrationAccess.Rejected(true)
+    savedProfileId.isNullOrBlank() ->
+        CampsiteRegistrationAccess.Rejected(false)
+
+    profile != null && profile.id == savedProfileId ->
+        CampsiteRegistrationAccess.Allowed(profile)
+
+    else ->
+        CampsiteRegistrationAccess.Rejected(true)
 }
 
 // The following class was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
@@ -173,7 +178,7 @@ fun campsiteImageRecord(campsiteId: String, uploaderId: String, dataUrl: String)
  * @return A campsite with normalized required fields and no embedded image data.
  */
 fun buildCampsiteForRegistration(
-    owner: CampOwner,
+    owner: Profile,
     name: String,
     location: String,
     description: String,

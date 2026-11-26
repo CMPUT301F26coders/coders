@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.coders.CampOwner
 import com.example.coders.Notification
 import com.example.coders.NotificationRepo
 import com.example.coders.SignedInProfile
@@ -66,7 +65,7 @@ private fun groupSentNotifications(notifications: List<Notification>): List<Sent
 fun OwnerSentNotificationsScreen(navController: NavController) {
     val profile by remember { SignedInProfile() }.rememberSignedInProfile()
     val notificationRepo = remember { NotificationRepo() }
-    val ownerId = (profile as? CampOwner)?.id
+    val ownerId = profile?.id
 
     var notifications by remember(ownerId) { mutableStateOf<List<Notification>?>(null) }
     var errorMessage by remember(ownerId) { mutableStateOf<String?>(null) }
@@ -86,6 +85,10 @@ fun OwnerSentNotificationsScreen(navController: NavController) {
         }
         onDispose {
             registration?.remove()
+        }
+    }
+    DisposableEffect(notificationRepo) {
+        onDispose {
             notificationRepo.close()
         }
     }
@@ -114,10 +117,6 @@ fun OwnerSentNotificationsScreen(navController: NavController) {
 
             when {
                 profile == null -> LoadingSentNotifications()
-                profile !is CampOwner -> Text(
-                    text = "This page is available to campsite owners.",
-                    modifier = Modifier.padding(20.dp)
-                )
                 errorMessage != null -> Text(
                     text = errorMessage.orEmpty(),
                     color = MaterialTheme.colorScheme.error,

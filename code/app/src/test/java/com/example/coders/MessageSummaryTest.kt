@@ -36,8 +36,8 @@ class MessageSummaryTest {
      */
     @Test
     fun entrantSummaryShowsCampOwnerAndLatestMessage() {
-        val owner = CampOwner(name = "Casey Owner")
-        val entrant = Entrant(name = "Alex Entrant")
+        val owner = Profile(name = "Casey Owner")
+        val entrant = Profile(name = "Alex Entrant")
         val conversation = conversation(
             entrant = entrant,
             owner = owner,
@@ -72,8 +72,8 @@ class MessageSummaryTest {
      */
     @Test
     fun campOwnerSummaryShowsEntrantAsConversationPartner() {
-        val owner = CampOwner(name = "Casey Owner")
-        val entrant = Entrant(name = "Alex Entrant")
+        val owner = Profile(name = "Casey Owner")
+        val entrant = Profile(name = "Alex Entrant")
         val conversation = conversation(entrant = entrant, owner = owner)
 
         val summaries = owner.copy(conversations = mutableListOf(conversation)).toMessageSummaries()
@@ -102,18 +102,18 @@ class MessageSummaryTest {
     }
 
     /**
-     * Tests that profiles without conversation lists return no message summaries.
-     *
-     * Verifies that:
-     * - A null profile returns an empty list.
-     * - An admin profile returns an empty list.
-     *
-     * This ensures unsupported or missing profiles do not produce summaries.
+     * Verifies that missing profiles and profiles without
+     * conversations return an empty summary list,
+     * regardless of their account role.
      */
     @Test
-    fun profilesWithoutConversationListsReturnNoSummaries() {
+    fun profilesWithoutConversationsReturnNoSummaries() {
         assertEquals(emptyList<MessageSummary>(), null.toMessageSummaries())
-        assertEquals(emptyList<MessageSummary>(), Admin().toMessageSummaries())
+        assertEquals(emptyList<MessageSummary>(), Profile().toMessageSummaries())
+        assertEquals(
+            emptyList<MessageSummary>(),
+            Profile(type = "Admin").toMessageSummaries()
+        )
     }
 
     /**
@@ -129,13 +129,17 @@ class MessageSummaryTest {
      * @return A Conversation object containing the provided information.
      */
     private fun conversation(
-        entrant: Entrant = Entrant(name = "Alex Entrant"),
-        owner: CampOwner = CampOwner(name = "Casey Owner"),
+        entrant: Profile = Profile(name = "Alex Entrant"),
+        owner: Profile = Profile(name = "Casey Owner"),
         messages: List<Message> = emptyList()
     ) = Conversation(
         messages = messages,
         campOwner = owner,
         entrant = entrant,
-        campsite = Campsite(name = "Pine Lake")
+        campsite = Campsite(name = "Pine Lake"),
+        campOwnerId = owner.id,
+        entrantId = entrant.id,
+        participantIds = listOf(owner.id, entrant.id)
     )
+
 }

@@ -18,8 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-
-import com.example.coders.CampOwner
 import com.example.coders.CampsiteRepo
 import com.example.coders.Reservation
 import com.example.coders.ReservationRepo
@@ -54,7 +52,7 @@ fun ViewBookedDatesScreen(
 
     val signedInProfile = remember { SignedInProfile() }
     val profile by signedInProfile.rememberSignedInProfile()
-    val ownerId = (profile as? CampOwner)?.id
+    val currentUserId = profile?.id
 
     var calendar by remember {
         mutableStateOf(Calendar.getInstance())
@@ -80,21 +78,26 @@ fun ViewBookedDatesScreen(
         mutableStateOf<String?>(null)
     }
 
+    var campsiteExists by remember {
+        mutableStateOf(false)
+    }
+
     /**
-     * Verify that the selected campsite belongs
-     * to the signed-in campsite owner.
+     * Verifies that the selected campsite exists and
+     * determines whether the signed-in user owns it.
      */
-    DisposableEffect(campsiteId, ownerId) {
+    DisposableEffect(campsiteId, currentUserId) {
         var disposed = false
 
         loading = true
         isOwner = false
         errorMessage = null
+        campsiteExists = false
         reservations = emptyList()
 
-        if (ownerId.isNullOrBlank() || campsiteId.isBlank()) {
+        if (currentUserId.isNullOrBlank() || campsiteId.isBlank()) {
             loading = false
-            errorMessage = "Sign in as a campsite owner."
+            errorMessage = "Please sign in."
         } else {
             campsiteRepo.getCampsiteById(campsiteId) { campsite, error ->
                 if (!disposed) {
@@ -102,20 +105,21 @@ fun ViewBookedDatesScreen(
                         ?.ifBlank { campsite.campOwner.id }
 
                     when {
-                        error != null ->
-                            errorMessage = error.message
+                        error != null -> {
+                            errorMessage = error.message ?: "Unable to load campsite."
+                            loading = false
+                        }
 
-                        campsite == null ->
+                        campsite == null -> {
                             errorMessage = "Campsite not found."
+                            loading = false
+                        }
 
-                        campsiteOwnerId != ownerId ->
-                            errorMessage = "You do not own this campsite."
-
-                        else ->
-                            isOwner = true
+                        else -> {
+                            isOwner = campsiteOwnerId == currentUserId
+                            campsiteExists = true
+                        }
                     }
-
-                    loading = false
                 }
             }
         }
@@ -129,8 +133,10 @@ fun ViewBookedDatesScreen(
      * Listen for real-time Firebase reservation updates.
      * The listener is removed when the screen closes.
      */
-    DisposableEffect(campsiteId, isOwner) {
-        val listener = if (isOwner) {
+    DisposableEffect(campsiteId, currentUserId, campsiteExists) {
+        val listener = if (
+            campsiteExists && !currentUserId.isNullOrBlank()
+        ) {
             loading = true
 
             reservationRepo.listenForCampsiteReservations(
@@ -223,7 +229,7 @@ fun ViewBookedDatesScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Text("View booked and available dates for your campsite.")
+        Text("View booked and available dates for this campsite.")
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -237,10 +243,6 @@ fun ViewBookedDatesScreen(
                     text = errorMessage ?: "",
                     color = MaterialTheme.colorScheme.error
                 )
-            }
-
-            !isOwner -> {
-                Text("You cannot view this campsite's bookings.")
             }
 
             else -> {
@@ -378,8 +380,9 @@ fun ViewBookedDatesScreen(
                             text = "Status: Booked",
                             color = Color.Red
                         )
-
-                        Text(details)
+                        if (isOwner) {
+                            Text(details)
+                        }
                     } else {
                         Text(
                             text = "Status: Available",

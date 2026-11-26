@@ -27,21 +27,25 @@ data class MessageSummary(
 )
 
 /**
- * Creates message-list rows for the signed-in profile.
- * Entrants see the camp owner as the conversation partner; camp owners see the entrant.
- * Profiles without a conversation list, including admins, produce no rows.
+ * Creates message-list rows for the signed-in user.
+ * Determines the conversation partner using participant IDs.
+ * Profiles without conversations produce no rows.
  *
  * @return One summary for each conversation associated with this profile.
  */
 fun Profile?.toMessageSummaries(): List<MessageSummary> {
-    val conversationsAndPartner = when (this) {
-        is Entrant -> conversations.map { it to it.campOwner.name }
-        is CampOwner -> conversations.map { it to it.entrant.name }
-        else -> emptyList()
-    }
+    if (this == null) return emptyList()
 
-    return conversationsAndPartner.map { (conversation, otherPersonName) ->
+    return conversations.mapNotNull { conversation ->
+
+        val otherPersonName = when (id) {
+            conversation.campOwnerId -> conversation.entrant.name
+            conversation.entrantId -> conversation.campOwner.name
+            else -> return@mapNotNull null
+        }
+
         val latestMessage = conversation.messages.lastOrNull()
+
         MessageSummary(
             campsiteName = conversation.campsite.name,
             otherPersonName = otherPersonName,

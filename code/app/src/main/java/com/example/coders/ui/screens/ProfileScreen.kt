@@ -56,7 +56,7 @@ import androidx.core.content.edit
 import com.example.coders.Profile
 import com.example.coders.UserSession
 import com.example.coders.ViewMode
-import com.example.coders.Admin
+import com.example.coders.UserRole
 
 /**
  * Displays the user's profile and account management options.
@@ -326,59 +326,59 @@ fun ProfileScreen(navController: NavController) {
 
                         HorizontalDivider()
 
-                        Text("Account Type: ${p.type}")
+                        Text("Account Type: ${UserSession.userRole.name}")
                     }
+            }
+
+                var expanded by remember { mutableStateOf(false) }
+
+                val viewOptions = listOf(
+                    ViewMode.ADMIN,
+                    ViewMode.ENTRANT,
+                    ViewMode.CAMP_OWNER
+                ).filter { mode ->
+                    mode != ViewMode.ADMIN || UserSession.userRole == UserRole.ADMIN
                 }
-                if (p is Admin) {
 
-                    var expanded by remember { mutableStateOf(false) }
-
-                    val viewOptions = listOf(
-                        ViewMode.ADMIN,
-                        ViewMode.ENTRANT,
-                        ViewMode.CAMP_OWNER
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = UserSession.viewMode.name,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Switch View") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = expanded
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                     )
 
-                    ExposedDropdownMenuBox(
+                    ExposedDropdownMenu(
                         expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
+                        onDismissRequest = { expanded = false }
                     ) {
-                        OutlinedTextField(
-                            value = UserSession.viewMode.name,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Switch View") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(
-                                    expanded = expanded
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                        )
-
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            viewOptions.forEach { mode ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            when (mode) {
-                                                ViewMode.ADMIN -> "Admin"
-                                                ViewMode.ENTRANT -> "Entrant"
-                                                ViewMode.CAMP_OWNER -> "Campsite Owner"
-                                            }
-                                        )
-                                    },
-                                    onClick = {
-                                        UserSession.switchView(p, mode)
-                                        expanded = false
-                                    }
-                                )
-                            }
+                        viewOptions.forEach { mode ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        when (mode) {
+                                            ViewMode.ADMIN -> "Admin"
+                                            ViewMode.ENTRANT -> "Entrant"
+                                            ViewMode.CAMP_OWNER -> "Campsite Owner"
+                                        }
+                                    )
+                                },
+                                onClick = {
+                                    UserSession.switchView(mode)
+                                    expanded = false
+                                }
+                            )
                         }
                     }
                 }
@@ -475,9 +475,9 @@ fun ProfileScreen(navController: NavController) {
                         .update(key, updated)
                         .addOnSuccessListener {
                             user = when (key) {
-                                "name" -> p.withUpdatedDetails(name = updated)
-                                "email" -> p.withUpdatedDetails(email = updated)
-                                else -> p.withUpdatedDetails(phone = updated)
+                                "name" -> p.copy(name = updated)
+                                "email" -> p.copy(email = updated)
+                                else -> p.copy(phone = updated)
                             }
                             busy = false
                             editField = null

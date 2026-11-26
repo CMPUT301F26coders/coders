@@ -25,138 +25,29 @@ import com.google.android.gms.tasks.Tasks
 import android.util.Log
 import java.time.LocalDate
 
-/**
- * Common interface for all profiles.
- *
- * @property name The name of the profile.
- * @property email The email of the profile.
- * @property phone The phone number of the profile.
-* @property id The unique identifier of the profile.
- * @property type The role associated with the profile.
- */
-interface Profile {
-    val name: String
-    val email: String
-    val phone: String
-    val id: String
-
-    val type: String
-
-    /**
-     * Returns a copy of the profile with updated personal information.
-     *
-     * @param name The updated name.
-     * @param email The updated email.
-     * @param phone The updated phone number.
-     * @return A new profile containing the updated information.
-     */
-    fun withUpdatedDetails(
-        name: String = this.name,
-        email: String = this.email,
-        phone: String = this.phone
-    ): Profile
-}
-
-/**
- * Represents a user who is an Entrant.
- *
- * @property reservations A list of bookings made by the entrant.
- * @property waitlists A list of waitlists made by the entrant.
- * @property notifications A list of notifications made by the entrant.
- * @property conversations Conversations associated with this entrant.
- */
-data class Entrant(
-    override val name: String = "",
-    override val email: String = "",
-    override val phone: String = "",
+data class Profile(
+    val name: String = "",
+    val email: String = "",
+    val phone: String = "",
     val reservations: List<Reservation> = emptyList(),
     val waitlists: List<Waitlist> = emptyList(),
+    val campsites: List<Campsite> = emptyList(),
+    val lotteries: List<Lottery> = emptyList(),
     val notifications: List<Notification> = emptyList(),
-    override val type: String = "Entrant",
-    override val id: String = UUID.randomUUID().toString(),
-    val conversations: MutableList<Conversation> = mutableListOf()
-) : Profile {
-
-    override fun withUpdatedDetails(
-        name: String,
-        email: String,
-        phone: String
-    ): Profile {
-        return copy(name = name, email = email, phone = phone)
-    }
-}
-
-/**
- * Represents a user who is a CampOwner.
- *
- * @property campsites A list of campsites owned by the camp owner.
- * @property lotteries A list of lotteries managed by the camp owner.
- * @property reservations A list of reservations made by the camp owner.
- * @property notificationsSent A list of notifications sent by the camp owner.
- * @property notifications A list of notifications received by the camp owner.
- * @property conversations Conversations associated with this camp owner.
- */
-data class CampOwner(
-    override val name: String = "",
-    override val email: String = "",
-    override val phone: String = "",
-    val campsites : List<Campsite> = emptyList(),
-    val lotteries : List<Lottery> = emptyList(),
-    val reservations : List<Reservation> = emptyList(),
-    val notificationsSent : List<Notification> = emptyList(),
-    val notifications : List<Notification> = emptyList(),
+    val notificationsSent: List<Notification> = emptyList(),
     val conversations: MutableList<Conversation> = mutableListOf(),
-    override val type: String = "CampOwner",
-    override val id: String = UUID.randomUUID().toString()
-) : Profile {
-
-    /**
-     * copies the profile with updated details, used on profile screen
-     *
-     * @property name name of user
-     * @property email email of user
-     * @property phone phone number of user
-     */
-    override fun withUpdatedDetails(
-        name: String,
-        email: String,
-        phone: String
-    ): Profile {
-        return copy(name = name, email = email, phone = phone)
-    }
-}
-
-/**
- * Represents a user who is an Admin.
- *
- * @property waitlists A list of waitlists managed by the admin.
- * @property campsites A list of campsites managed by the admin.
- * @property lotteries A list of lotteries managed by the admin.
- * @property reservations A list of reservations managed by the admin.
- * @property notificationLogs A list of notification logs managed by the admin.
- * @property messageLogs A list of message logs managed by the admin.
- */
-data class Admin (
-    override val name: String = "",
-    override val email: String = "",
-    override val phone: String = "",
-    val waitlists: List<Waitlist> = emptyList(),
-    val campsites : List<Campsite> = emptyList(),
-    val lotteries : List<Lottery> = emptyList(),
-    val reservations : List<Reservation> = emptyList(),
-    val notificationLogs : List<Notification> = emptyList(),
-    val messageLogs : List<Message> = emptyList(),
-    override val type: String = "Admin",
-    override val id: String = UUID.randomUUID().toString()
-) : Profile {
-
-    override fun withUpdatedDetails(
-        name: String,
-        email: String,
-        phone: String
-    ): Profile {
-        return copy(name = name, email = email, phone = phone)
-    }
+    val notificationLogs: List<Notification> = emptyList(),
+    val messageLogs: List<Message> = emptyList(),
+    val id: String = UUID.randomUUID().toString(),
+    val type: String = "User"
+) {
+    @get:Exclude
+    val role: UserRole //basically makes it so the pre-existing profiles that used "Entrant" or "Campsite Owner" will still function. This automatically makes them NORMAL users
+        get() = if (type.equals("Admin", ignoreCase = true)) {
+            UserRole.ADMIN
+        } else {
+            UserRole.NORMAL
+        }
 }
 
 /**
@@ -171,7 +62,7 @@ data class Admin (
  */
 data class Waitlist (
     val campsite : Campsite = Campsite(),
-    val entrantList : List<Entrant> = emptyList(),
+    val entrantList : List<Profile> = emptyList(),
     val id: String = UUID.randomUUID().toString(),
     val lotteryId: String = "",
     val campsiteId: String = "",
@@ -207,7 +98,7 @@ data class Campsite(
     var description: String = "",
     var capacity: Int = 0,
     var mapLocation: String = "",
-    val campOwner: CampOwner = CampOwner(),
+    val campOwner: Profile = Profile(),
     var rating: Double? = null,
 
     var images: List<Image> = emptyList(),
@@ -337,8 +228,8 @@ data class Reservation (
     val dates : String = "",
     val guestNumber : Int = 0,
     val status : ReservationStatus = ReservationStatus.Active,
-    val campOwner : CampOwner = CampOwner(),
-    val entrants : List<Entrant> = emptyList(),
+    val campOwner : Profile = Profile(),
+    val entrants : List<Profile> = emptyList(),
     val id: String = UUID.randomUUID().toString(),
     val campsiteId: String = "",
     val campOwnerId: String = "",
@@ -382,7 +273,7 @@ data class Notification (
  * @property date The date of the message.
  */
 data class Message (
-    val senderType: String = "Entrant",
+    val senderType: String = "User",
     val senderId: String = "",
     val senderName: String = "",
     val senderEmail: String = "",
@@ -414,11 +305,13 @@ data class Message (
      */
     @get:Exclude
     val sender: Profile
-        get() = when (senderType) {
-            "CampOwner" -> CampOwner(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
-            "Admin" -> Admin(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
-            else -> Entrant(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
-        }
+        get() = Profile(
+            name = senderName,
+            email = senderEmail,
+            phone = senderPhone,
+            id = senderId,
+            type = senderType
+        )
 }
 
 /**
@@ -432,12 +325,12 @@ data class Message (
  * @property entrantId Entrant profile document ID.
  * @property campsiteId Campsite document ID.
  * @property participantIds Profile document IDs participating in the chat.
-* @property id The unique identifier of the conversation.
+ * @property id The unique identifier of the conversation.
  */
 data class Conversation (
     val messages : List<Message> = emptyList(),
-    val campOwner : CampOwner = CampOwner(),
-    val entrant : Entrant = Entrant(),
+    val campOwner : Profile = Profile(),
+    val entrant : Profile = Profile(),
     val id: String = UUID.randomUUID().toString(),
     val campsite: Campsite = Campsite(),
     val campOwnerId: String = "",
@@ -603,7 +496,7 @@ class CampsiteRepo : AutoCloseable {
      * @param owner The campsite owner whose campsites should be returned.
      * @return The matching campsites.
      */
-    fun getCampsitesByOwner(owner: CampOwner): List<Campsite> {
+    fun getCampsitesByOwner(owner: Profile): List<Campsite> {
         return _campsites.filter {
             (it.campOwnerId.ifBlank { if (it.campOwner.hasStoredIdentity()) it.campOwner.id else "" }) == owner.id
         }
@@ -756,18 +649,18 @@ class CampsiteRepo : AutoCloseable {
         }
 
     private val cacheListener = campsiteRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _campsites.clear()
+        _campsites.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val campsite = campsiteFromDocument(document)
-                if (campsite != null) {
-                    _campsites.add(campsite)
-                }
+        snapshot?.documents?.forEach { document ->
+            val campsite = campsiteFromDocument(document)
+            if (campsite != null) {
+                _campsites.add(campsite)
             }
+        }
 
     }
 
@@ -871,8 +764,8 @@ class ProfileRepo : AutoCloseable {
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(winnerDocument)
-            val winner = profileFromDocument(snapshot) as? Entrant
-                ?: throw IllegalArgumentException("Lottery winner must be an entrant profile.")
+            val winner = profileFromDocument(snapshot)
+                ?: throw IllegalArgumentException("Lottery winner profile was not found.")
 
             val pendingOffer = reservation.copy(
                 status = ReservationStatus.Pending,
@@ -970,24 +863,35 @@ class ProfileRepo : AutoCloseable {
         type: String? = null,
         onError: (Exception) -> Unit = {}
     ): ListenerRegistration {
-        val query = if (type == null) profileRef else profileRef.whereEqualTo("type", type)
-        return query.listenForDecodedDocuments(::profileFromDocument, onUpdate, onError)
+        val query = when (type?.trim()?.uppercase()) {
+            null, "", "USER" -> profileRef
+
+            "NORMAL" -> profileRef.whereIn(
+                "type", listOf("Entrant", "CampOwner", "User")
+            )
+
+            "ADMIN" -> profileRef.whereEqualTo(
+                "type", "Admin"
+            )
+
+            else -> throw IllegalArgumentException("Unknown user role")
+        }
+
+        return query.listenForDecodedDocuments(
+            ::profileFromDocument,
+            onUpdate,
+            onError
+        )
     }
 
     /**
-     * Converts a Firestore document to a profile.
+     * Converts a Firestore document to a user.
      *
      * @param document The Firestore document to convert.
-     * @return The decoded profile, or `null` if the document is missing or has an unknown type.
+     * @return The decoded user, or null if the document is missing.
      */
     private fun profileFromDocument(document: DocumentSnapshot): Profile? {
-        val profile = when (document.getString("type")) {
-            "Entrant" -> document.toObject(Entrant::class.java)
-            "CampOwner" -> document.toObject(CampOwner::class.java)
-            "Admin" -> document.toObject(Admin::class.java)
-            else -> null
-        }
-        return profile?.let { withProfileId(it, document.id) }
+        return document.toObject(Profile::class.java)?.copy(id = document.id)
     }
 
     /**
@@ -997,26 +901,21 @@ class ProfileRepo : AutoCloseable {
      * @param id The stable document ID.
      * @return The profile with its Firestore document ID.
      */
-    private fun withProfileId(profile: Profile, id: String): Profile = when (profile) {
-        is Entrant -> profile.copy(id = id)
-        is CampOwner -> profile.copy(id = id)
-        is Admin -> profile.copy(id = id)
-        else -> profile
-    }
+    private fun withProfileId(profile: Profile, id: String): Profile = profile.copy(id = id)
 
     private val cacheListener = profileRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _profiles.clear()
+        _profiles.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val profile = profileFromDocument(document)
-                if (profile != null) {
-                    _profiles.add(profile)
-                }
+        snapshot?.documents?.forEach { document ->
+            val profile = profileFromDocument(document)
+            if (profile != null) {
+                _profiles.add(profile)
             }
+        }
 
     }
 
@@ -1182,21 +1081,21 @@ class ReservationRatingRepo {
                 .toObject(Campsite::class.java)
                 ?: error("Campsite was not found.")
 
-            check(campsite.ratingCount > 0) {
+            /*check(campsite.ratingCount > 0) {
                 "Campsite rating count is invalid."
             }
 
             check(campsite.ratingTotal >= rating.score) {
                 "Campsite rating total is invalid."
-            }
+            }*/
 
             transaction.delete(ratingDocument)
 
             transaction.update(
                 campsiteDocument,
                 calculateRating(
-                    campsite.ratingTotal - rating.score,
-                    campsite.ratingCount - 1
+                    (campsite.ratingTotal - rating.score).coerceAtLeast(0), //cant be negative
+                    (campsite.ratingCount - 1).coerceAtLeast(0) //cant be negative
                 )
             )
 
@@ -1405,7 +1304,7 @@ class ReservationReviewRepo {
 /**
  * Represents an image associated with a campsite.
  *
-* @property url The URL of the image.
+ * @property url The URL of the image.
  * @property description A description of the image.
  * @property id The unique identifier of the image.
  * @property campsiteId The ID of the campsite associated with the image.
@@ -1553,18 +1452,18 @@ class ImageRepo : AutoCloseable {
         document.toObject(Image::class.java)?.copy(id = document.id)
 
     private val cacheListener = imageRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _images.clear()
+        _images.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val image = imageFromDocument(document)
-                if (image != null) {
-                    _images.add(image)
-                }
+        snapshot?.documents?.forEach { document ->
+            val image = imageFromDocument(document)
+            if (image != null) {
+                _images.add(image)
             }
+        }
 
     }
 
@@ -1942,18 +1841,18 @@ class NotificationRepo : AutoCloseable {
         document.toObject(Notification::class.java)?.copy(id = document.id)
 
     private val cacheListener = notificationRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _notifications.clear()
+        _notifications.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val notification = notificationFromDocument(document)
-                if (notification != null) {
-                    _notifications.add(notification)
-                }
+        snapshot?.documents?.forEach { document ->
+            val notification = notificationFromDocument(document)
+            if (notification != null) {
+                _notifications.add(notification)
             }
+        }
 
     }
 
@@ -2114,8 +2013,8 @@ class ConversationRepo {
             if (conversation.campsite.name.isNotBlank()) conversation.campsite.id else ""
         },
         participantIds = (conversation.participantIds + conversation.campOwnerId + conversation.entrantId +
-            (if (conversation.campOwner.hasStoredIdentity()) conversation.campOwner.id else "") +
-            (if (conversation.entrant.hasStoredIdentity()) conversation.entrant.id else ""))
+                (if (conversation.campOwner.hasStoredIdentity()) conversation.campOwner.id else "") +
+                (if (conversation.entrant.hasStoredIdentity()) conversation.entrant.id else ""))
             .filter(String::isNotBlank)
             .distinct()
     )
@@ -2295,12 +2194,12 @@ class LotteryRepo {
                 lotteryDocument,
                 mapOf(
                     "campsiteIds" to
-                        (lottery.campsiteIds + campsiteIds).distinct(),
+                            (lottery.campsiteIds + campsiteIds).distinct(),
                     "participatingOwnerIds" to
-                        (lottery.participatingOwnerIds +
-                            lottery.campOwnerId + ownerId)
-                            .filter { it.isNotBlank() }
-                            .distinct()
+                            (lottery.participatingOwnerIds +
+                                    lottery.campOwnerId + ownerId)
+                                .filter { it.isNotBlank() }
+                                .distinct()
                 )
             )
 
@@ -2505,7 +2404,7 @@ class LotteryRepo {
                 mapOf(
                     "waitlistEntrantIds" to FieldValue.arrayUnion(entrantId),
                     "waitlistJoinedDates" to
-                        (lottery.waitlistJoinedDates + (entrantId to today.toString()))
+                            (lottery.waitlistJoinedDates + (entrantId to today.toString()))
                 )
             )
 
@@ -2552,7 +2451,7 @@ class LotteryRepo {
                 mapOf(
                     "waitlistEntrantIds" to FieldValue.arrayRemove(entrantId),
                     "waitlistJoinedDates" to
-                        (lottery.waitlistJoinedDates - entrantId)
+                            (lottery.waitlistJoinedDates - entrantId)
                 )
             )
 
@@ -2717,6 +2616,7 @@ class LotteryRepo {
                 val batch = db.batch()
                 val notificationCollection = db.collection("notification")
                 val sendGroupId = UUID.randomUUID().toString()
+
                 entrantIds.forEach { entrantId ->
                     val notification = Notification(
                         title = title.trim(),

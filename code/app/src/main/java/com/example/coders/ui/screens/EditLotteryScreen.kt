@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
 import com.example.coders.AuthManager
-import com.example.coders.CampOwner
 import com.example.coders.CampsiteRepo
 import com.example.coders.Lottery
 import com.example.coders.LotteryRepo
@@ -106,9 +105,9 @@ fun EditLotteryScreen(
 
             profileRepo.getProfileById(userId) { profile, _ ->
 
-                if (profile !is CampOwner) {
+                if (profile == null) {
 
-                    errorMessage = "Please sign in as a campsite owner."
+                    errorMessage = "Please sign in."
                     loading = false
 
                 } else {

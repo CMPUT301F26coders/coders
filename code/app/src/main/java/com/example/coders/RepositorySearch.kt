@@ -29,10 +29,9 @@ fun filterProfiles(
                 profile.name.contains(name.trim(), ignoreCase = true)
 
         val matchesType = when (type.trim().lowercase()) {
-            "" -> true
-            "entrant" -> profile is Entrant
-            "campowner", "camp owner" -> profile is CampOwner
-            "admin" -> profile is Admin
+            "", "user" -> true
+            "normal" -> profile.role == UserRole.NORMAL
+            "admin" -> profile.role == UserRole.ADMIN
             else -> false
         }
 
