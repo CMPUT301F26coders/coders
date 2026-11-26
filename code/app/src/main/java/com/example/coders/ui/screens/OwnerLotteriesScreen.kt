@@ -192,7 +192,7 @@ fun OwnerLotteriesScreen(navController: NavController) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        // Lottery details will be added next.
+                                        navController.navigate("ownerLotteryDetails/${lottery.id}")
                                     },
                                 shape = RoundedCornerShape(15.dp)
                             ) {
