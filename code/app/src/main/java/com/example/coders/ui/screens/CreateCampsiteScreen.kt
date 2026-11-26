@@ -1,6 +1,9 @@
 package com.example.coders.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,8 +26,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.coders.CampOwner
 import com.example.coders.Campsite
+import com.example.coders.CampsiteListingImageRepo
 import com.example.coders.CampsiteRepo
 import com.example.coders.SignedInProfile
+import com.example.coders.encodeProfileImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -42,6 +48,10 @@ fun CreateCampsiteScreen(
     var occupancy by remember { mutableStateOf("") }
     var rules by remember { mutableStateOf("") }
     var tags by remember { mutableStateOf(listOf<String>()) }
+    var selectedImageDataUrl by remember { mutableStateOf<String?>(null) }
+    var isEncodingImage by remember { mutableStateOf(false) }
+    var imageError by remember { mutableStateOf<String?>(null) }
+    var isSavingCampsite by remember { mutableStateOf(false) }
 
     // Selected map coordinates
     var selectedLatitude by remember { mutableStateOf<Double?>(null) }
@@ -52,6 +62,29 @@ fun CreateCampsiteScreen(
     var addressSearchMessage by remember { mutableStateOf<String?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
+    val campsiteImageRepo = remember { CampsiteListingImageRepo() }
+
+    // The following block was added using OpenAI, Codex, "Enable image selection while creating
+    // a campsite", 2026-11-26.
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            isEncodingImage = true
+            imageError = null
+            coroutineScope.launch {
+                try {
+                    selectedImageDataUrl = encodeProfileImage(context.applicationContext, uri)
+                } catch (exception: Exception) {
+                    if (exception is CancellationException) throw exception
+                    selectedImageDataUrl = null
+                    imageError = exception.message ?: "Unable to use that image."
+                } finally {
+                    isEncodingImage = false
+                }
+            }
+        }
+    }
 
     var showMissingInfoError by remember {
         mutableStateOf(false)
@@ -344,7 +377,13 @@ fun CreateCampsiteScreen(
             ) {
 
                 Button(
-                    onClick = {},
+                    onClick = {
+                        imagePicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    enabled = !isEncodingImage && !isSavingCampsite,
+                    modifier = Modifier.testTag("uploadCampsiteImage"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ),
@@ -360,7 +399,7 @@ fun CreateCampsiteScreen(
                     Spacer(modifier = Modifier.width(4.dp))
 
                     Text(
-                        "Upload Images",
+                        if (isEncodingImage) "Preparing Image..." else "Upload Image",
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 12.sp
                     )
@@ -399,11 +438,31 @@ fun CreateCampsiteScreen(
                 }
             }
 
+            if (selectedImageDataUrl != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Image selected. It will be uploaded when you register the campsite.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            imageError?.let { message ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = message,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Confirm Campsite
             Button(
                 onClick = {
+
+                    if (isEncodingImage || isSavingCampsite) return@Button
 
                     val capacityInt = occupancy.toIntOrNull()
 
@@ -449,19 +508,42 @@ fun CreateCampsiteScreen(
 
                         } else {
 
+                            isSavingCampsite = true
                             campsiteRepo.addCampsite(newCampsite) { error ->
 
                                 if (error == null) {
-
-                                    Toast.makeText(
-                                        context,
-                                        "Campsite Registered",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-
-                                    navController.popBackStack()
+                                    val imageDataUrl = selectedImageDataUrl
+                                    if (imageDataUrl == null) {
+                                        isSavingCampsite = false
+                                        Toast.makeText(
+                                            context,
+                                            "Campsite Registered",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        navController.popBackStack()
+                                    } else {
+                                        campsiteImageRepo.setCampsiteImage(
+                                            campsiteId = campsiteId,
+                                            uploaderId = campOwner.id,
+                                            dataUrl = imageDataUrl
+                                        ) { imageSaveError ->
+                                            isSavingCampsite = false
+                                            Toast.makeText(
+                                                context,
+                                                if (imageSaveError == null) {
+                                                    "Campsite Registered with image"
+                                                } else {
+                                                    "Campsite registered, but the image could not be saved"
+                                                },
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            navController.popBackStack()
+                                        }
+                                    }
 
                                 } else {
+
+                                    isSavingCampsite = false
 
                                     Toast.makeText(
                                         context,
@@ -479,10 +561,11 @@ fun CreateCampsiteScreen(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.onSurface
-                )
+                ),
+                enabled = !isEncodingImage && !isSavingCampsite
             ) {
                 Text(
-                    "Confirm Campsite",
+                    if (isSavingCampsite) "Saving Campsite..." else "Confirm Campsite",
                     color = MaterialTheme.colorScheme.surface,
                     fontSize = 16.sp
                 )

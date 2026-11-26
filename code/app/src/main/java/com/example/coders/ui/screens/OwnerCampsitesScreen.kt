@@ -1,5 +1,9 @@
 package com.example.coders.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,18 +21,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.CampOwner
 import com.example.coders.Campsite
+import com.example.coders.CampsiteListingImageRepo
 import com.example.coders.CampsiteRepo
+import com.example.coders.Image as ImageRecord
 import com.example.coders.SignedInProfile
+import com.example.coders.dataUrlToImageBitmap
+import com.example.coders.encodeProfileImage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 /**
  * Displays a list of campsites
  *
  */
+// The following composable was modified using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
 @Composable
 fun OwnerCampsitesScreen(
     navController: NavController,
@@ -149,6 +163,7 @@ fun OwnerCampsitesScreen(
 /**
  * Renders a summary card for a campsite.
  */
+// The following composable was modified using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
 @Composable
 fun OwnerCampsiteCard(
     campsite: Campsite,
@@ -169,28 +184,9 @@ fun OwnerCampsiteCard(
                 .padding(4.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Box(
-                modifier = Modifier
-                    .size(45.dp)
-                    .clip(RoundedCornerShape(0.dp))
-                    .background(MaterialTheme.colorScheme.error),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Landscape,
-                    contentDescription = "Campsite Image",
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onError
-                )
-            }
+            CampsiteListingImage(campsite = campsite)
 
-            Spacer(modifier = Modifier.width(2.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = campsite.name, fontSize = 22.sp)
-                Text(text = campsite.location, fontSize = 10.sp)
-                Text(text = "${campsite.capacity} guests", fontSize = 14.sp)
-            }
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = campsite.name, fontSize = 22.sp)
@@ -208,6 +204,129 @@ fun OwnerCampsiteCard(
             IconButton(onClick = onDeleteClick, modifier = Modifier.size(20.dp)) {
                 Icon(Icons.Default.Remove, contentDescription = "Delete")
             }
+        }
+    }
+}
+
+// The following composable was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+/**
+ * Displays and lets the owner replace the primary image for one campsite listing.
+ *
+ * The image is encoded before it is written to the campsite's deterministic `images` document.
+ */
+@Composable
+private fun CampsiteListingImage(campsite: Campsite) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val imageRepo = remember { CampsiteListingImageRepo() }
+    var image by remember(campsite.id) { mutableStateOf<ImageRecord?>(null) }
+    var isUploading by remember(campsite.id) { mutableStateOf(false) }
+    var error by remember(campsite.id) { mutableStateOf<String?>(null) }
+    val uploaderId = campsite.campOwnerId.ifBlank { campsite.campOwner.id }
+
+    // The following block was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    DisposableEffect(campsite.id) {
+        val listener = imageRepo.listenForCampsiteImage(
+            campsiteId = campsite.id,
+            onUpdate = { image = it },
+            onError = { exception ->
+                error = exception.message ?: "Unable to load campsite image."
+            }
+        )
+        onDispose { listener.remove() }
+    }
+
+    // The following block was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            isUploading = true
+            error = null
+            scope.launch {
+                try {
+                    val dataUrl = encodeProfileImage(context.applicationContext, uri)
+                    imageRepo.setCampsiteImage(campsite.id, uploaderId, dataUrl) { exception ->
+                        isUploading = false
+                        if (exception != null) {
+                            error = exception.message ?: "Unable to save campsite image."
+                        }
+                    }
+                } catch (exception: Exception) {
+                    if (exception is CancellationException) throw exception
+                    isUploading = false
+                    error = exception.message ?: "Unable to use that image."
+                }
+            }
+        }
+    }
+
+    val bitmap = remember(image?.url) { image?.url?.let(::dataUrlToImageBitmap) }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.error),
+            contentAlignment = Alignment.Center
+        ) {
+            if (bitmap == null) {
+                Icon(
+                    imageVector = Icons.Default.Landscape,
+                    contentDescription = "Campsite image for ${campsite.name}",
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onError
+                )
+            } else {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "Campsite image for ${campsite.name}",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            }
+
+            if (isUploading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 3.dp,
+                    color = MaterialTheme.colorScheme.onError
+                )
+            } else {
+                IconButton(
+                    onClick = {
+                        imagePicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(50)
+                        )
+                        .size(32.dp)
+                        .testTag("uploadCampsiteImage_${campsite.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = if (image == null) {
+                            "Add image for ${campsite.name}"
+                        } else {
+                            "Change image for ${campsite.name}"
+                        },
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+        error?.let { message ->
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 10.sp
+            )
         }
     }
 }
