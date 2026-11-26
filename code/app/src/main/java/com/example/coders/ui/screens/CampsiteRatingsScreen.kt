@@ -62,6 +62,7 @@ fun CampsiteRatingsScreen(
     val ratingRepo = remember { ReservationRatingRepo() }
     val profileRepo = remember { ProfileRepo() }
     val campsiteRepo = remember { CampsiteRepo() }
+    val deletionRepo = remember { DeletionRepo() }
 
     var isLoadingRating by remember(campsiteId) {
         mutableStateOf(true)
@@ -177,21 +178,36 @@ fun CampsiteRatingsScreen(
             }
         }
         ratingToDelete?.let { rating ->
-            DeleteConfirmationDialog(
+            DeleteConfirmationDialogAdmin(
                 itemName = "this rating",
 
-                onConfirm = {
+                onConfirm = { reason ->
                     ratingToDelete = null
 
+                    val currentProfile = profile
+
+                    if (currentProfile is Admin) { //stupid check because apparently it cant be sure its still an admin???
                     ratingRepo.deleteRating(rating.reservationId) { error ->
                         if (error == null) {
                             ratings = ratings.orEmpty().filterNot {
                                 it.reservationId == rating.reservationId
                             }
+
+
+                            val deletion = Deletion(
+                                deletedObjectId = rating.reservationId,
+                                collectionName = "reservationRatings",
+                                reason = reason,
+                                deletedBy = currentProfile.id
+                            )
+
+                            deletionRepo.addDeletion(deletion)
                         } else {
                             deleteError = error.message ?: "Failed to delete rating."
                         }
                     }
+                    }
+
                 },
 
                 onDismiss = {

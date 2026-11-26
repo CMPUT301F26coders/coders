@@ -32,7 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import com.example.coders.dataUrlToImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Delete
+import com.example.coders.ui.screens.DeletionRepo
 import androidx.compose.ui.Alignment
 
 /**
@@ -61,6 +61,7 @@ fun AdminSearchScreen(navController: NavController) {
     val profileRepo = remember { ProfileRepo() }
     val imageRepo = remember { ImageRepo() }
     val profileImageRepo = remember { ProfileImageRepo() }
+    val deletionRepo = remember { DeletionRepo() }
 
 
     val campsites = campsiteRepo.getAllCampsites()
@@ -429,20 +430,58 @@ fun AdminSearchScreen(navController: NavController) {
     }
 
     itemToDelete?.let { (type, id) ->
-        DeleteConfirmationDialog(
+        DeleteConfirmationDialogAdmin(
             itemName = type,
-            onConfirm = {
-                when (type) {
-                    "campsite" -> campsiteRepo.deleteCampsite(id)
-                    "profile" -> profileRepo.deleteProfile(id)
-                    "image" -> imageRepo.deleteImage(id)
+            onConfirm = { reason ->
+                val admin = signedInProfile
+
+                if (admin != null) {
+                    when (type) {
+                        "campsite" -> {
+                            campsiteRepo.deleteCampsite(id)
+
+                            val deletion = Deletion(
+                                deletedObjectId = id,
+                                collectionName = "campsites",
+                                reason = reason,
+                                deletedBy = admin.id
+                            )
+
+                            deletionRepo.addDeletion(deletion)
+                        }
+
+                        "profile" -> {
+                            profileRepo.deleteProfile(id)
+
+                            val deletion = Deletion(
+                                deletedObjectId = id,
+                                collectionName = "profiles",
+                                reason = reason,
+                                deletedBy = admin.id
+                            )
+
+                            deletionRepo.addDeletion(deletion)
+                        }
+                        "image" -> {
+                            imageRepo.deleteImage(id)
+
+                            val deletion = Deletion(
+                                deletedObjectId = id,
+                                collectionName = "images",
+                                reason = reason,
+                                deletedBy = admin.id
+                            )
+
+                            deletionRepo.addDeletion(deletion)
+                        }
+                    }
+                }
+                    itemToDelete = null
+                },
+                onDismiss = {
+                    itemToDelete = null
                 }
 
-                itemToDelete = null
-            },
-            onDismiss = {
-                itemToDelete = null
-            }
         )
     }
 

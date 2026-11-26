@@ -632,8 +632,43 @@ class CampsiteRepo : AutoCloseable {
      * @param onComplete Called with `null` on success or the error on failure.
      */
     fun addCampsite(campsite: Campsite, onComplete: (Exception?) -> Unit = {}) {
-        val record = campsite.copy(campOwnerId = campsiteOwnerId(campsite))
+
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite),
+            qr = campsite.qr.ifBlank { "coders://campsite/${campsite.id}" }
+        )
         campsiteRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+    /**
+     * Atomically registers a campsite and, when supplied, its one optional image record.
+     *
+     * Keeping encoded image data in the `images` collection prevents it from approaching the
+     * Firestore document-size limit for the campsite itself.
+     *
+     * @param campsite The campsite record to register.
+     * @param imageDataUrl The optional bounded image data URL selected by the owner.
+     * @param onComplete Called once with `null` on success or the write error on failure.
+     */
+    fun registerCampsite(
+        campsite: Campsite,
+        imageDataUrl: String? = null,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite),
+            images = emptyList()
+        )
+        val batch = db.batch()
+        batch.set(campsiteRef.document(record.id), record)
+        if (imageDataUrl != null) {
+            val image = campsiteImageRecord(record.id, record.campOwnerId, imageDataUrl)
+            batch.set(db.collection("images").document(image.id), image)
+        }
+        batch.commit()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -1392,7 +1427,7 @@ data class Image(
  */
 class ImageRepo : AutoCloseable {
     private val db = Firebase.firestore
-    private val imageRef = db.collection("image")
+    private val imageRef = db.collection("images")
 
     private val _images = mutableStateListOf<Image>()
 
@@ -1549,7 +1584,7 @@ class ImageRepo : AutoCloseable {
  * @property imageRef The Firestore collection containing all image records.
  */
 class ProfileImageRepo {
-    private val imageRef = Firebase.firestore.collection("image")
+    private val imageRef = Firebase.firestore.collection("images")
 
     // The following block was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
     // and remove profile images stored as Firestore data URLs", 2026-11-22.
@@ -1687,6 +1722,101 @@ class ProfileImageRepo {
                 onComplete(null, error)
             }
     }
+}
+
+// The following class was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+/**
+ * Saves and observes the primary image displayed for a campsite listing.
+ *
+ * This repository observes a single deterministic image document so owner-list cards do not
+ * create a collection-wide image listener.
+ */
+class CampsiteListingImageRepo {
+    private val imageRef = Firebase.firestore.collection("images")
+
+    // The following block was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    /** Utilities for the one primary image shown on an owner campsite card. */
+    companion object {
+        /** Prefix used for the deterministic Firestore document ID of a campsite listing image. */
+        const val CAMPSITE_LISTING_IMAGE_PREFIX = "campsite_"
+
+        /** Description stored with a campsite listing image. */
+        const val CAMPSITE_LISTING_IMAGE_DESCRIPTION = "Campsite listing image"
+
+        // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+        /**
+         * Returns the deterministic image document ID for a campsite.
+         *
+         * @param campsiteId The campsite document ID.
+         * @return The matching primary-image document ID.
+         */
+        fun campsiteImageId(campsiteId: String): String = "$CAMPSITE_LISTING_IMAGE_PREFIX$campsiteId"
+
+        // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+        /**
+         * Creates the Firestore record for a campsite's primary listing image.
+         *
+         * @param campsiteId The campsite document ID.
+         * @param uploaderId The owner profile document ID.
+         * @param dataUrl The encoded JPEG data URL.
+         * @return The Firestore-ready image record.
+         */
+        fun campsiteImageRecord(campsiteId: String, uploaderId: String, dataUrl: String): Image =
+            Image(
+                id = campsiteImageId(campsiteId),
+                campsiteId = campsiteId,
+                uploaderId = uploaderId,
+                description = CAMPSITE_LISTING_IMAGE_DESCRIPTION,
+                url = dataUrl
+            )
+    }
+
+    // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    /**
+     * Creates or replaces a campsite listing image.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param uploaderId The owner profile document ID.
+     * @param dataUrl The bounded encoded JPEG data URL.
+     * @param onComplete Called with `null` on success or the save error on failure.
+     */
+    fun setCampsiteImage(
+        campsiteId: String,
+        uploaderId: String,
+        dataUrl: String,
+        onComplete: (Exception?) -> Unit
+    ) {
+        val image = campsiteImageRecord(campsiteId, uploaderId, dataUrl)
+        imageRef.document(image.id).set(image)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    /**
+     * Observes the one primary listing image for a campsite.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param onUpdate Receives the image or `null` if one is not stored.
+     * @param onError Receives Firestore listener errors.
+     * @return The listener registration to remove when the card leaves composition.
+     */
+    fun listenForCampsiteImage(
+        campsiteId: String,
+        onUpdate: (Image?) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = imageRef.document(campsiteImageId(campsiteId))
+        .addSnapshotListener { document, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+
+            val image = document?.takeIf { it.exists() }
+                ?.toObject(Image::class.java)
+                ?.copy(id = document.id)
+            onUpdate(image)
+        }
 }
 
 /**

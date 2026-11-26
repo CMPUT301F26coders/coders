@@ -19,6 +19,9 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
@@ -163,6 +166,9 @@ class EntrantReservationCancellationTest {
     @Test
     fun test20_CancelReservationUpdatesFirestoreAndRemovesItFromActiveReservations() {
         openHome()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
+            ?: error("The signed-in entrant profile ID was not saved")
         val reservationId = seedActiveReservationForSignedInEntrant()
         openEntrantReservations()
 
@@ -190,5 +196,19 @@ class EntrantReservationCancellationTest {
         }
 
         composeTestRule.onNodeWithText(campsiteName).assertDoesNotExist()
+
+        val notificationId = UUID.nameUUIDFromBytes(
+            "cancellation:$reservationId:$entrantId".toByteArray()
+        ).toString()
+        val notificationDocument = firestore.collection("notification").document(notificationId)
+        createdDocuments += notificationDocument
+        val cancellationNotification = await(notificationDocument.get())
+            .toObject(Notification::class.java)
+
+        assertNotNull("A cancellation should create a confirmation notification", cancellationNotification)
+        assertEquals("Cancellation Confirmed", cancellationNotification!!.title)
+        assertEquals(entrantId, cancellationNotification.recipientId)
+        assertTrue(cancellationNotification.content.contains(campsiteName))
+        assertTrue(cancellationNotification.content.contains("2026-11-15 - 2026-11-17"))
     }
 }
