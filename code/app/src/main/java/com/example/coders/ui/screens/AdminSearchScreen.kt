@@ -435,16 +435,26 @@ fun AdminSearchScreen(navController: NavController) {
             onConfirm = { reason ->
                 val admin = signedInProfile
 
+
+
                 if (admin != null) {
                     when (type) {
                         "campsite" -> {
                             campsiteRepo.deleteCampsite(id)
 
+                            var owner = ""
+                            campsiteRepo.getCampsiteById(id) { campsite, error ->
+                                if (campsite != null) {
+                                    owner = campsite.campOwnerId
+                                }
+                            }
+
                             val deletion = Deletion(
                                 deletedObjectId = id,
                                 collectionName = "campsites",
                                 reason = reason,
-                                deletedBy = admin.id
+                                objectDeletedBy = admin.id,
+                                objectCreatedBy = owner
                             )
 
                             deletionRepo.addDeletion(deletion)
@@ -457,19 +467,28 @@ fun AdminSearchScreen(navController: NavController) {
                                 deletedObjectId = id,
                                 collectionName = "profiles",
                                 reason = reason,
-                                deletedBy = admin.id
+                                objectDeletedBy = admin.id,
+                                objectCreatedBy = id
                             )
 
                             deletionRepo.addDeletion(deletion)
                         }
                         "image" -> {
+
+                            var uploaderId = ""
+                            imageRepo.getImageById(id) { image, error ->
+                                if (image != null) {
+                                    uploaderId = image.uploaderId
+                                }
+                            }
                             imageRepo.deleteImage(id)
 
                             val deletion = Deletion(
                                 deletedObjectId = id,
                                 collectionName = "images",
                                 reason = reason,
-                                deletedBy = admin.id
+                                objectDeletedBy = admin.id,
+                                objectCreatedBy = uploaderId
                             )
 
                             deletionRepo.addDeletion(deletion)

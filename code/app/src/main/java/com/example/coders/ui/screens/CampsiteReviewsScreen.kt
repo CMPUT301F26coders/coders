@@ -193,7 +193,9 @@ fun CampsiteReviewsScreen(
                                         deletedObjectId = review.reservationId,
                                         collectionName = "reservationReviews",
                                         reason = reason,
-                                        deletedBy = currentProfile.id
+                                        objectDeletedBy = currentProfile.id,
+                                        objectCreatedBy = review.entrantId
+
                                     )
 
                                     deletionRepo.addDeletion(deletion)

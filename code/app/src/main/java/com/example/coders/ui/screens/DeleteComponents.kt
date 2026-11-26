@@ -19,9 +19,11 @@ data class Deletion(
     val deletedObjectId: String = "", //id of deleted object
     val collectionName: String = "",
     val reason: String = "",
-    val deletedBy: String = "",
+    val objectDeletedBy: String = "",
+    val objectCreatedBy: String = "",
     @ServerTimestamp
     val deletedAt: Timestamp? = null
+
 )
 
 class DeletionRepo  {

@@ -714,7 +714,7 @@ class CampsiteRepo : AutoCloseable {
      * @param campsite The campsite whose owner ID should be returned.
      * @return The camp owner profile ID, or an empty string when unavailable.
      */
-    private fun campsiteOwnerId(campsite: Campsite): String =
+    fun campsiteOwnerId(campsite: Campsite): String =
         campsite.campOwnerId.ifBlank {
             if (campsite.campOwner.hasStoredIdentity()) campsite.campOwner.id else ""
         }
