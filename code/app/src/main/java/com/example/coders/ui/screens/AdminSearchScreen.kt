@@ -440,58 +440,61 @@ fun AdminSearchScreen(navController: NavController) {
                 if (admin != null) {
                     when (type) {
                         "campsite" -> {
-                            campsiteRepo.deleteCampsite(id)
-
-                            var owner = ""
                             campsiteRepo.getCampsiteById(id) { campsite, error ->
-                                if (campsite != null) {
-                                    owner = campsite.campOwnerId
+                                if (campsite != null && error == null) {
+                                    campsiteRepo.deleteCampsite(id) { deleteError ->
+                                        if (deleteError == null) {
+                                            val deletion = Deletion(
+                                                deletedObjectId = id,
+                                                collectionName = "campsites",
+                                                reason = reason,
+                                                objectDeletedBy = admin.id,
+                                                objectCreatedBy = campsite.campOwnerId
+                                            )
+
+                                            deletionRepo.addDeletion(deletion)
+                                        }
+                                    }
                                 }
                             }
-
-                            val deletion = Deletion(
-                                deletedObjectId = id,
-                                collectionName = "campsites",
-                                reason = reason,
-                                objectDeletedBy = admin.id,
-                                objectCreatedBy = owner
-                            )
-
-                            deletionRepo.addDeletion(deletion)
                         }
 
                         "profile" -> {
-                            profileRepo.deleteProfile(id)
+                            profileRepo.deleteProfile(id) { deleteError ->
+                                if (deleteError == null) {
+                                    val deletion = Deletion(
+                                        deletedObjectId = id,
+                                        collectionName = "profiles",
+                                        reason = reason,
+                                        objectDeletedBy = admin.id,
+                                        objectCreatedBy = id
+                                    )
 
-                            val deletion = Deletion(
-                                deletedObjectId = id,
-                                collectionName = "profiles",
-                                reason = reason,
-                                objectDeletedBy = admin.id,
-                                objectCreatedBy = id
-                            )
+                                    deletionRepo.addDeletion(deletion)
 
-                            deletionRepo.addDeletion(deletion)
-                        }
-                        "image" -> {
-
-                            var uploaderId = ""
-                            imageRepo.getImageById(id) { image, error ->
-                                if (image != null) {
-                                    uploaderId = image.uploaderId
+                                    profiles = profiles.filterNot { it.id == id }
                                 }
                             }
-                            imageRepo.deleteImage(id)
+                        }
 
-                            val deletion = Deletion(
-                                deletedObjectId = id,
-                                collectionName = "images",
-                                reason = reason,
-                                objectDeletedBy = admin.id,
-                                objectCreatedBy = uploaderId
-                            )
+                        "image" -> {
+                            imageRepo.getImageById(id) { image, error ->
+                                if (image != null && error == null) {
+                                    imageRepo.deleteImage(id) { deleteError ->
+                                        if (deleteError == null) {
+                                            val deletion = Deletion(
+                                                deletedObjectId = id,
+                                                collectionName = "images",
+                                                reason = reason,
+                                                objectDeletedBy = admin.id,
+                                                objectCreatedBy = image.uploaderId
+                                            )
 
-                            deletionRepo.addDeletion(deletion)
+                                            deletionRepo.addDeletion(deletion)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
