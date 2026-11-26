@@ -27,8 +27,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.NavController
 import com.example.coders.CampOwner
+import com.example.coders.CAMPSITE_REGISTERED_RESULT_KEY
 import com.example.coders.Campsite
 import com.example.coders.CampsiteListingImageRepo
 import com.example.coders.CampsiteRepo
@@ -37,19 +39,22 @@ import com.example.coders.SignedInProfile
 import com.example.coders.dataUrlToImageBitmap
 import com.example.coders.encodeProfileImage
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 /**
  * Displays a list of campsites
  *
  */
-// The following composable was modified using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+// The following composable was modified using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
 @Composable
 fun OwnerCampsitesScreen(
     navController: NavController,
-    campsiteRepo: CampsiteRepo? = null
+    campsiteRepo: CampsiteRepo? = null,
+    savedStateHandle: SavedStateHandle? = null
 ) {
 
     val repo = remember { campsiteRepo ?: CampsiteRepo() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
 
     val profile by SignedInProfile().rememberSignedInProfile()
@@ -86,12 +91,25 @@ fun OwnerCampsitesScreen(
         }
     }
 
+    // The following block was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+    LaunchedEffect(savedStateHandle) {
+        savedStateHandle
+            ?.getStateFlow<String?>(CAMPSITE_REGISTERED_RESULT_KEY, null)
+            ?.collect { message ->
+                if (message != null) {
+                    savedStateHandle[CAMPSITE_REGISTERED_RESULT_KEY] = null
+                    snackbarHostState.showSnackbar(message)
+                }
+            }
+    }
+
     Scaffold(
         bottomBar = {
             AppBottomBar(
                 navController = navController
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -132,12 +150,13 @@ fun OwnerCampsitesScreen(
                 onClick = { navController.navigate("create_campsite") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(32.dp),
+                    .height(32.dp)
+                    .testTag("registerCampsiteButton"),
                 shape = RoundedCornerShape(0.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Create", modifier = Modifier.size(12.dp))
+                Icon(Icons.Default.Add, contentDescription = "Register", modifier = Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(18.dp))
-                Text("Create Campsite", fontSize = 11.sp, fontWeight = FontWeight.Normal)
+                Text("Register a Campsite", fontSize = 11.sp, fontWeight = FontWeight.Normal)
             }
         }
 
@@ -160,10 +179,8 @@ fun OwnerCampsitesScreen(
     }
 }
 
-/**
- * Renders a summary card for a campsite.
- */
 // The following composable was modified using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+/** Renders a summary card for a campsite, including its primary listing image. */
 @Composable
 fun OwnerCampsiteCard(
     campsite: Campsite,
@@ -184,7 +201,7 @@ fun OwnerCampsiteCard(
                 .padding(4.dp),
             verticalAlignment = Alignment.Top
         ) {
-            CampsiteListingImage(campsite = campsite)
+            CampsiteListingImage(campsite)
 
             Spacer(modifier = Modifier.width(8.dp))
 
@@ -210,9 +227,10 @@ fun OwnerCampsiteCard(
 
 // The following composable was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
 /**
- * Displays and lets the owner replace the primary image for one campsite listing.
+ * Shows a campsite's primary listing image and lets its owner replace it.
  *
- * The image is encoded before it is written to the campsite's deterministic `images` document.
+ * Image documents use the same deterministic campsite ID as the registration flow, so a photo
+ * selected while registering is shown here as soon as Firestore delivers it.
  */
 @Composable
 private fun CampsiteListingImage(campsite: Campsite) {
@@ -224,7 +242,6 @@ private fun CampsiteListingImage(campsite: Campsite) {
     var error by remember(campsite.id) { mutableStateOf<String?>(null) }
     val uploaderId = campsite.campOwnerId.ifBlank { campsite.campOwner.id }
 
-    // The following block was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
     DisposableEffect(campsite.id) {
         val listener = imageRepo.listenForCampsiteImage(
             campsiteId = campsite.id,
@@ -236,7 +253,6 @@ private fun CampsiteListingImage(campsite: Campsite) {
         onDispose { listener.remove() }
     }
 
-    // The following block was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
