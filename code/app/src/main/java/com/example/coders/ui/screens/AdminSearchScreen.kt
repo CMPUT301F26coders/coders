@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import com.example.coders.ui.screens.DeletionRepo
 import androidx.compose.ui.Alignment
+import com.example.coders.UserRole
 
 /**
  * Displays searchable and filterable list of all available campsites for entrants
@@ -305,11 +306,11 @@ fun AdminSearchScreen(navController: NavController) {
                     // then search by campsite name or location.
                     val filteredProfiles = profiles.filter { profile ->
                         profile.id != signedInProfile?.id && //doesnt show yourself
-                        searchText.isBlank() ||
+                                (searchText.isBlank() ||
                                 profile.name.contains(
                                     searchText.trim(),
                                     ignoreCase = true
-                                )
+                                ))
                     }
                     // Profile search UI
 
@@ -395,7 +396,7 @@ fun AdminSearchScreen(navController: NavController) {
 
                                             Text("Email: ${profile.email}")
                                             Text("Phone Number: ${profile.phone}")
-                                            Text("Type: ${profile.type}")
+                                            Text("Role: ${profile.role.name}")
                                         }
 
                                         DeleteButton(
@@ -476,7 +477,7 @@ fun AdminSearchScreen(navController: NavController) {
 
 
 
-                if (admin != null) {
+                if (admin?.role == UserRole.ADMIN) {
                     when (type) {
                         "campsite" -> {
                             campsiteRepo.getCampsiteById(id) { campsite, error ->
