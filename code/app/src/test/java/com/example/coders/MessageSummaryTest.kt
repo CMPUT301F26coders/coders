@@ -36,8 +36,8 @@ class MessageSummaryTest {
      */
     @Test
     fun entrantSummaryShowsCampOwnerAndLatestMessage() {
-        val owner = CampOwner(name = "Casey Owner")
-        val entrant = Entrant(name = "Alex Entrant")
+        val owner = Profile(name = "Casey Owner")
+        val entrant = Profile(name = "Alex Entrant")
         val conversation = conversation(
             entrant = entrant,
             owner = owner,
@@ -72,8 +72,8 @@ class MessageSummaryTest {
      */
     @Test
     fun campOwnerSummaryShowsEntrantAsConversationPartner() {
-        val owner = CampOwner(name = "Casey Owner")
-        val entrant = Entrant(name = "Alex Entrant")
+        val owner = Profile(name = "Casey Owner")
+        val entrant = Profile(name = "Alex Entrant")
         val conversation = conversation(entrant = entrant, owner = owner)
 
         val summaries = owner.copy(conversations = mutableListOf(conversation)).toMessageSummaries()
@@ -113,7 +113,7 @@ class MessageSummaryTest {
     @Test
     fun profilesWithoutConversationListsReturnNoSummaries() {
         assertEquals(emptyList<MessageSummary>(), null.toMessageSummaries())
-        assertEquals(emptyList<MessageSummary>(), Admin().toMessageSummaries())
+        assertEquals(emptyList<MessageSummary>(), Profile().toMessageSummaries())
     }
 
     /**
@@ -129,8 +129,8 @@ class MessageSummaryTest {
      * @return A Conversation object containing the provided information.
      */
     private fun conversation(
-        entrant: Entrant = Entrant(name = "Alex Entrant"),
-        owner: CampOwner = CampOwner(name = "Casey Owner"),
+        entrant: Profile = Profile(name = "Alex Entrant"),
+        owner: Profile = Profile(name = "Casey Owner"),
         messages: List<Message> = emptyList()
     ) = Conversation(
         messages = messages,

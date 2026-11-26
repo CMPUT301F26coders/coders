@@ -19,14 +19,11 @@ import androidx.navigation.NavController
 import com.example.coders.R
 import com.example.coders.SignedInProfile
 import com.example.coders.Conversation
-import com.google.firebase.firestore.ListenerRegistration
 import android.util.Log
 import androidx.compose.runtime.*
 import com.example.coders.ConversationRepo
 import com.example.coders.CampsiteRepo
 import com.example.coders.ProfileRepo
-import com.example.coders.CampOwner
-import com.example.coders.Entrant
 import com.example.coders.MessageSummary
 
 
@@ -105,13 +102,16 @@ fun MessagesScreen(navController: NavController) {
 
         var disposed = false
         val summaries = MutableList<MessageSummary?>(conversations.size) { null }
+        if (conversations.isEmpty()) {
+            messageSummaries = emptyList()
+        }
 
         conversations.forEachIndexed { index, conversation ->
 
-            val otherPersonId = when (profile) {
-                is CampOwner -> conversation.entrantId
-                is Entrant -> conversation.campOwnerId
-                else -> ""
+            val otherPersonId = when (profile?.id) {
+                conversation.campOwnerId -> conversation.entrantId
+                conversation.entrantId -> conversation.campOwnerId
+                else -> return@forEachIndexed
             }
 
             //if (otherPersonId.isBlank() || conversation.campsiteId.isBlank()) {
@@ -189,7 +189,7 @@ fun MessagesScreen(navController: NavController) {
 
                         MessageBox(
                             name = summary.campsiteName,
-                            owner = summary.otherPersonName,
+                            otherPerson = summary.otherPersonName,
                             message = summary.latestMessage,
                             date = summary.latestDate,
                             picture = R.drawable.ic_launcher_foreground,
@@ -208,7 +208,7 @@ fun MessagesScreen(navController: NavController) {
 @Composable
 fun MessageBox(
     name: String,
-    owner: String,
+    otherPerson: String,
     message: String,
     date: String,
     picture: Int,
@@ -224,7 +224,7 @@ fun MessageBox(
 
         OutlinedButton(
             onClick = {
-                ChatData.owner = owner
+                ChatData.otherPerson = otherPerson
                 ChatData.conversationId = conversationId
                 navController.navigate("chat")
             },
@@ -247,7 +247,7 @@ fun MessageBox(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(name, fontWeight = FontWeight.Bold)
-                    Text(owner)
+                    Text(otherPerson)
                     Text(message)
                     Text(date)
                 }

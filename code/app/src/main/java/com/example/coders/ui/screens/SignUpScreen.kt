@@ -15,13 +15,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.coders.Admin
 import com.example.coders.AuthManager
-import com.example.coders.CampOwner
-import com.example.coders.Entrant
 import com.example.coders.Profile
 import com.example.coders.ProfileRepo
 import com.example.coders.UserSession
+import com.example.coders.UserRole
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,7 +41,9 @@ fun SignUpScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
 
     // Remember selected account type
-    var accountType by remember { mutableStateOf("Entrant") }
+    var accountType by remember {
+        mutableStateOf(UserRole.NORMAL)
+    }
 
     Column(
         modifier = Modifier
@@ -123,15 +123,14 @@ fun SignUpScreen(navController: NavController) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Admin", "Entrant", "Campsite owner").forEach { type ->
-
+            UserRole.entries.forEach { role ->
                 FilterChip(
-                    selected = accountType == type,
+                    selected = accountType == role,
                     onClick = {
-                        accountType = type
+                        accountType = role
                     },
                     label = {
-                        Text(type, fontSize = 11.sp)
+                        Text(role.name, fontSize = 11.sp)
                     }
                 )
             }
@@ -160,23 +159,16 @@ fun SignUpScreen(navController: NavController) {
                     }.joinToString("\n")
                 } else {
                     val fullName = "${firstName.trim()} ${lastName.trim()}"
-                    val profile: Profile = when (accountType) {
-                        "Admin" -> Admin(
-                            name = fullName,
-                            email = email.trim(),
-                            phone = phone.trim()
-                        )
-                        "Entrant" -> Entrant(
-                            name = fullName,
-                            email = email.trim(),
-                            phone = phone.trim()
-                        )
-                        else -> CampOwner(
-                            name = fullName,
-                            email = email.trim(),
-                            phone = phone.trim()
-                        )
-                    }
+                    val profile = Profile(
+                        name = fullName,
+                        email = email.trim(),
+                        phone = phone.trim(),
+                        type = if (accountType == UserRole.ADMIN) {
+                            "Admin"
+                        } else {
+                            "User"
+                        }
+                    )
 
                     errorMessage = ""
                     isSaving = true
@@ -189,17 +181,8 @@ fun SignUpScreen(navController: NavController) {
                                 try {
                                     AuthManager(context.applicationContext).saveUserId(profile.id)
                                     UserSession.initializeView(profile)
-                                    when (profile) {
-                                        is Admin -> { //starts by having admin in an entrant view, can switch to camp owner view
-                                            navController.navigate("home")
-                                        }
-                                        is CampOwner -> {
-                                            navController.navigate("home")
-                                        }
-                                        is Entrant -> {
-                                            navController.navigate("home")
-                                        }
-                                    }
+                                    navController.navigate("home")
+
                                 } catch (error: Exception) {
                                     errorMessage = "Profile saved, but this device couldn't remember the sign-in."
                                 }

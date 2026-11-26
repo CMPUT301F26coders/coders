@@ -70,7 +70,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.coders.AuthManager
 import com.example.coders.CAMPSITE_REGISTERED_MESSAGE
 import com.example.coders.CAMPSITE_REGISTERED_RESULT_KEY
-import com.example.coders.CampOwner
+import com.example.coders.Profile
 import com.example.coders.CampsiteRegistrationAccess
 import com.example.coders.CampsiteRepo
 import com.example.coders.CampsiteRequiredField
@@ -216,7 +216,7 @@ fun CreateCampsiteScreen(
 private fun CampsiteRegistrationForm(
     navController: NavController,
     campsiteRepo: CampsiteRepo?,
-    owner: CampOwner,
+    owner: Profile,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -750,6 +750,6 @@ fun PreviewCreateCampsiteScreen() {
     CampsiteRegistrationForm(
         navController = rememberNavController(),
         campsiteRepo = null,
-        owner = CampOwner(name = "Preview Owner")
+        owner = Profile(name = "Preview Owner")
     )
 }

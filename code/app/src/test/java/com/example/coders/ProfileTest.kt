@@ -37,7 +37,7 @@ class ProfileTest {
      */
     @Test
     fun entrant_creation_storesPropertiesCorrectly() {
-        val entrant = Entrant(
+        val entrant = Profile(
             name = "Alice",
             email = "alice@example.com",
             phone = "780-111-2222",
@@ -62,7 +62,7 @@ class ProfileTest {
      */
     @Test
     fun campOwner_creation_storesPropertiesAndListsCorrectly() {
-        val owner = CampOwner(
+        val owner = Profile(
             name = "Bob Owner",
             email = "bob@campsite.ca",
             phone = "780-333-4444",
@@ -90,7 +90,7 @@ class ProfileTest {
     @Test
     fun admin_creation_storesAuditLogsCorrectly() {
         val notification = Notification("Title", "Content", "2026-10-26")
-        val admin = Admin(
+        val admin = Profile(
             name = "Admin Sarah",
             email = "admin@campsite.ca",
             phone = "780-999-0000",
@@ -118,9 +118,9 @@ class ProfileTest {
      */
     @Test
     fun all_profile_types_creation_storesPropertiesCorrectly() {
-        val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())
-        val owner: Profile = CampOwner("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
-        val admin: Profile = Admin("User3", "u3@test.com", "333", emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+        val entrant: Profile = Profile("User1", "u1@test.com", "111", emptyList(), emptyList())
+        val owner: Profile = Profile("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
+        val admin: Profile = Profile("User3", "u3@test.com", "333", emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
 
         val userList: List<Profile> = listOf(entrant, owner, admin)
 
@@ -142,8 +142,8 @@ class ProfileTest {
      */
     @Test
     fun profile_idsAreUniqueAndStable() {
-        val entrant: Profile = Entrant("User1", "u1@test.com", "111", emptyList(), emptyList())
-        val owner: Profile = CampOwner("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
+        val entrant: Profile = Profile("User1", "u1@test.com", "111", emptyList(), emptyList())
+        val owner: Profile = Profile("User2", "u2@test.com", "222", emptyList(), emptyList(), emptyList(), emptyList())
         val entrantId = entrant.id
 
         assertNotEquals(entrant.id, owner.id)

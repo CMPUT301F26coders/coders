@@ -29,18 +29,18 @@ import org.junit.Test
  */
 class RepositorySearchTest {
 
-    private val entrant = Entrant(
+    private val entrant = Profile(
         name = "Alice Smith",
         email = "alice@test.com",
         phone = "111"
     )
-    private val owner = CampOwner(
+    private val owner = Profile(
         name = "Bob Owner",
         email = "bob@test.com",
         phone = "222"
     )
 
-    private val admin = Admin(
+    private val admin = Profile(
         name = "Admin Sarah",
         email = "admin@test.com",
         phone = "333"

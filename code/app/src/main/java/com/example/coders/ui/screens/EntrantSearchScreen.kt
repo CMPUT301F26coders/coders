@@ -21,8 +21,6 @@ import androidx.navigation.NavController
 import com.example.coders.CampsiteRepo
 import com.example.coders.filterCampsites
 import com.example.coders.SignedInProfile
-import com.example.coders.Reservation
-import com.example.coders.ReservationRepo
 
 /**
  * Displays searchable and filterable list of all available campsites for entrants
@@ -41,25 +39,6 @@ fun EntrantSearchScreen(navController: NavController) {
 
     val campsiteRepo = remember { CampsiteRepo() }
     val campsites = campsiteRepo.getAllCampsites()
-    val reservationRepo = remember { ReservationRepo() }
-    var reservations by remember { mutableStateOf<List<Reservation>>(emptyList()) }
-    var reservationsLoaded by remember { mutableStateOf(false) }
-    var reservationsError by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(reservationRepo) {
-        val registration = reservationRepo.listenForAllReservations(
-            onUpdate = { currentReservations ->
-                reservations = currentReservations
-                reservationsLoaded = true
-                reservationsError = null
-            },
-            onError = { error ->
-                reservationsError = error.message ?: "Unable to check reservation availability."
-                reservationsLoaded = true
-            }
-        )
-        onDispose { registration.remove() }
-    }
 
     var searchText by remember { mutableStateOf("") }
 
@@ -71,29 +50,24 @@ fun EntrantSearchScreen(navController: NavController) {
 
     // Apply location, date, and guest filters,
     // then search by campsite name or location.
-    val hasAvailabilityDates = selectedStartDate.isNotBlank() || selectedEndDate.isNotBlank()
-    val availabilityMessage = when {
-        hasAvailabilityDates && reservationsError != null -> reservationsError
-        hasAvailabilityDates && !reservationsLoaded -> "Checking reservation availability..."
-        else -> null
-    }
-    val filteredCampsites = if (availabilityMessage == null) filterCampsites(
+    val filteredCampsites = filterCampsites(
         campsites = campsites,
         location = selectedLocation,
         guests = selectedGuests,
         startDate = selectedStartDate,
-        endDate = selectedEndDate,
-        reservations = reservations
+        endDate = selectedEndDate
     ).filter { campsite ->
         signedInProfile?.id != campsite.campOwnerId &&
-            (searchText.isBlank() || campsite.name.contains(
+                searchText.isBlank() ||
+                campsite.name.contains(
                     searchText.trim(),
                     ignoreCase = true
-                ) || campsite.location.contains(
+                ) ||
+                campsite.location.contains(
                     searchText.trim(),
                     ignoreCase = true
-                ))
-    } else emptyList()
+                )
+    }
 
     Scaffold(
         bottomBar = {
@@ -148,16 +122,7 @@ fun EntrantSearchScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (availabilityMessage != null) {
-                Text(
-                    text = availabilityMessage,
-                    color = if (reservationsError != null) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-            } else if (filteredCampsites.isEmpty()) {
+            if (filteredCampsites.isEmpty()) {
 
                 Text(
                     text = "No campsites available.",
