@@ -1081,21 +1081,21 @@ class ReservationRatingRepo {
                 .toObject(Campsite::class.java)
                 ?: error("Campsite was not found.")
 
-            check(campsite.ratingCount > 0) {
+            /*check(campsite.ratingCount > 0) {
                 "Campsite rating count is invalid."
             }
 
             check(campsite.ratingTotal >= rating.score) {
                 "Campsite rating total is invalid."
-            }
+            }*/
 
             transaction.delete(ratingDocument)
 
             transaction.update(
                 campsiteDocument,
                 calculateRating(
-                    campsite.ratingTotal - rating.score,
-                    campsite.ratingCount - 1
+                    (campsite.ratingTotal - rating.score).coerceAtLeast(0), //cant be negative
+                    (campsite.ratingCount - 1).coerceAtLeast(0) //cant be negative
                 )
             )
 
