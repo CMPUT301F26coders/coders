@@ -102,18 +102,18 @@ class MessageSummaryTest {
     }
 
     /**
-     * Tests that profiles without conversation lists return no message summaries.
-     *
-     * Verifies that:
-     * - A null profile returns an empty list.
-     * - An admin profile returns an empty list.
-     *
-     * This ensures unsupported or missing profiles do not produce summaries.
+     * Verifies that missing profiles and profiles without
+     * conversations return an empty summary list,
+     * regardless of their account role.
      */
     @Test
-    fun profilesWithoutConversationListsReturnNoSummaries() {
+    fun profilesWithoutConversationsReturnNoSummaries() {
         assertEquals(emptyList<MessageSummary>(), null.toMessageSummaries())
         assertEquals(emptyList<MessageSummary>(), Profile().toMessageSummaries())
+        assertEquals(
+            emptyList<MessageSummary>(),
+            Profile(type = "Admin").toMessageSummaries()
+        )
     }
 
     /**
@@ -136,6 +136,10 @@ class MessageSummaryTest {
         messages = messages,
         campOwner = owner,
         entrant = entrant,
-        campsite = Campsite(name = "Pine Lake")
+        campsite = Campsite(name = "Pine Lake"),
+        campOwnerId = owner.id,
+        entrantId = entrant.id,
+        participantIds = listOf(owner.id, entrant.id)
     )
+
 }

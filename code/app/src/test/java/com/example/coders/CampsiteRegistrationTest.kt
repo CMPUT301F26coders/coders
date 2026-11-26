@@ -18,45 +18,47 @@ class CampsiteRegistrationTest {
 
     private val owner = Profile(name = "Owner", id = "owner-123")
 
-    // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
-    /** Verifies that no saved account is rejected without a saved-account flag. */
+    /**
+     * Verifies that campsite registration is rejected when the saved
+     * account has no associated profile or the profile ID does not
+     * match the saved account ID.
+     */
     @Test
-    fun registrationAccess_withoutSavedId_isRejectedWithoutAccount() {
-        assertEquals(
-            CampsiteRegistrationAccess.Rejected(false),
-            campsiteRegistrationAccess(null, owner)
-        )
-        assertEquals(
-            CampsiteRegistrationAccess.Rejected(false),
-            campsiteRegistrationAccess("   ", owner)
-        )
-    }
-
-    // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
-    /** Verifies saved IDs without a campsite-owner profile are rejected. */
-    @Test
-    fun registrationAccess_withoutCampOwner_isRejectedWithAccount() {
+    fun registrationAccess_withMissingOrMismatchedProfile_isRejected() {
         assertEquals(
             CampsiteRegistrationAccess.Rejected(true),
             campsiteRegistrationAccess("saved", null)
         )
         assertEquals(
             CampsiteRegistrationAccess.Rejected(true),
-            campsiteRegistrationAccess("saved", Profile(id = "entrant-123"))
-        )
-        assertEquals(
-            CampsiteRegistrationAccess.Rejected(true),
-            campsiteRegistrationAccess("saved", Profile(id = "admin-123"))
+            campsiteRegistrationAccess("saved", owner)
         )
     }
 
     // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
-    /** Verifies a saved campsite owner receives the exact allowed owner. */
+    /**
+     * Verifies that a user with a matching saved profile ID
+     * is permitted to register a campsite.
+     */
     @Test
-    fun registrationAccess_withCampOwner_isAllowed() {
+    fun registrationAccess_withMatchingProfile_isAllowed() {
         assertEquals(
             CampsiteRegistrationAccess.Allowed(owner),
-            campsiteRegistrationAccess("saved", owner)
+            campsiteRegistrationAccess(owner.id, owner)
+        )
+    }
+
+    /**
+     * Verifies that administrators are also permitted to register
+     * campsites when their profile ID matches the saved account ID.
+     */
+    @Test
+    fun registrationAccess_withAdminProfile_isAllowed() {
+        val admin = Profile(id = "admin-123", type = "Admin")
+
+        assertEquals(
+            CampsiteRegistrationAccess.Allowed(admin),
+            campsiteRegistrationAccess(admin.id, admin)
         )
     }
 
@@ -67,6 +69,22 @@ class CampsiteRegistrationTest {
         assertTrue(
             missingCampsiteFields("Name", "Location", "Amenities", " 4 ", 53.5, -113.5)
                 .isEmpty()
+        )
+    }
+
+    /**
+     * Verifies that campsite registration is rejected when no account
+     * ID is saved or the saved account ID is blank.
+     */
+    @Test
+    fun registrationAccess_withoutSavedId_isRejectedWithoutAccount() {
+        assertEquals(
+            CampsiteRegistrationAccess.Rejected(false),
+            campsiteRegistrationAccess(null, owner)
+        )
+        assertEquals(
+            CampsiteRegistrationAccess.Rejected(false),
+            campsiteRegistrationAccess("   ", owner)
         )
     }
 

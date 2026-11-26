@@ -34,7 +34,7 @@ data class MessageSummary(
  * @return One summary for each conversation associated with this profile.
  */
 fun Profile?.toMessageSummaries(): List<MessageSummary> {
-    if (this !is Profile) return emptyList()
+    if (this == null) return emptyList()
 
     return conversations.mapNotNull { conversation ->
 
