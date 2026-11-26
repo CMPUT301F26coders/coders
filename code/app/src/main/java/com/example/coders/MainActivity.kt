@@ -69,9 +69,24 @@ import com.example.coders.ui.screens.OwnerLotteryWaitlistScreen
 import com.example.coders.ui.screens.EditLotteryScreen
 import com.example.coders.ui.screens.ViewBookedDatesScreen
 
+//Qr Code imports:
+import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.navigation.navDeepLink
+
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
 
+    //So that a qr code navigates to the right thing even if the app is already open
+    private var appNavController: NavHostController? = null
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        appNavController?.handleDeepLink(intent)
+    }
     /**
      * Initializes the application's UI and navigation system.
      *
@@ -88,6 +103,7 @@ class MainActivity : ComponentActivity() {
             CodersTheme {
 
                 val navController = rememberNavController()
+                appNavController = navController
                 val authManager = remember {
                     AuthManager(applicationContext)
                 }
@@ -568,36 +584,65 @@ class MainActivity : ComponentActivity() {
                         AdminSearchScreen(navController)
                     }
 
-                    // Campsite Details page
+
+                    // Campsite Details page (supports QR deep link: coders://campsite/{campsiteId})
                     composable(
                         route = "campsiteDetails/{campsiteId}",
                         arguments = listOf(
                             navArgument("campsiteId") {
                                 type = NavType.StringType
                             }
+                        ),
+                        deepLinks = listOf(
+                            navDeepLink {
+                                uriPattern = "coders://campsite/{campsiteId}"
+                            }
                         )
                     ) { backStackEntry ->
-
                         val campsiteId = backStackEntry.arguments
                             ?.getString("campsiteId")
                             .orEmpty()
 
-
-                        val campsite = campsiteRepo
+                        val cachedCampsite = campsiteRepo
                             .getAllCampsites()
                             .firstOrNull { it.id == campsiteId }
 
-                        if (campsite != null) {
-                            CampsiteDetailsScreen(
-                                navController = navController,
-                                campsite = campsite
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("Campsite not found")
+                        var loadedCampsite by remember(campsiteId) { mutableStateOf(cachedCampsite) }
+                        var isLoading by remember(campsiteId) { mutableStateOf(cachedCampsite == null) }
+
+                        LaunchedEffect(campsiteId) {
+                            if (loadedCampsite == null && campsiteId.isNotBlank()) {
+                                campsiteRepo.getCampsiteById(campsiteId) { fetched, _ ->
+                                    loadedCampsite = fetched
+                                    isLoading = false
+                                }
+                            } else {
+                                isLoading = false
+                            }
+                        }
+
+                        when {
+                            isLoading -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                            loadedCampsite != null -> {
+                                CampsiteDetailsScreen(
+                                    navController = navController,
+                                    campsite = loadedCampsite!!
+                                )
+                            }
+                            else -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Campsite not found")
+                                }
                             }
                         }
                     }

@@ -421,7 +421,9 @@ fun CreateCampsiteScreen(
 
                     } else {
 
+                        val campsiteId = java.util.UUID.randomUUID().toString()
                         val newCampsite = Campsite(
+                            id = campsiteId,
                             name = name,
                             location = location,
                             description = if (rules.isNotBlank()) {
@@ -430,13 +432,11 @@ fun CreateCampsiteScreen(
                                 description
                             },
                             capacity = capacityInt,
-
-                            // Save the actual selected coordinates
                             mapLocation = "${selectedLatitude},${selectedLongitude}",
-
                             campOwner = campOwner,
                             campOwnerId = campOwner.id,
-                            tags = tags
+                            tags = tags,
+                            qr = "coders://campsite/$campsiteId"
                         )
 
                         if (campsiteRepo == null) {

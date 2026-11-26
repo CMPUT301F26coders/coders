@@ -290,5 +290,30 @@ fun CampsiteDetailsScreen(
                 }
             }
         }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // QR Code
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Campsite QR Code",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                CampsiteQrCodeImage(
+                    campsite = campsite,
+                    size = 160.dp
+                )
+            }
+        }
     }
 }
