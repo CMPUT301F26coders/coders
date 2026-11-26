@@ -16,7 +16,7 @@ import org.junit.Test
 /** Tests the deterministic, platform-independent campsite-registration helpers. */
 class CampsiteRegistrationTest {
 
-    private val owner = CampOwner(name = "Owner", id = "owner-123")
+    private val owner = Profile(name = "Owner", id = "owner-123")
 
     // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
     /** Verifies that no saved account is rejected without a saved-account flag. */
@@ -42,11 +42,11 @@ class CampsiteRegistrationTest {
         )
         assertEquals(
             CampsiteRegistrationAccess.Rejected(true),
-            campsiteRegistrationAccess("saved", Entrant(id = "entrant-123"))
+            campsiteRegistrationAccess("saved", Profile(id = "entrant-123"))
         )
         assertEquals(
             CampsiteRegistrationAccess.Rejected(true),
-            campsiteRegistrationAccess("saved", Admin(id = "admin-123"))
+            campsiteRegistrationAccess("saved", Profile(id = "admin-123"))
         )
     }
 

@@ -15,7 +15,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.coders.Entrant
 import com.example.coders.ProfileRepo
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
@@ -190,7 +189,7 @@ fun EntrantReservationsScreen(navController: NavController) {
             return
         }
 
-        val currentEntrant = profile as? Entrant
+        val currentEntrant = profile
 
         if (currentEntrant != null) {
             val updatedEntrant = currentEntrant.copy(

@@ -37,7 +37,7 @@ import java.util.Locale
  * Used to pass the target owners name and the specific conversation ID to the chatscreen
  */
 object ChatData {
-    var owner = ""
+    var otherPerson = ""
     var conversationId = ""
 }
 
@@ -135,7 +135,7 @@ fun ChatScreen(navController: NavController) {
         )
 
         Text(
-            text = ChatData.owner,
+            text = ChatData.otherPerson,
             color = Color.Gray,
             fontSize = 14.sp
         )

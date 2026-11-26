@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
 import com.example.coders.AuthManager
-import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Lottery
@@ -119,10 +118,10 @@ fun OwnerLotteryDetailsScreen(
 
             profileRepo.getProfileById(id) { profile, _ ->
 
-                if (profile is CampOwner) {
+                if (profile != null) {
                     ownerId = profile.id
                 } else {
-                    errorMessage = "Please sign in as a campsite owner."
+                    errorMessage = "Please sign in."
                     loading = false
                 }
             }

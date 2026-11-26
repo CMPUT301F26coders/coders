@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import com.example.coders.Admin
+import com.example.coders.UserRole
 import com.example.coders.SignedInProfile
 import androidx.compose.runtime.DisposableEffect
 import android.util.Log
@@ -164,7 +164,7 @@ fun CampsiteRatingsScreen(
                             name = ratingNames[rating.entrantId] ?: "Unknown"
                         )
 
-                        if (profile is Admin) {
+                        if (profile?.role == UserRole.ADMIN) {
                             DeleteButton(
                                 onDelete = {
                                     ratingToDelete = rating
@@ -186,7 +186,7 @@ fun CampsiteRatingsScreen(
 
                     val currentProfile = profile
 
-                    if (currentProfile is Admin) { //stupid check because apparently it cant be sure its still an admin???
+                    if (currentProfile?.role == UserRole.ADMIN) { //stupid check because apparently it cant be sure its still an admin???
                     ratingRepo.deleteRating(rating.reservationId) { error ->
                         if (error == null) {
                             ratings = ratings.orEmpty().filterNot {

@@ -57,7 +57,7 @@ class CommunicationTest {
      */
     @Test
     fun message_storesSenderAndContent() {
-        val entrant = Entrant("Alice", "alice@test.com", "123", emptyList(), emptyList())
+        val entrant = Profile("Alice", "alice@test.com", "123", emptyList(), emptyList())
         val message = Message(
             sender = entrant,
             content = "What time is check-in?",
@@ -80,8 +80,8 @@ class CommunicationTest {
      */
     @Test
     fun conversation_storesMessagesAndCampOwnerAndEntrant() {
-        val owner = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
-        val entrant = Entrant("Alice", "alice@test.com", "456", emptyList(), emptyList())
+        val owner = Profile("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
+        val entrant = Profile("Alice", "alice@test.com", "456", emptyList(), emptyList())
         val message = Message(entrant, "Hello!", "2026-10-26")
 
         val chat = Conversation(
@@ -134,8 +134,8 @@ class CommunicationTest {
      */
     @Test
     fun conversation_ids_autoIncrementOnCreation() {
-        val owner = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
-        val entrant = Entrant("Alice", "alice@test.com", "456", emptyList(), emptyList())
+        val owner = Profile("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
+        val entrant = Profile("Alice", "alice@test.com", "456", emptyList(), emptyList())
         val message = Message(entrant, "Hello!", "2026-10-26")
 
         val chat = Conversation(
@@ -145,8 +145,8 @@ class CommunicationTest {
             campsite = Campsite(name = "Pine Lake")
         )
 
-        val owner2 = CampOwner("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
-        val entrant2 = Entrant("Alice", "alice@test.com", "456", emptyList(), emptyList())
+        val owner2 = Profile("Bob", "bob@test.com", "123", emptyList(), emptyList(), emptyList(), emptyList())
+        val entrant2 = Profile("Alice", "alice@test.com", "456", emptyList(), emptyList())
         val message2 = Message(entrant, "Hello!", "2026-10-26")
 
         val chat2 = Conversation(

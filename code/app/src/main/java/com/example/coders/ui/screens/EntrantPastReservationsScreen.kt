@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
-import com.example.coders.Entrant
+import com.example.coders.Profile
 import com.example.coders.Reservation
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
@@ -61,7 +61,7 @@ import android.util.Log
 @Composable
 fun EntrantPastReservationsScreen(
     navController: NavController,
-    testEntrant: Entrant? = null
+    testEntrant: Profile? = null
 ) {
     val profile by SignedInProfile().rememberSignedInProfile()
     val entrantId = testEntrant?.id ?: profile?.id

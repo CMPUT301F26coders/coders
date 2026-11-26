@@ -14,9 +14,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
-import com.example.coders.CampOwner
+import com.example.coders.Profile
 import com.example.coders.ProfileRepo
 import java.util.Calendar
+import com.example.coders.CampsiteRepo
 
 /**
  * Displays the multi-owner lottery creation screen.
@@ -29,12 +30,14 @@ import java.util.Calendar
  * @param navController Handles navigation.
  * @param campsites Campsites belonging to the signed-in owner.
  * @param onCreateLottery Sends the selected information
+ * @param currentOwnerId The signed-in user's profile ID.
  * to the code responsible for creating the lottery.
  */
 @Composable
 fun MultiOwnerLotteryScreen(
     navController: NavController,
     campsites: List<Campsite>,
+    currentOwnerId: String,
     onCreateLottery: (
         List<String>,
         List<String>,
@@ -56,9 +59,10 @@ fun MultiOwnerLotteryScreen(
 
     // Load campsite owners from Firebase.
     val profileRepo = remember { ProfileRepo() }
+    val campsiteRepo = remember { CampsiteRepo() }
 
     var owners by remember {
-        mutableStateOf<List<CampOwner>>(emptyList())
+        mutableStateOf<List<Profile>>(emptyList())
     }
 
     var ownersLoading by remember {
@@ -73,20 +77,36 @@ fun MultiOwnerLotteryScreen(
         mutableStateListOf<String>()
     }
 
-    val currentOwnerId = campsites.firstOrNull()?.campOwnerId.orEmpty()
 
     LaunchedEffect(currentOwnerId) {
         ownersLoading = true
+        ownersError = false
 
-        profileRepo.getAllProfiles { profiles, error ->
-            ownersLoading = false
-            ownersError = error != null
+        campsiteRepo.getAllCampsites { allCampsites, campsiteError ->
+            if (campsiteError != null) {
+                ownersLoading = false
+                ownersError = true
+            } else {
+                val ownerIds = allCampsites.orEmpty()
+                    .map { it.campOwnerId }
+                    .filter { it.isNotBlank() }
+                    .toSet()
 
-            if (error == null) {
-                owners = profiles.orEmpty()
-                    .filterIsInstance<CampOwner>()
-                    .filter { it.id != currentOwnerId }
+                profileRepo.getAllProfiles { profiles, error ->
+                    ownersLoading = false
+                    ownersError = error != null
+
+                    owners = profiles.orEmpty().filter {
+                        it.id in ownerIds && it.id != currentOwnerId
+                    }
+                }
             }
+        }
+    }
+    DisposableEffect(profileRepo, campsiteRepo) {
+        onDispose {
+            profileRepo.close()
+            campsiteRepo.close()
         }
     }
 

@@ -9,14 +9,6 @@
 
 package com.example.coders
 
-/**
- * Filters profiles by name and role type.
- *
- * @param profiles The list of profiles to filter.
- * @param name The name to search for.
- * @param type The profile role to filter by (Entrant, CampOwner, or Admin).
- * @return A list of profiles matching the specified criteria.
- */
 fun filterProfiles(
     profiles: List<Profile>,
     name: String = "",
@@ -27,10 +19,9 @@ fun filterProfiles(
                 profile.name.contains(name.trim(), ignoreCase = true)
 
         val matchesType = when (type.trim().lowercase()) {
-            "" -> true
-            "entrant" -> profile is Entrant
-            "campowner", "camp owner" -> profile is CampOwner
-            "admin" -> profile is Admin
+            "", "user" -> true
+            "normal" -> profile.role == UserRole.NORMAL
+            "admin" -> profile.role == UserRole.ADMIN
             else -> false
         }
 

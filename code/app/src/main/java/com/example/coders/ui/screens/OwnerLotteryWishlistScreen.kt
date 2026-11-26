@@ -16,8 +16,6 @@ import androidx.navigation.NavController
 import java.time.LocalDate
 
 import com.example.coders.AuthManager
-import com.example.coders.CampOwner
-import com.example.coders.Entrant
 import com.example.coders.Lottery
 import com.example.coders.ProfileRepo
 
@@ -83,19 +81,18 @@ fun OwnerLotteryWaitlistScreen(
     var resultMessage by remember { mutableStateOf("") }
 
     /**
-     * Checks the signed-in user's profile and verifies that
-     * the user is a campsite owner.
+     * Retrieves the signed-in user's profile and owner ID.
      */
     LaunchedEffect(Unit) {
         val userId = authManager.getCurrentUserId()
 
-        if (userId == null) {
+        if (userId.isNullOrBlank()) {
             errorMessage = "Please sign in."
             loading = false
         } else {
             profileRepo.getProfileById(userId) { profile, error ->
-                if (error != null || profile !is CampOwner) {
-                    errorMessage = "Only campsite owners can view this page."
+                if (error != null || profile == null) {
+                    errorMessage = "Unable to load your profile."
                     loading = false
                 } else {
                     ownerId = profile.id
@@ -184,11 +181,7 @@ fun OwnerLotteryWaitlistScreen(
                  * Uses the entrant's name when available and
                  * displays a fallback when the profile is missing.
                  */
-                val name = if (profile is Entrant) {
-                    profile.name
-                } else {
-                    "Profile unavailable"
-                }
+                val name = profile?.name ?: "Profile unavailable"
 
                 result.add(
                     WaitlistPerson(
