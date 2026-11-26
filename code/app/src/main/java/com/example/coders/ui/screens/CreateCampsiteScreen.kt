@@ -489,8 +489,7 @@ private fun CampsiteRegistrationForm(
                     val latitude = selectedLatitude ?: return@Button
                     val longitude = selectedLongitude ?: return@Button
                     isSaving = true
-                    campsiteRepo.registerCampsite(
-                        buildCampsiteForRegistration(
+                    val campsite = buildCampsiteForRegistration(
                             owner = owner,
                             name = name,
                             location = location,
@@ -500,7 +499,9 @@ private fun CampsiteRegistrationForm(
                             latitude = latitude,
                             longitude = longitude,
                             tags = tags
-                        ),
+                        )
+                    campsiteRepo.registerCampsite(
+                        campsite.copy(qr = "coders://campsite/${campsite.id}"),
                         imageDataUrl
                     ) { error ->
                         if (error == null) {

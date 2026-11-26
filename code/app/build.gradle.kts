@@ -70,4 +70,5 @@ dependencies {
     implementation("org.maplibre.gl:android-sdk:13.7.1")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("com.google.zxing:core:3.5.3")
 }

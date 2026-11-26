@@ -632,7 +632,11 @@ class CampsiteRepo : AutoCloseable {
      * @param onComplete Called with `null` on success or the error on failure.
      */
     fun addCampsite(campsite: Campsite, onComplete: (Exception?) -> Unit = {}) {
-        val record = campsite.copy(campOwnerId = campsiteOwnerId(campsite))
+
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite),
+            qr = campsite.qr.ifBlank { "coders://campsite/${campsite.id}" }
+        )
         campsiteRef.document(record.id).set(record)
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }

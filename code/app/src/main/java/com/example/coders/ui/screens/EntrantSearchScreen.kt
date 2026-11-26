@@ -148,30 +148,32 @@ fun EntrantSearchScreen(navController: NavController) {
                                 )
                             }
                         ) {
-
-                            Column(
-                                modifier = Modifier.padding(16.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = campsite.name,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
 
-                                Text(
-                                    text = campsite.name,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
+                                    Spacer(modifier = Modifier.height(6.dp))
 
-                                Spacer(
-                                    modifier = Modifier.height(6.dp)
-                                )
+                                    Text(text = "Location: ${campsite.location}")
+                                    Text(text = "Maximum Occupancy: ${campsite.capacity} guests")
+                                    Text(text = "Rating: ${campsite.rating ?: "Not rated"}")
+                                }
 
-                                Text(
-                                    text = "Location: ${campsite.location}"
-                                )
+                                Spacer(modifier = Modifier.width(12.dp))
 
-                                Text(
-                                    text = "Maximum Occupancy: ${campsite.capacity} guests"
-                                )
-
-                                Text(
-                                    text = "Rating: ${campsite.rating ?: "Not rated"}"
+                                CampsiteQrCodeImage(
+                                    campsite = campsite,
+                                    size = 72.dp
                                 )
                             }
                         }
