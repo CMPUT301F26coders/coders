@@ -24,6 +24,8 @@ import java.util.UUID
 import com.google.android.gms.tasks.Tasks
 import android.util.Log
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 data class Profile(
     val name: String = "",
@@ -205,7 +207,14 @@ data class Lottery (
     val drawCompleted: Boolean = false,
 
     // Stores the date each entrant joined the waitlist.
-    val waitlistJoinedDates: Map<String, String> = emptyMap()
+    val waitlistJoinedDates: Map<String, String> = emptyMap(), 
+    // Stores the start and end times for each lottery period.
+    val availabilityStartTime: String = "",
+    val availabilityEndTime: String = "",
+    val registrationStartTime: String = "",
+    val registrationEndTime: String = "",
+    val bookingStartTime: String = "",
+    val bookingEndTime: String = ""
 
 )
 
@@ -2093,32 +2102,78 @@ class ConversationRepo {
 
 }
 
-/**
- * Provides Firebase operations for lotteries and lottery waitlists.
- *
- * @property lotteryRef The reference to the lottery collection in the database.
- * @property db The database.
- */
-class LotteryRepo {
-    private val db = Firebase.firestore
-    private val lotteryRef = db.collection("lottery")
     /**
-     * Checks that lottery settings are valid.
+     * Provides Firebase operations for lotteries and lottery waitlists.
      *
-     * @param lottery The lottery to check.
-     * @return True if the settings are valid.
+     * @property lotteryRef The reference to the lottery collection in the database.
+     * @property db The database.
      */
-    fun validateLottery(lottery: Lottery): Boolean {
+    class LotteryRepo {
+        private val db = Firebase.firestore
+        private val lotteryRef = db.collection("lottery")
+        /**
+         * Checks that lottery settings are valid.
+         *
+         * @param lottery The lottery to check.
+         * @return True if the settings are valid.
+         */
+        fun validateLottery(lottery: Lottery): Boolean {
         if (lottery.winnerCount <= 0) {
             return false
         }
-
+    
         if (lottery.waitlistCapacity != null &&
             lottery.waitlistCapacity <= 0) {
             return false
         }
-
-        return true
+    
+        val times = listOf(
+            lottery.availabilityStartTime,
+            lottery.availabilityEndTime,
+            lottery.registrationStartTime,
+            lottery.registrationEndTime,
+            lottery.bookingStartTime,
+            lottery.bookingEndTime
+        )
+    
+        // Preserve compatibility with older lotteries.
+        if (times.all { it.isBlank() }) {
+            return true
+        }
+    
+        return try {
+            val availabilityStart = LocalDateTime.parse(
+                "${lottery.availabilityStartDate}T${lottery.availabilityStartTime}"
+            )
+    
+            val availabilityEnd = LocalDateTime.parse(
+                "${lottery.availabilityEndDate}T${lottery.availabilityEndTime}"
+            )
+    
+            val registrationStart = LocalDateTime.parse(
+                "${lottery.registrationStartDate}T${lottery.registrationStartTime}"
+            )
+    
+            val registrationEnd = LocalDateTime.parse(
+                "${lottery.registrationEndDate}T${lottery.registrationEndTime}"
+            )
+    
+            val bookingStart = LocalDateTime.parse(
+                "${lottery.bookingStartDate}T${lottery.bookingStartTime}"
+            )
+    
+            val bookingEnd = LocalDateTime.parse(
+                "${lottery.bookingEndDate}T${lottery.bookingEndTime}"
+            )
+    
+            availabilityEnd.isAfter(availabilityStart) &&
+                    registrationEnd.isAfter(registrationStart) &&
+                    bookingEnd.isAfter(bookingStart) &&
+                    bookingStart.isAfter(registrationEnd)
+    
+        } catch (error: Exception) {
+            false
+        }
     }
 
 
@@ -2212,45 +2267,53 @@ class LotteryRepo {
     }
 
 
-    /**
-     * Updates a lottery only before registration closes.
-     *
-     * @param lottery The lottery with updated settings.
-     * @param onComplete Called with null on success or an error on failure.
-     */
-    fun updateLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
+        /**
+         * Updates a lottery only before registration closes.
+         *
+         * @param lottery The lottery with updated settings.
+         * @param onComplete Called with null on success or an error on failure.
+         */
+        fun updateLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
         if (!validateLottery(lottery)) {
             onComplete(IllegalArgumentException("Invalid lottery settings."))
             return
         }
-
+    
         val record = withRelationshipIds(lottery)
         val lotteryDocument = lotteryRef.document(record.id)
-
+    
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-
+    
             if (!snapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-
+    
             val existing = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
-
+    
             if (existing.drawCompleted) {
                 throw IllegalStateException("Cannot edit a completed lottery.")
             }
-
+    
             val registrationEndDate = snapshot.getString("registrationEndDate")
                 ?: throw IllegalStateException("Registration end date is missing.")
-
+    
             val closingDate = LocalDate.parse(registrationEndDate)
-            val today = LocalDate.now()
-
-            if (!today.isBefore(closingDate)) {
+    
+            // Check both the registration closing date and time.
+            val closingTime = if (existing.registrationEndTime.isBlank()) {
+                LocalTime.MIDNIGHT
+            } else {
+                LocalTime.parse(existing.registrationEndTime)
+            }
+    
+            val closingDateTime = LocalDateTime.of(closingDate, closingTime)
+    
+            if (!LocalDateTime.now().isBefore(closingDateTime)) {
                 throw IllegalStateException("Registration has already ended.")
             }
-
+    
             transaction.update(
                 lotteryDocument,
                 mapOf(
@@ -2263,10 +2326,18 @@ class LotteryRepo {
                     "waitlistCapacity" to record.waitlistCapacity,
                     "availabilityStartDate" to record.availabilityStartDate,
                     "availabilityEndDate" to record.availabilityEndDate,
-                    "allowOtherOwners" to record.allowOtherOwners
+                    "allowOtherOwners" to record.allowOtherOwners,
+    
+                    // Save the updated lottery times.
+                    "availabilityStartTime" to record.availabilityStartTime,
+                    "availabilityEndTime" to record.availabilityEndTime,
+                    "registrationStartTime" to record.registrationStartTime,
+                    "registrationEndTime" to record.registrationEndTime,
+                    "bookingStartTime" to record.bookingStartTime,
+                    "bookingEndTime" to record.bookingEndTime
                 )
             )
-
+    
             true
         }.addOnSuccessListener {
             onComplete(null)
@@ -2380,11 +2451,28 @@ class LotteryRepo {
             }
 
             // Make sure registration is currently open.
-            val today = LocalDate.now()
+            val now = LocalDateTime.now()
+            val today = now.toLocalDate()
+            
             val start = LocalDate.parse(lottery.registrationStartDate)
             val end = LocalDate.parse(lottery.registrationEndDate)
-
-            if (today.isBefore(start) || today.isAfter(end)) {
+            
+            val startTime = if (lottery.registrationStartTime.isBlank()) {
+                LocalTime.MIDNIGHT
+            } else {
+                LocalTime.parse(lottery.registrationStartTime)
+            }
+            
+            val endTime = if (lottery.registrationEndTime.isBlank()) {
+                LocalTime.MAX
+            } else {
+                LocalTime.parse(lottery.registrationEndTime)
+            }
+            
+            val startDateTime = LocalDateTime.of(start, startTime)
+            val endDateTime = LocalDateTime.of(end, endTime)
+            
+            if (now.isBefore(startDateTime) || !now.isBefore(endDateTime)) {
                 throw IllegalStateException("Registration is not open.")
             }
 
@@ -2499,8 +2587,17 @@ class LotteryRepo {
 
             // 4. Make sure registration has ended.
             val endDate = LocalDate.parse(lottery.registrationEndDate)
+            
+            val closingDateTime = if (lottery.registrationEndTime.isBlank()) {
+                endDate.plusDays(1).atStartOfDay()
+            } else {
+                LocalDateTime.of(
+                    endDate,
+                    LocalTime.parse(lottery.registrationEndTime)
+                )
+            }
 
-            if (!LocalDate.now().isAfter(endDate)) {
+            if (LocalDateTime.now().isBefore(closingDateTime)) {
                 throw IllegalStateException("Registration has not ended yet.")
             }
 
