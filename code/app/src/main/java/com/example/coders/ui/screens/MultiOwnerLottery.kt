@@ -1,4 +1,3 @@
-
 package com.example.coders.ui.screens
 
 import android.app.DatePickerDialog
@@ -14,10 +13,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
-import com.example.coders.Profile
+import com.example.coders.CampOwner
 import com.example.coders.ProfileRepo
 import java.util.Calendar
-import com.example.coders.CampsiteRepo
 
 /**
  * Displays the multi-owner lottery creation screen.
@@ -30,14 +28,12 @@ import com.example.coders.CampsiteRepo
  * @param navController Handles navigation.
  * @param campsites Campsites belonging to the signed-in owner.
  * @param onCreateLottery Sends the selected information
- * @param currentOwnerId The signed-in user's profile ID.
  * to the code responsible for creating the lottery.
  */
 @Composable
 fun MultiOwnerLotteryScreen(
     navController: NavController,
     campsites: List<Campsite>,
-    currentOwnerId: String,
     onCreateLottery: (
         List<String>,
         List<String>,
@@ -59,10 +55,9 @@ fun MultiOwnerLotteryScreen(
 
     // Load campsite owners from Firebase.
     val profileRepo = remember { ProfileRepo() }
-    val campsiteRepo = remember { CampsiteRepo() }
 
     var owners by remember {
-        mutableStateOf<List<Profile>>(emptyList())
+        mutableStateOf<List<CampOwner>>(emptyList())
     }
 
     var ownersLoading by remember {
@@ -77,36 +72,34 @@ fun MultiOwnerLotteryScreen(
         mutableStateListOf<String>()
     }
 
+    // NEW: Owner search
+    // Stores the name entered in the search field.
+    var ownerSearch by remember {
+        mutableStateOf("")
+    }
+
+    // Filters campsite owners based on the entered name.
+    val filteredOwners = owners.filter { owner ->
+        owner.name.contains(
+            ownerSearch.trim(),
+            ignoreCase = true
+        )
+    }
+
+    val currentOwnerId = campsites.firstOrNull()?.campOwnerId.orEmpty()
 
     LaunchedEffect(currentOwnerId) {
         ownersLoading = true
-        ownersError = false
 
-        campsiteRepo.getAllCampsites { allCampsites, campsiteError ->
-            if (campsiteError != null) {
-                ownersLoading = false
-                ownersError = true
-            } else {
-                val ownerIds = allCampsites.orEmpty()
-                    .map { it.campOwnerId }
-                    .filter { it.isNotBlank() }
-                    .toSet()
+        profileRepo.getAllProfiles { profiles, error ->
+            ownersLoading = false
+            ownersError = error != null
 
-                profileRepo.getAllProfiles { profiles, error ->
-                    ownersLoading = false
-                    ownersError = error != null
-
-                    owners = profiles.orEmpty().filter {
-                        it.id in ownerIds && it.id != currentOwnerId
-                    }
-                }
+            if (error == null) {
+                owners = profiles.orEmpty()
+                    .filterIsInstance<CampOwner>()
+                    .filter { it.id != currentOwnerId }
             }
-        }
-    }
-    DisposableEffect(profileRepo, campsiteRepo) {
-        onDispose {
-            profileRepo.close()
-            campsiteRepo.close()
         }
     }
 
@@ -613,12 +606,33 @@ fun MultiOwnerLotteryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // NEW: Owner search
+        // Allows the user to search for campsite owners by name.
+        OutlinedTextField(
+            value = ownerSearch,
+            onValueChange = {
+                ownerSearch = it
+            },
+            label = {
+                Text("Search Campsite Owner")
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         when {
             ownersLoading -> Text("Loading campsite owners...")
             ownersError -> Text("Could not load campsite owners.")
             owners.isEmpty() -> Text("No campsite owners found.")
 
-            else -> owners.forEach { owner ->
+            // NEW: Owner search
+            filteredOwners.isEmpty() ->
+                Text("No matching campsite owners found.")
+
+            // Displays only the owners matching the search.
+            else -> filteredOwners.forEach { owner ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
