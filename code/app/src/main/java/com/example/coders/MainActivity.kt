@@ -50,7 +50,7 @@ import com.example.coders.ui.screens.EntrantPastReservationsScreen
 import com.example.coders.ui.screens.RateCampsiteScreen
 import com.example.coders.ui.screens.CampsiteRatingsScreen
 import com.example.coders.ui.screens.CampsiteReviewsScreen
-
+import com.example.coders.ui.screens.ReservationMapScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.coders.ui.screens.ReviewCampsiteScreen
@@ -165,6 +165,25 @@ class MainActivity : ComponentActivity() {
 
                     composable("entrantreservations") {
                         EntrantReservationsScreen(navController)
+                    }
+
+                    composable(
+                        route = "reservationmap/{campsiteId}",
+                        arguments = listOf(
+                            navArgument("campsiteId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+
+                        val campsiteId = backStackEntry.arguments
+                            ?.getString("campsiteId")
+                            .orEmpty()
+
+                        ReservationMapScreen(
+                            navController = navController,
+                            campsiteId = campsiteId
+                        )
                     }
 
                     //routed the rate campsite screen

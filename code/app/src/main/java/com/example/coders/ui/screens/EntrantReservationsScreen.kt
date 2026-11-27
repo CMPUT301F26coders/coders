@@ -1,4 +1,3 @@
-/** Provides the entrant's live Pending and Active reservation management screen. */
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -24,10 +23,9 @@ import com.example.coders.ReservationRepo
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Profile
+import androidx.compose.foundation.layout.statusBarsPadding
 
-// The following enum was added using OpenAI, Codex, "Implement US 01.04.03: add Pending and
-// Active reservation tabs for entrant lottery offers", 2026-11-06.
-/** Identifies each reservation status that can be displayed on this screen. */
+
 private enum class EntrantReservationTab(
     val label: String,
     val status: ReservationStatus
@@ -36,17 +34,6 @@ private enum class EntrantReservationTab(
     Active("Active", ReservationStatus.Active)
 }
 
-// The following composable was modified using OpenAI, Codex, "Implement US 01.04.03: add Pending
-// and Active reservation tabs plus accept and confirmed-decline lottery-offer actions", 2026-11-06.
-/**
- * Displays the signed-in entrant's lottery offers and active reservations.
- *
- * Pending lottery offers can be accepted or declined. Accepting makes the reservation active;
- * declining it requires confirmation and changes its status to rejected. Active reservations can
- * still be cancelled after confirmation.
- *
- * @param navController Handles navigation to the map, chat, and previous screens.
- */
 @Composable
 fun EntrantReservationsScreen(navController: NavController) {
 
@@ -309,6 +296,18 @@ fun EntrantReservationsScreen(navController: NavController) {
                         Text("Location", fontWeight = FontWeight.Bold)
                         Text(campsite?.location ?: "Loading...")
 
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                navController.navigate("reservationmap/${summary.campsiteId}")
+                            },
+                            enabled = summary.campsiteId.isNotBlank(),
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.End)
+                        ) {
+                            Text("View on Map")
+                        }
+
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Text("Dates", fontWeight = FontWeight.Bold)
@@ -412,7 +411,6 @@ fun EntrantReservationsScreen(navController: NavController) {
         ) {
             Text("Past Reservations", fontWeight = FontWeight.Bold)
         }
-        Spacer(modifier = Modifier.height(24.dp))
     }
 
 // The following AlertDialog is from OpenAI, Codex, "in my [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt) I've already added the cancel reservation feature to each card. I need you to create the AlertDialog; confirmation updates that reservation in entrant.reservations to cancelled through ProfileRepo.updateProfile(...). Then Remove it from the active display after saving. This should go after the main Column in [EntrantReservationsScreen.kt](code/app/src/main/java/com/example/coders/ui/screens/EntrantReservationsScreen.kt)"
@@ -426,7 +424,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                 Column {
                     Text(
                         "Cancel your reservation for ${campsiteName(reservation)}? " +
-                            "This action cannot be undone."
+                                "This action cannot be undone."
                     )
 
                     cancellationError?.let { error ->
@@ -480,7 +478,7 @@ fun EntrantReservationsScreen(navController: NavController) {
                 Column {
                     Text(
                         "Decline your reservation offer for ${campsiteName(reservation)}? " +
-                            "This action cannot be undone."
+                                "This action cannot be undone."
                     )
 
                     offerUpdateError?.let { error ->
@@ -524,3 +522,4 @@ fun EntrantReservationsScreen(navController: NavController) {
         )
     }
 }
+
