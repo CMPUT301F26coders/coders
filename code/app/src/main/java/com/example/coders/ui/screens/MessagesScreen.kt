@@ -25,7 +25,7 @@ import com.example.coders.ConversationRepo
 import com.example.coders.CampsiteRepo
 import com.example.coders.ProfileRepo
 import com.example.coders.MessageSummary
-
+import com.example.coders.MessageBox
 
 
 
@@ -200,59 +200,5 @@ fun MessagesScreen(navController: NavController) {
                 }
             }
         }
-    }
-}
-
-
-/** Displays one campsite conversation preview and opens its chat when selected. */
-@Composable
-fun MessageBox(
-    name: String,
-    otherPerson: String,
-    message: String,
-    date: String,
-    picture: Int,
-    conversationId: String,
-    navController: NavController
-) {
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp)
-    ) {
-
-        OutlinedButton(
-            onClick = {
-                ChatData.otherPerson = otherPerson
-                ChatData.conversationId = conversationId
-                navController.navigate("chat")
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-
-                Image(
-                    painter = painterResource(picture),
-                    contentDescription = name,
-                    modifier = Modifier.size(60.dp)
-                )
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(name, fontWeight = FontWeight.Bold)
-                    Text(otherPerson)
-                    Text(message)
-                    Text(date)
-                }
-            }
-        }
-
     }
 }

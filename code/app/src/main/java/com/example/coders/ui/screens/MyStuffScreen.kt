@@ -15,6 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.List
@@ -41,7 +43,7 @@ import com.example.coders.ViewMode
 fun MyStuffScreen(navController: NavController) {
 
 
-    val isOwner = (UserSession.viewMode == ViewMode.CAMP_OWNER)
+
     Scaffold(
         bottomBar = {
             AppBottomBar(navController = navController)
@@ -67,10 +69,13 @@ fun MyStuffScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = if (isOwner) {
-                    "Manage your campsites and reservations"
-                } else {
-                    "Manage your bookings, waitlists and reservations"
+                text = when (UserSession.viewMode) {
+                    ViewMode.CAMP_OWNER ->
+                        "Manage your campsites and reservations"
+                    ViewMode.ENTRANT ->
+                        "Manage your bookings, waitlists and reservations"
+                    ViewMode.ADMIN ->
+                        "View message and notification logs"
                 },
                 fontSize = 15.sp
             )
@@ -78,67 +83,70 @@ fun MyStuffScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(30.dp))
 
 
-            if (isOwner) {
+            when (UserSession.viewMode) {
+                ViewMode.CAMP_OWNER -> {
 
-                // CAMPSITE OWNER BUTTONS
+                    // CAMPSITE OWNER BUTTONS
 
-                MyStuffMenuButton(
-                    title = "My Campsites",
-                    subtitle = "View and manage",
-                    icon = Icons.Default.Landscape,
-                    onClick = {
-                        navController.navigate("ownercampsites")
-                    }
-                )
+                    MyStuffMenuButton(
+                        title = "My Campsites",
+                        subtitle = "View and manage",
+                        icon = Icons.Default.Landscape,
+                        onClick = {
+                            navController.navigate("ownercampsites")
+                        }
+                    )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                MyStuffMenuButton(
-                    title = "Reservations",
-                    subtitle = "View and manage",
-                    icon = Icons.Default.Event,
-                    onClick = {
-                        navController.navigate("ownerreservations")
-                    }
-                )
+                    MyStuffMenuButton(
+                        title = "Reservations",
+                        subtitle = "View and manage",
+                        icon = Icons.Default.Event,
+                        onClick = {
+                            navController.navigate("ownerreservations")
+                        }
+                    )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                MyStuffMenuButton(
-                    title = "My Lotteries",
-                    subtitle = "View lotteries and message waitlisted entrants",
-                    icon = Icons.Default.Event,
-                    onClick = {
-                        navController.navigate("ownerlotteries")
-                    }
-                )
+                    MyStuffMenuButton(
+                        title = "My Lotteries",
+                        subtitle = "View lotteries and message waitlisted entrants",
+                        icon = Icons.Default.Event,
+                        onClick = {
+                            navController.navigate("ownerlotteries")
+                        }
+                    )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                MyStuffMenuButton(
-                    title = "Sent Notifications",
-                    subtitle = "View notifications sent to entrants",
-                    icon = Icons.Default.Notifications,
-                    onClick = {
-                        navController.navigate("ownerSentNotifications")
-                    }
-                )
-            } else {
+                    MyStuffMenuButton(
+                        title = "Sent Notifications",
+                        subtitle = "View notifications sent to entrants",
+                        icon = Icons.Default.Notifications,
+                        onClick = {
+                            navController.navigate("ownerSentNotifications")
+                        }
+                    )
+                }
 
-                // ENTRANT BUTTONS
+                ViewMode.ENTRANT -> {
 
-                MyStuffMenuButton(
-                    title = "My Bookings",
-                    subtitle = "View and manage",
-                    icon = Icons.Default.Landscape,
-                    onClick = {
-                        navController.navigate("entrantreservations")
-                    }
-                )
+                    // ENTRANT BUTTONS
 
-                //Spacer(modifier = Modifier.height(20.dp))
+                    MyStuffMenuButton(
+                        title = "My Bookings",
+                        subtitle = "View and manage",
+                        icon = Icons.Default.Landscape,
+                        onClick = {
+                            navController.navigate("entrantreservations")
+                        }
+                    )
 
-                /*MyStuffMenuButton(
+                    //Spacer(modifier = Modifier.height(20.dp))
+
+                    /*MyStuffMenuButton(
                     title = "Waitlists",
                     subtitle = "Active lotteries",
                     icon = Icons.Default.List,
@@ -147,8 +155,32 @@ fun MyStuffScreen(navController: NavController) {
                     }
                 )*/
 
-                //Spacer(modifier = Modifier.height(20.dp))
+                    //Spacer(modifier = Modifier.height(20.dp))
 
+                }
+                ViewMode.ADMIN -> {
+                    MyStuffMenuButton(
+                        title = "Message logs",
+                        subtitle = "View",
+                        icon = Icons.Default.ChatBubble,
+                        onClick = {
+                            navController.navigate("messagelogs")
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    MyStuffMenuButton(
+                        title = "Notification Logs",
+                        subtitle = "View",
+                        icon = Icons.Default.Notifications,
+                        onClick = {
+                            navController.navigate("notificationlogs")
+                        }
+                    )
+
+
+                }
             }
         }
     }
