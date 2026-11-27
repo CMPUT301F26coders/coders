@@ -80,6 +80,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.navigation.navDeepLink
 
+import com.example.coders.ui.screens.AdminNotificationLogs
+import com.example.coders.ui.screens.AdminMessageLogs
+
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
 
@@ -698,6 +701,17 @@ class MainActivity : ComponentActivity() {
                                 Text("Campsite not found")
                             }
                         }
+                    }
+                    // The following block was modified using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+                    composable("messagelogs")  {
+                        AdminMessageLogs(
+                            navController = navController
+                        )
+                    }
+                    composable("notificationlogs") {
+                        AdminNotificationLogs(
+                            navController = navController
+                        )
                     }
                 }
             }
