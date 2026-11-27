@@ -14,9 +14,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
-import com.example.coders.CampOwner
+import com.example.coders.Profile
 import com.example.coders.ProfileRepo
 import java.util.Calendar
+import com.example.coders.CampsiteRepo
 
 /**
  * Displays the multi-owner lottery creation screen.
@@ -29,12 +30,14 @@ import java.util.Calendar
  * @param navController Handles navigation.
  * @param campsites Campsites belonging to the signed-in owner.
  * @param onCreateLottery Sends the selected information
+ * @param currentOwnerId The signed-in user's profile ID.
  * to the code responsible for creating the lottery.
  */
 @Composable
 fun MultiOwnerLotteryScreen(
     navController: NavController,
     campsites: List<Campsite>,
+    currentOwnerId: String,
     onCreateLottery: (
         List<String>,
         List<String>,
@@ -44,7 +47,8 @@ fun MultiOwnerLotteryScreen(
         String,
         String,
         String,
-        Int
+        Int,
+        Int?
     ) -> Unit
 ) {
     val context = LocalContext.current
@@ -55,9 +59,10 @@ fun MultiOwnerLotteryScreen(
 
     // Load campsite owners from Firebase.
     val profileRepo = remember { ProfileRepo() }
+    val campsiteRepo = remember { CampsiteRepo() }
 
     var owners by remember {
-        mutableStateOf<List<CampOwner>>(emptyList())
+        mutableStateOf<List<Profile>>(emptyList())
     }
 
     var ownersLoading by remember {
@@ -72,20 +77,36 @@ fun MultiOwnerLotteryScreen(
         mutableStateListOf<String>()
     }
 
-    val currentOwnerId = campsites.firstOrNull()?.campOwnerId.orEmpty()
 
     LaunchedEffect(currentOwnerId) {
         ownersLoading = true
+        ownersError = false
 
-        profileRepo.getAllProfiles { profiles, error ->
-            ownersLoading = false
-            ownersError = error != null
+        campsiteRepo.getAllCampsites { allCampsites, campsiteError ->
+            if (campsiteError != null) {
+                ownersLoading = false
+                ownersError = true
+            } else {
+                val ownerIds = allCampsites.orEmpty()
+                    .map { it.campOwnerId }
+                    .filter { it.isNotBlank() }
+                    .toSet()
 
-            if (error == null) {
-                owners = profiles.orEmpty()
-                    .filterIsInstance<CampOwner>()
-                    .filter { it.id != currentOwnerId }
+                profileRepo.getAllProfiles { profiles, error ->
+                    ownersLoading = false
+                    ownersError = error != null
+
+                    owners = profiles.orEmpty().filter {
+                        it.id in ownerIds && it.id != currentOwnerId
+                    }
+                }
             }
+        }
+    }
+    DisposableEffect(profileRepo, campsiteRepo) {
+        onDispose {
+            profileRepo.close()
+            campsiteRepo.close()
         }
     }
 
@@ -120,6 +141,17 @@ fun MultiOwnerLotteryScreen(
     var numberOfWinners by remember {
         mutableStateOf("")
     }
+
+    // NEW: Stores the optional maximum waitlist capacity.
+    var maximumCapacity by remember {
+        mutableStateOf("")
+    }
+
+    // NEW: Empty means no limit. Otherwise, capacity must be positive.
+    val capacity = maximumCapacity.toIntOrNull()
+
+    val validCapacity = maximumCapacity.isBlank() ||
+            (capacity != null && capacity > 0)
 
     val availableCampsiteIds = campsites.map { it.id }.toSet()
 
@@ -175,11 +207,11 @@ fun MultiOwnerLotteryScreen(
 
     val validWinnerCount =
         winnerCount != null && winnerCount > 0
-    var backClicked by remember {mutableStateOf(false)}
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
@@ -187,10 +219,7 @@ fun MultiOwnerLotteryScreen(
 
         TextButton(
             onClick = {
-                if (!backClicked) {
-                    backClicked = true
-                    navController.popBackStack()
-                }
+                navController.popBackStack()
             }
         ) {
             Text("Back")
@@ -259,7 +288,7 @@ fun MultiOwnerLotteryScreen(
 
                 /**
                  * Displays the campsite name and location
-                 * vertically beside its checkbox.
+                 * vertically beside the checkbox.
                  */
                 Column {
                     Text(campsite.name)
@@ -533,6 +562,46 @@ fun MultiOwnerLotteryScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // NEW: OPTIONAL MAXIMUM WAITLIST CAPACITY
+
+        Text(
+            text = "Set Maximum Capacity",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = "Leave empty for no maximum capacity."
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
+            value = maximumCapacity,
+            onValueChange = {
+                maximumCapacity = it
+            },
+            label = {
+                Text("Set Maximum Capacity")
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number
+            ),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (!validCapacity) {
+            Text("Enter a positive whole number.")
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        HorizontalDivider()
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         // 6. CHOOSE CAMPSITE OWNERS
 
         Text(
@@ -589,7 +658,8 @@ fun MultiOwnerLotteryScreen(
                         registrationEndDate,
                         bookingStartDate,
                         bookingEndDate,
-                        count
+                        count,
+                        capacity
                     )
                 }
             },
@@ -598,7 +668,8 @@ fun MultiOwnerLotteryScreen(
                     validRegistrationDates &&
                     validBookingDates &&
                     validPeriodOrder &&
-                    validWinnerCount,
+                    validWinnerCount &&
+                    validCapacity,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Create Lottery")

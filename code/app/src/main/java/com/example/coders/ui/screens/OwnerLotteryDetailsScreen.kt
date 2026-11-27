@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
 import com.example.coders.AuthManager
-import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Lottery
@@ -77,6 +76,13 @@ fun OwnerLotteryDetailsScreen(
         mutableStateOf(false)
     }
 
+    var showNotificationDialog by remember { mutableStateOf(false) }
+    var notificationTitle by remember { mutableStateOf("Lottery Update") }
+    var notificationContent by remember { mutableStateOf("") }
+    var isSendingNotification by remember { mutableStateOf(false) }
+    var notificationError by remember { mutableStateOf<String?>(null) }
+    var notificationResult by remember { mutableStateOf<String?>(null) }
+
     // Delete lottery variables.
     var showDeleteConfirmation by remember {
         mutableStateOf(false)
@@ -112,10 +118,10 @@ fun OwnerLotteryDetailsScreen(
 
             profileRepo.getProfileById(id) { profile, _ ->
 
-                if (profile is CampOwner) {
+                if (profile != null) {
                     ownerId = profile.id
                 } else {
-                    errorMessage = "Please sign in as a campsite owner."
+                    errorMessage = "Please sign in."
                     loading = false
                 }
             }
@@ -467,10 +473,94 @@ fun OwnerLotteryDetailsScreen(
 
                         // Send Notification button.
                         Button(
-                            onClick = {},
+                            onClick = {
+                                notificationTitle = "Lottery Update"
+                                notificationContent = ""
+                                notificationError = null
+                                showNotificationDialog = true
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Send Notification")
+                        }
+
+                        notificationResult?.let { result ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(result, color = MaterialTheme.colorScheme.primary)
+                        }
+
+                        if (showNotificationDialog) {
+                            AlertDialog(
+                                onDismissRequest = {
+                                    if (!isSendingNotification) showNotificationDialog = false
+                                },
+                                title = { Text("Notify waitlisted entrants") },
+                                text = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Text(
+                                            "This message will be sent to " +
+                                                "${currentLottery.waitlistEntrantIds.filter(String::isNotBlank).distinct().size} entrants on this lottery's waitlist."
+                                        )
+                                        OutlinedTextField(
+                                            value = notificationTitle,
+                                            onValueChange = { notificationTitle = it },
+                                            label = { Text("Title") },
+                                            singleLine = true,
+                                            enabled = !isSendingNotification
+                                        )
+                                        OutlinedTextField(
+                                            value = notificationContent,
+                                            onValueChange = { notificationContent = it },
+                                            label = { Text("Message") },
+                                            minLines = 3,
+                                            enabled = !isSendingNotification
+                                        )
+                                        notificationError?.let { error ->
+                                            Text(error, color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        enabled = !isSendingNotification &&
+                                            notificationTitle.isNotBlank() &&
+                                            notificationContent.isNotBlank(),
+                                        onClick = {
+                                            isSendingNotification = true
+                                            notificationError = null
+                                            lotteryRepo.sendWaitlistNotification(
+                                                ownerId = ownerId,
+                                                lotteryId = currentLottery.id,
+                                                title = notificationTitle,
+                                                content = notificationContent
+                                            ) { recipientCount, error ->
+                                                isSendingNotification = false
+                                                if (error != null) {
+                                                    notificationError = error.message
+                                                        ?: "Unable to send notification."
+                                                } else {
+                                                    notificationResult = if (recipientCount == 0) {
+                                                        "There are no entrants on this waitlist yet."
+                                                    } else {
+                                                        "Notification sent to $recipientCount entrants."
+                                                    }
+                                                    showNotificationDialog = false
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Text(if (isSendingNotification) "Sending…" else "Send")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        enabled = !isSendingNotification,
+                                        onClick = { showNotificationDialog = false }
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))

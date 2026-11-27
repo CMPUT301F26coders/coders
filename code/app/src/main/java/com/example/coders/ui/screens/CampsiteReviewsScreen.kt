@@ -20,7 +20,7 @@ import com.example.coders.ReservationReview
 import com.example.coders.ReservationReviewRepo
 import com.example.coders.ProfileRepo
 import com.example.coders.CampsiteRepo
-import com.example.coders.Admin
+import com.example.coders.UserRole
 import com.example.coders.SignedInProfile
 
 @Composable
@@ -62,6 +62,7 @@ fun CampsiteReviewsScreen(
     val reviewRepo = remember { ReservationReviewRepo() }
     val profileRepo = remember { ProfileRepo() }
     val campsiteRepo = remember { CampsiteRepo() }
+    val deletionRepo = remember { DeletionRepo() }
 
     var isLoadingReview by remember(campsiteId) {
         mutableStateOf(true)
@@ -160,7 +161,7 @@ fun CampsiteReviewsScreen(
                                 ?: "Unknown"
                         )
 
-                        if (profile is Admin) {
+                        if (profile?.role == UserRole.ADMIN) {
                             DeleteButton(
                                 onDelete = {
                                     reviewToDelete = review
@@ -175,18 +176,29 @@ fun CampsiteReviewsScreen(
         }
 
         reviewToDelete?.let { review ->
-            DeleteConfirmationDialog(
+            DeleteConfirmationDialogAdmin(
                 itemName = "this review",
 
-                onConfirm = {
+                onConfirm = { reason ->
                     reviewToDelete = null
 
-                    if (profile is Admin) {
+                    val currentProfile = profile
+                    if (currentProfile?.role == UserRole.ADMIN) {
                         reviewRepo.deleteReview(review.reservationId) { error ->
                             if (error == null) {
                                 reviews = reviews.orEmpty().filterNot {
                                     it.reservationId == review.reservationId
                                 }
+                                    val deletion = Deletion(
+                                        deletedObjectId = review.reservationId,
+                                        collectionName = "reservationReviews",
+                                        reason = reason,
+                                        objectDeletedBy = currentProfile.id,
+                                        objectCreatedBy = review.entrantId
+                                    )
+
+                                    deletionRepo.addDeletion(deletion)
+
                             } else {
                                 reviewError = error
                             }

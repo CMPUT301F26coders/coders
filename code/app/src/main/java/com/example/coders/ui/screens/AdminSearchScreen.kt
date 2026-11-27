@@ -23,6 +23,8 @@ import com.example.coders.filterCampsites
 import com.example.coders.ProfileRepo
 import com.example.coders.ImageRepo
 import com.example.coders.Profile
+import com.example.coders.Reservation
+import com.example.coders.ReservationRepo
 import com.example.coders.SignedInProfile
 import com.example.coders.Image as ImageRecord
 import com.example.coders.ProfileImageRepo
@@ -32,8 +34,9 @@ import androidx.compose.ui.layout.ContentScale
 import com.example.coders.dataUrlToImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Delete
+import com.example.coders.ui.screens.DeletionRepo
 import androidx.compose.ui.Alignment
+import com.example.coders.UserRole
 
 /**
  * Displays searchable and filterable list of all available campsites for entrants
@@ -58,13 +61,34 @@ private enum class SearchTab(
 fun AdminSearchScreen(navController: NavController) {
 
     val campsiteRepo = remember { CampsiteRepo() }
+    val reservationRepo = remember { ReservationRepo() }
     val profileRepo = remember { ProfileRepo() }
     val imageRepo = remember { ImageRepo() }
     val profileImageRepo = remember { ProfileImageRepo() }
+    val deletionRepo = remember { DeletionRepo() }
 
 
     val campsites = campsiteRepo.getAllCampsites()
     val images = imageRepo.getAllImages()
+
+    var reservations by remember { mutableStateOf<List<Reservation>>(emptyList()) }
+    var reservationsLoaded by remember { mutableStateOf(false) }
+    var reservationsError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(reservationRepo) {
+        val registration = reservationRepo.listenForAllReservations(
+            onUpdate = { currentReservations ->
+                reservations = currentReservations
+                reservationsLoaded = true
+                reservationsError = null
+            },
+            onError = { error ->
+                reservationsError = error.message ?: "Unable to check reservation availability."
+                reservationsLoaded = true
+            }
+        )
+        onDispose { registration.remove() }
+    }
 
     var profiles by remember {
         mutableStateOf<List<Profile>>(emptyList())
@@ -151,12 +175,20 @@ fun AdminSearchScreen(navController: NavController) {
 
                     // Apply location, date, and guest filters,
                     // then search by campsite name or location.
-                    val filteredCampsites = filterCampsites(
+                    val hasAvailabilityDates =
+                        selectedStartDate.isNotBlank() || selectedEndDate.isNotBlank()
+                    val availabilityMessage = when {
+                        hasAvailabilityDates && reservationsError != null -> reservationsError
+                        hasAvailabilityDates && !reservationsLoaded -> "Checking reservation availability..."
+                        else -> null
+                    }
+                    val filteredCampsites = if (availabilityMessage == null) filterCampsites(
                         campsites = campsites,
                         location = selectedLocation,
                         guests = selectedGuests,
                         startDate = selectedStartDate,
-                        endDate = selectedEndDate
+                        endDate = selectedEndDate,
+                        reservations = reservations
                     ).filter { campsite ->
                         searchText.isBlank() ||
                                 campsite.name.contains(
@@ -167,7 +199,7 @@ fun AdminSearchScreen(navController: NavController) {
                                     searchText.trim(),
                                     ignoreCase = true
                                 )
-                    }
+                    } else emptyList()
 
                     OutlinedTextField(
                         value = searchText,
@@ -202,7 +234,16 @@ fun AdminSearchScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    if (filteredCampsites.isEmpty()) {
+                    if (availabilityMessage != null) {
+                        Text(
+                            text = availabilityMessage,
+                            color = if (reservationsError != null) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    } else if (filteredCampsites.isEmpty()) {
 
                         Text(
                             text = "No campsites available.",
@@ -265,11 +306,11 @@ fun AdminSearchScreen(navController: NavController) {
                     // then search by campsite name or location.
                     val filteredProfiles = profiles.filter { profile ->
                         profile.id != signedInProfile?.id && //doesnt show yourself
-                        searchText.isBlank() ||
+                                (searchText.isBlank() ||
                                 profile.name.contains(
                                     searchText.trim(),
                                     ignoreCase = true
-                                )
+                                ))
                     }
                     // Profile search UI
 
@@ -355,7 +396,7 @@ fun AdminSearchScreen(navController: NavController) {
 
                                             Text("Email: ${profile.email}")
                                             Text("Phone Number: ${profile.phone}")
-                                            Text("Type: ${profile.type}")
+                                            Text("Role: ${profile.role.name}")
                                         }
 
                                         DeleteButton(
@@ -429,20 +470,80 @@ fun AdminSearchScreen(navController: NavController) {
     }
 
     itemToDelete?.let { (type, id) ->
-        DeleteConfirmationDialog(
+        DeleteConfirmationDialogAdmin(
             itemName = type,
-            onConfirm = {
-                when (type) {
-                    "campsite" -> campsiteRepo.deleteCampsite(id)
-                    "profile" -> profileRepo.deleteProfile(id)
-                    "image" -> imageRepo.deleteImage(id)
+            onConfirm = { reason ->
+                val admin = signedInProfile
+
+
+
+                if (admin?.role == UserRole.ADMIN) {
+                    when (type) {
+                        "campsite" -> {
+                            campsiteRepo.getCampsiteById(id) { campsite, error ->
+                                if (campsite != null && error == null) {
+                                    campsiteRepo.deleteCampsite(id) { deleteError ->
+                                        if (deleteError == null) {
+                                            val deletion = Deletion(
+                                                deletedObjectId = id,
+                                                collectionName = "campsites",
+                                                reason = reason,
+                                                objectDeletedBy = admin.id,
+                                                objectCreatedBy = campsite.campOwnerId
+                                            )
+
+                                            deletionRepo.addDeletion(deletion)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        "profile" -> {
+                            profileRepo.deleteProfile(id) { deleteError ->
+                                if (deleteError == null) {
+                                    val deletion = Deletion(
+                                        deletedObjectId = id,
+                                        collectionName = "profiles",
+                                        reason = reason,
+                                        objectDeletedBy = admin.id,
+                                        objectCreatedBy = id
+                                    )
+
+                                    deletionRepo.addDeletion(deletion)
+
+                                    profiles = profiles.filterNot { it.id == id }
+                                }
+                            }
+                        }
+
+                        "image" -> {
+                            imageRepo.getImageById(id) { image, error ->
+                                if (image != null && error == null) {
+                                    imageRepo.deleteImage(id) { deleteError ->
+                                        if (deleteError == null) {
+                                            val deletion = Deletion(
+                                                deletedObjectId = id,
+                                                collectionName = "images",
+                                                reason = reason,
+                                                objectDeletedBy = admin.id,
+                                                objectCreatedBy = image.uploaderId
+                                            )
+
+                                            deletionRepo.addDeletion(deletion)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                    itemToDelete = null
+                },
+                onDismiss = {
+                    itemToDelete = null
                 }
 
-                itemToDelete = null
-            },
-            onDismiss = {
-                itemToDelete = null
-            }
         )
     }
 

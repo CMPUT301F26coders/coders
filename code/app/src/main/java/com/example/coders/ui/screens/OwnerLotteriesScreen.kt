@@ -15,9 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-
 import com.example.coders.AuthManager
-import com.example.coders.CampOwner
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Lottery
@@ -58,7 +56,7 @@ fun OwnerLotteriesScreen(navController: NavController) {
 
         if (id != null) {
             profileRepo.getProfileById(id) { profile, error ->
-                if (profile is CampOwner) {
+                if (profile != null) {
                     ownerId = profile.id
                 }
                 isLoading = false
@@ -192,7 +190,7 @@ fun OwnerLotteriesScreen(navController: NavController) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        // Lottery details will be added next.
+                                        navController.navigate("ownerLotteryDetails/${lottery.id}")
                                     },
                                 shape = RoundedCornerShape(15.dp)
                             ) {
@@ -219,6 +217,7 @@ fun OwnerLotteriesScreen(navController: NavController) {
                                         Text(
                                             text = campsiteNames
                                         )
+
                                     }
 
                                     Text(
@@ -248,4 +247,5 @@ fun OwnerLotteriesScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(20.dp))
     }
+
 }

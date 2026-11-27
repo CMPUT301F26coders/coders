@@ -25,138 +25,29 @@ import com.google.android.gms.tasks.Tasks
 import android.util.Log
 import java.time.LocalDate
 
-/**
- * Common interface for all profiles.
- *
- * @property name The name of the profile.
- * @property email The email of the profile.
- * @property phone The phone number of the profile.
-* @property id The unique identifier of the profile.
- * @property type The role associated with the profile.
- */
-interface Profile {
-    val name: String
-    val email: String
-    val phone: String
-    val id: String
-
-    val type: String
-
-    /**
-     * Returns a copy of the profile with updated personal information.
-     *
-     * @param name The updated name.
-     * @param email The updated email.
-     * @param phone The updated phone number.
-     * @return A new profile containing the updated information.
-     */
-    fun withUpdatedDetails(
-        name: String = this.name,
-        email: String = this.email,
-        phone: String = this.phone
-    ): Profile
-}
-
-/**
- * Represents a user who is an Entrant.
- *
- * @property reservations A list of bookings made by the entrant.
- * @property waitlists A list of waitlists made by the entrant.
- * @property notifications A list of notifications made by the entrant.
- * @property conversations Conversations associated with this entrant.
- */
-data class Entrant(
-    override val name: String = "",
-    override val email: String = "",
-    override val phone: String = "",
+data class Profile(
+    val name: String = "",
+    val email: String = "",
+    val phone: String = "",
     val reservations: List<Reservation> = emptyList(),
     val waitlists: List<Waitlist> = emptyList(),
+    val campsites: List<Campsite> = emptyList(),
+    val lotteries: List<Lottery> = emptyList(),
     val notifications: List<Notification> = emptyList(),
-    override val type: String = "Entrant",
-    override val id: String = UUID.randomUUID().toString(),
-    val conversations: MutableList<Conversation> = mutableListOf()
-) : Profile {
-
-    override fun withUpdatedDetails(
-        name: String,
-        email: String,
-        phone: String
-    ): Profile {
-        return copy(name = name, email = email, phone = phone)
-    }
-}
-
-/**
- * Represents a user who is a CampOwner.
- *
- * @property campsites A list of campsites owned by the camp owner.
- * @property lotteries A list of lotteries managed by the camp owner.
- * @property reservations A list of reservations made by the camp owner.
- * @property notificationsSent A list of notifications sent by the camp owner.
- * @property notificationsReceived A list of notifications received by the camp owner.
- * @property conversations Conversations associated with this camp owner.
- */
-data class CampOwner(
-    override val name: String = "",
-    override val email: String = "",
-    override val phone: String = "",
-    val campsites : List<Campsite> = emptyList(),
-    val lotteries : List<Lottery> = emptyList(),
-    val reservations : List<Reservation> = emptyList(),
-    val notificationsSent : List<Notification> = emptyList(),
-    val notificationsReceived : List<Notification> = emptyList(),
+    val notificationsSent: List<Notification> = emptyList(),
     val conversations: MutableList<Conversation> = mutableListOf(),
-    override val type: String = "CampOwner",
-    override val id: String = UUID.randomUUID().toString()
-) : Profile {
-
-    /**
-     * copies the profile with updated details, used on profile screen
-     *
-     * @property name name of user
-     * @property email email of user
-     * @property phone phone number of user
-     */
-    override fun withUpdatedDetails(
-        name: String,
-        email: String,
-        phone: String
-    ): Profile {
-        return copy(name = name, email = email, phone = phone)
-    }
-}
-
-/**
- * Represents a user who is an Admin.
- *
- * @property waitlists A list of waitlists managed by the admin.
- * @property campsites A list of campsites managed by the admin.
- * @property lotteries A list of lotteries managed by the admin.
- * @property reservations A list of reservations managed by the admin.
- * @property notificationLogs A list of notification logs managed by the admin.
- * @property messageLogs A list of message logs managed by the admin.
- */
-data class Admin (
-    override val name: String = "",
-    override val email: String = "",
-    override val phone: String = "",
-    val waitlists: List<Waitlist> = emptyList(),
-    val campsites : List<Campsite> = emptyList(),
-    val lotteries : List<Lottery> = emptyList(),
-    val reservations : List<Reservation> = emptyList(),
-    val notificationLogs : List<Notification> = emptyList(),
-    val messageLogs : List<Message> = emptyList(),
-    override val type: String = "Admin",
-    override val id: String = UUID.randomUUID().toString()
-) : Profile {
-
-    override fun withUpdatedDetails(
-        name: String,
-        email: String,
-        phone: String
-    ): Profile {
-        return copy(name = name, email = email, phone = phone)
-    }
+    val notificationLogs: List<Notification> = emptyList(),
+    val messageLogs: List<Message> = emptyList(),
+    val id: String = UUID.randomUUID().toString(),
+    val type: String = "User"
+) {
+    @get:Exclude
+    val role: UserRole //basically makes it so the pre-existing profiles that used "Entrant" or "Campsite Owner" will still function. This automatically makes them NORMAL users
+        get() = if (type.equals("Admin", ignoreCase = true)) {
+            UserRole.ADMIN
+        } else {
+            UserRole.NORMAL
+        }
 }
 
 /**
@@ -171,7 +62,7 @@ data class Admin (
  */
 data class Waitlist (
     val campsite : Campsite = Campsite(),
-    val entrantList : List<Entrant> = emptyList(),
+    val entrantList : List<Profile> = emptyList(),
     val id: String = UUID.randomUUID().toString(),
     val lotteryId: String = "",
     val campsiteId: String = "",
@@ -207,7 +98,7 @@ data class Campsite(
     var description: String = "",
     var capacity: Int = 0,
     var mapLocation: String = "",
-    val campOwner: CampOwner = CampOwner(),
+    val campOwner: Profile = Profile(),
     var rating: Double? = null,
 
     var images: List<Image> = emptyList(),
@@ -306,13 +197,13 @@ data class Lottery (
     val allowOtherOwners: Boolean = false,
     val availabilityStartDate: String = "",
     val availabilityEndDate: String = "",
-    
+
     // Stores the IDs of entrants selected as winners.
     val winnerEntrantIds: List<String> = emptyList(),
-    
+
     // True once the lottery draw is completed.
     val drawCompleted: Boolean = false,
-    
+
     // Stores the date each entrant joined the waitlist.
     val waitlistJoinedDates: Map<String, String> = emptyMap()
 
@@ -337,8 +228,8 @@ data class Reservation (
     val dates : String = "",
     val guestNumber : Int = 0,
     val status : ReservationStatus = ReservationStatus.Active,
-    val campOwner : CampOwner = CampOwner(),
-    val entrants : List<Entrant> = emptyList(),
+    val campOwner : Profile = Profile(),
+    val entrants : List<Profile> = emptyList(),
     val id: String = UUID.randomUUID().toString(),
     val campsiteId: String = "",
     val campOwnerId: String = "",
@@ -365,7 +256,8 @@ data class Notification (
     val date : String = "",
     val id: String = UUID.randomUUID().toString(),
     val recipientId: String = "",
-    val senderId: String = ""
+    val senderId: String = "",
+    val sendGroupId: String = ""
 )
 
 /**
@@ -381,7 +273,7 @@ data class Notification (
  * @property date The date of the message.
  */
 data class Message (
-    val senderType: String = "Entrant",
+    val senderType: String = "User",
     val senderId: String = "",
     val senderName: String = "",
     val senderEmail: String = "",
@@ -413,11 +305,13 @@ data class Message (
      */
     @get:Exclude
     val sender: Profile
-        get() = when (senderType) {
-            "CampOwner" -> CampOwner(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
-            "Admin" -> Admin(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
-            else -> Entrant(name = senderName, email = senderEmail, phone = senderPhone, id = senderId)
-        }
+        get() = Profile(
+            name = senderName,
+            email = senderEmail,
+            phone = senderPhone,
+            id = senderId,
+            type = senderType
+        )
 }
 
 /**
@@ -431,12 +325,12 @@ data class Message (
  * @property entrantId Entrant profile document ID.
  * @property campsiteId Campsite document ID.
  * @property participantIds Profile document IDs participating in the chat.
-* @property id The unique identifier of the conversation.
+ * @property id The unique identifier of the conversation.
  */
 data class Conversation (
     val messages : List<Message> = emptyList(),
-    val campOwner : CampOwner = CampOwner(),
-    val entrant : Entrant = Entrant(),
+    val campOwner : Profile = Profile(),
+    val entrant : Profile = Profile(),
     val id: String = UUID.randomUUID().toString(),
     val campsite: Campsite = Campsite(),
     val campOwnerId: String = "",
@@ -602,7 +496,7 @@ class CampsiteRepo : AutoCloseable {
      * @param owner The campsite owner whose campsites should be returned.
      * @return The matching campsites.
      */
-    fun getCampsitesByOwner(owner: CampOwner): List<Campsite> {
+    fun getCampsitesByOwner(owner: Profile): List<Campsite> {
         return _campsites.filter {
             (it.campOwnerId.ifBlank { if (it.campOwner.hasStoredIdentity()) it.campOwner.id else "" }) == owner.id
         }
@@ -632,8 +526,43 @@ class CampsiteRepo : AutoCloseable {
      * @param onComplete Called with `null` on success or the error on failure.
      */
     fun addCampsite(campsite: Campsite, onComplete: (Exception?) -> Unit = {}) {
-        val record = campsite.copy(campOwnerId = campsiteOwnerId(campsite))
+
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite),
+            qr = campsite.qr.ifBlank { "coders://campsite/${campsite.id}" }
+        )
         campsiteRef.document(record.id).set(record)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+    /**
+     * Atomically registers a campsite and, when supplied, its one optional image record.
+     *
+     * Keeping encoded image data in the `images` collection prevents it from approaching the
+     * Firestore document-size limit for the campsite itself.
+     *
+     * @param campsite The campsite record to register.
+     * @param imageDataUrl The optional bounded image data URL selected by the owner.
+     * @param onComplete Called once with `null` on success or the write error on failure.
+     */
+    fun registerCampsite(
+        campsite: Campsite,
+        imageDataUrl: String? = null,
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        val record = campsite.copy(
+            campOwnerId = campsiteOwnerId(campsite),
+            images = emptyList()
+        )
+        val batch = db.batch()
+        batch.set(campsiteRef.document(record.id), record)
+        if (imageDataUrl != null) {
+            val image = campsiteImageRecord(record.id, record.campOwnerId, imageDataUrl)
+            batch.set(db.collection("images").document(image.id), image)
+        }
+        batch.commit()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -714,24 +643,24 @@ class CampsiteRepo : AutoCloseable {
      * @param campsite The campsite whose owner ID should be returned.
      * @return The camp owner profile ID, or an empty string when unavailable.
      */
-    private fun campsiteOwnerId(campsite: Campsite): String =
+    fun campsiteOwnerId(campsite: Campsite): String =
         campsite.campOwnerId.ifBlank {
             if (campsite.campOwner.hasStoredIdentity()) campsite.campOwner.id else ""
         }
 
     private val cacheListener = campsiteRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _campsites.clear()
+        _campsites.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val campsite = campsiteFromDocument(document)
-                if (campsite != null) {
-                    _campsites.add(campsite)
-                }
+        snapshot?.documents?.forEach { document ->
+            val campsite = campsiteFromDocument(document)
+            if (campsite != null) {
+                _campsites.add(campsite)
             }
+        }
 
     }
 
@@ -821,11 +750,22 @@ class ProfileRepo : AutoCloseable {
 
         val winnerDocument = profileRef.document(winnerId)
         val reservationDocument = reservationRef.document(reservation.id)
+        val notification = Notification(
+            title = "Lottery Won!",
+            content = "You won the campsite lottery. Review your pending reservation offer.",
+            date = java.time.LocalDate.now().toString(),
+            id = reservation.lotteryId.takeIf(String::isNotBlank)?.let { lotteryId ->
+                UUID.nameUUIDFromBytes("lottery-result:$lotteryId:$winnerId".toByteArray()).toString()
+            } ?: "lottery-win-${reservation.id}",
+            recipientId = winnerId,
+            senderId = reservation.campOwnerId
+        )
+        val notificationDocument = db.collection("notification").document(notification.id)
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(winnerDocument)
-            val winner = profileFromDocument(snapshot) as? Entrant
-                ?: throw IllegalArgumentException("Lottery winner must be an entrant profile.")
+            val winner = profileFromDocument(snapshot)
+                ?: throw IllegalArgumentException("Lottery winner profile was not found.")
 
             val pendingOffer = reservation.copy(
                 status = ReservationStatus.Pending,
@@ -844,6 +784,7 @@ class ProfileRepo : AutoCloseable {
                 updatedWinner.reservations.map(::reservationStorageRecord)
             )
             transaction.set(reservationDocument, reservationStorageRecord(pendingOffer))
+            transaction.set(notificationDocument, notification)
         }.addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
@@ -922,24 +863,35 @@ class ProfileRepo : AutoCloseable {
         type: String? = null,
         onError: (Exception) -> Unit = {}
     ): ListenerRegistration {
-        val query = if (type == null) profileRef else profileRef.whereEqualTo("type", type)
-        return query.listenForDecodedDocuments(::profileFromDocument, onUpdate, onError)
+        val query = when (type?.trim()?.uppercase()) {
+            null, "", "USER" -> profileRef
+
+            "NORMAL" -> profileRef.whereIn(
+                "type", listOf("Entrant", "CampOwner", "User")
+            )
+
+            "ADMIN" -> profileRef.whereEqualTo(
+                "type", "Admin"
+            )
+
+            else -> throw IllegalArgumentException("Unknown user role")
+        }
+
+        return query.listenForDecodedDocuments(
+            ::profileFromDocument,
+            onUpdate,
+            onError
+        )
     }
 
     /**
-     * Converts a Firestore document to a profile.
+     * Converts a Firestore document to a user.
      *
      * @param document The Firestore document to convert.
-     * @return The decoded profile, or `null` if the document is missing or has an unknown type.
+     * @return The decoded user, or null if the document is missing.
      */
     private fun profileFromDocument(document: DocumentSnapshot): Profile? {
-        val profile = when (document.getString("type")) {
-            "Entrant" -> document.toObject(Entrant::class.java)
-            "CampOwner" -> document.toObject(CampOwner::class.java)
-            "Admin" -> document.toObject(Admin::class.java)
-            else -> null
-        }
-        return profile?.let { withProfileId(it, document.id) }
+        return document.toObject(Profile::class.java)?.copy(id = document.id)
     }
 
     /**
@@ -949,26 +901,21 @@ class ProfileRepo : AutoCloseable {
      * @param id The stable document ID.
      * @return The profile with its Firestore document ID.
      */
-    private fun withProfileId(profile: Profile, id: String): Profile = when (profile) {
-        is Entrant -> profile.copy(id = id)
-        is CampOwner -> profile.copy(id = id)
-        is Admin -> profile.copy(id = id)
-        else -> profile
-    }
+    private fun withProfileId(profile: Profile, id: String): Profile = profile.copy(id = id)
 
     private val cacheListener = profileRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _profiles.clear()
+        _profiles.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val profile = profileFromDocument(document)
-                if (profile != null) {
-                    _profiles.add(profile)
-                }
+        snapshot?.documents?.forEach { document ->
+            val profile = profileFromDocument(document)
+            if (profile != null) {
+                _profiles.add(profile)
             }
+        }
 
     }
 
@@ -1134,21 +1081,21 @@ class ReservationRatingRepo {
                 .toObject(Campsite::class.java)
                 ?: error("Campsite was not found.")
 
-            check(campsite.ratingCount > 0) {
+            /*check(campsite.ratingCount > 0) {
                 "Campsite rating count is invalid."
             }
 
             check(campsite.ratingTotal >= rating.score) {
                 "Campsite rating total is invalid."
-            }
+            }*/
 
             transaction.delete(ratingDocument)
 
             transaction.update(
                 campsiteDocument,
                 calculateRating(
-                    campsite.ratingTotal - rating.score,
-                    campsite.ratingCount - 1
+                    (campsite.ratingTotal - rating.score).coerceAtLeast(0), //cant be negative
+                    (campsite.ratingCount - 1).coerceAtLeast(0) //cant be negative
                 )
             )
 
@@ -1356,8 +1303,8 @@ class ReservationReviewRepo {
 
 /**
  * Represents an image associated with a campsite.
- * 
-* @property url The URL of the image.
+ *
+ * @property url The URL of the image.
  * @property description A description of the image.
  * @property id The unique identifier of the image.
  * @property campsiteId The ID of the campsite associated with the image.
@@ -1380,7 +1327,7 @@ data class Image(
  */
 class ImageRepo : AutoCloseable {
     private val db = Firebase.firestore
-    private val imageRef = db.collection("image")
+    private val imageRef = db.collection("images")
 
     private val _images = mutableStateListOf<Image>()
 
@@ -1505,18 +1452,18 @@ class ImageRepo : AutoCloseable {
         document.toObject(Image::class.java)?.copy(id = document.id)
 
     private val cacheListener = imageRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _images.clear()
+        _images.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val image = imageFromDocument(document)
-                if (image != null) {
-                    _images.add(image)
-                }
+        snapshot?.documents?.forEach { document ->
+            val image = imageFromDocument(document)
+            if (image != null) {
+                _images.add(image)
             }
+        }
 
     }
 
@@ -1537,7 +1484,7 @@ class ImageRepo : AutoCloseable {
  * @property imageRef The Firestore collection containing all image records.
  */
 class ProfileImageRepo {
-    private val imageRef = Firebase.firestore.collection("image")
+    private val imageRef = Firebase.firestore.collection("images")
 
     // The following block was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
     // and remove profile images stored as Firestore data URLs", 2026-11-22.
@@ -1677,6 +1624,101 @@ class ProfileImageRepo {
     }
 }
 
+// The following class was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+/**
+ * Saves and observes the primary image displayed for a campsite listing.
+ *
+ * This repository observes a single deterministic image document so owner-list cards do not
+ * create a collection-wide image listener.
+ */
+class CampsiteListingImageRepo {
+    private val imageRef = Firebase.firestore.collection("images")
+
+    // The following block was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    /** Utilities for the one primary image shown on an owner campsite card. */
+    companion object {
+        /** Prefix used for the deterministic Firestore document ID of a campsite listing image. */
+        const val CAMPSITE_LISTING_IMAGE_PREFIX = "campsite_"
+
+        /** Description stored with a campsite listing image. */
+        const val CAMPSITE_LISTING_IMAGE_DESCRIPTION = "Campsite listing image"
+
+        // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+        /**
+         * Returns the deterministic image document ID for a campsite.
+         *
+         * @param campsiteId The campsite document ID.
+         * @return The matching primary-image document ID.
+         */
+        fun campsiteImageId(campsiteId: String): String = "$CAMPSITE_LISTING_IMAGE_PREFIX$campsiteId"
+
+        // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+        /**
+         * Creates the Firestore record for a campsite's primary listing image.
+         *
+         * @param campsiteId The campsite document ID.
+         * @param uploaderId The owner profile document ID.
+         * @param dataUrl The encoded JPEG data URL.
+         * @return The Firestore-ready image record.
+         */
+        fun campsiteImageRecord(campsiteId: String, uploaderId: String, dataUrl: String): Image =
+            Image(
+                id = campsiteImageId(campsiteId),
+                campsiteId = campsiteId,
+                uploaderId = uploaderId,
+                description = CAMPSITE_LISTING_IMAGE_DESCRIPTION,
+                url = dataUrl
+            )
+    }
+
+    // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    /**
+     * Creates or replaces a campsite listing image.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param uploaderId The owner profile document ID.
+     * @param dataUrl The bounded encoded JPEG data URL.
+     * @param onComplete Called with `null` on success or the save error on failure.
+     */
+    fun setCampsiteImage(
+        campsiteId: String,
+        uploaderId: String,
+        dataUrl: String,
+        onComplete: (Exception?) -> Unit
+    ) {
+        val image = campsiteImageRecord(campsiteId, uploaderId, dataUrl)
+        imageRef.document(image.id).set(image)
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using OpenAI, Codex, "Add campsite image uploads to owner listings", 2026-11-26.
+    /**
+     * Observes the one primary listing image for a campsite.
+     *
+     * @param campsiteId The campsite document ID.
+     * @param onUpdate Receives the image or `null` if one is not stored.
+     * @param onError Receives Firestore listener errors.
+     * @return The listener registration to remove when the card leaves composition.
+     */
+    fun listenForCampsiteImage(
+        campsiteId: String,
+        onUpdate: (Image?) -> Unit,
+        onError: (Exception) -> Unit = {}
+    ): ListenerRegistration = imageRef.document(campsiteImageId(campsiteId))
+        .addSnapshotListener { document, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+
+            val image = document?.takeIf { it.exists() }
+                ?.toObject(Image::class.java)
+                ?.copy(id = document.id)
+            onUpdate(image)
+        }
+}
+
 /**
  * Represents a repository of notification.
  *
@@ -1799,18 +1841,18 @@ class NotificationRepo : AutoCloseable {
         document.toObject(Notification::class.java)?.copy(id = document.id)
 
     private val cacheListener = notificationRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+        if (error != null) {
+            return@addSnapshotListener
+        }
 
-            _notifications.clear()
+        _notifications.clear()
 
-            snapshot?.documents?.forEach { document ->
-                val notification = notificationFromDocument(document)
-                if (notification != null) {
-                    _notifications.add(notification)
-                }
+        snapshot?.documents?.forEach { document ->
+            val notification = notificationFromDocument(document)
+            if (notification != null) {
+                _notifications.add(notification)
             }
+        }
 
     }
 
@@ -1971,8 +2013,8 @@ class ConversationRepo {
             if (conversation.campsite.name.isNotBlank()) conversation.campsite.id else ""
         },
         participantIds = (conversation.participantIds + conversation.campOwnerId + conversation.entrantId +
-            (if (conversation.campOwner.hasStoredIdentity()) conversation.campOwner.id else "") +
-            (if (conversation.entrant.hasStoredIdentity()) conversation.entrant.id else ""))
+                (if (conversation.campOwner.hasStoredIdentity()) conversation.campOwner.id else "") +
+                (if (conversation.entrant.hasStoredIdentity()) conversation.entrant.id else ""))
             .filter(String::isNotBlank)
             .distinct()
     )
@@ -2070,12 +2112,12 @@ class LotteryRepo {
         if (lottery.winnerCount <= 0) {
             return false
         }
-    
+
         if (lottery.waitlistCapacity != null &&
             lottery.waitlistCapacity <= 0) {
             return false
         }
-    
+
         return true
     }
 
@@ -2086,20 +2128,20 @@ class LotteryRepo {
      * @param lottery The lottery record to save or add.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    
+
     fun addLottery(lottery: Lottery, onComplete: (Exception?) -> Unit = {}) {
         if (!validateLottery(lottery)) {
             onComplete(IllegalArgumentException("Invalid lottery settings."))
             return
         }
-    
+
         val record = withRelationshipIds(lottery)
         lotteryRef.document(record.id).set(record)
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }
 
-    
+
     fun joinOwnerLottery(
         lotteryId: String,
         ownerId: String,
@@ -2107,37 +2149,37 @@ class LotteryRepo {
         onComplete: (Exception?) -> Unit = {}
     ) {
         val lotteryDocument = lotteryRef.document(lotteryId)
-    
+
         db.runTransaction { transaction ->
             val lotterySnapshot = transaction.get(lotteryDocument)
-    
+
             if (!lotterySnapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-    
+
             val lottery = lotterySnapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
-    
+
             if (!lottery.allowOtherOwners) {
                 throw IllegalStateException("This lottery does not allow other owners.")
             }
-    
+
             if (lottery.campOwnerId == ownerId) {
                 throw IllegalStateException("You cannot join your own lottery.")
             }
-    
+
             if (ownerId in lottery.participatingOwnerIds) {
                 throw IllegalStateException("You already joined this lottery.")
             }
-    
+
             if (campsiteIds.isEmpty()) {
                 throw IllegalArgumentException("Select at least one campsite.")
             }
-    
+
             val campsiteSnapshots = campsiteIds.distinct().map { id ->
                 transaction.get(db.collection("campsites").document(id))
             }
-    
+
             for (snapshot in campsiteSnapshots) {
                 if (!snapshot.exists() ||
                     snapshot.getString("campOwnerId") != ownerId
@@ -2147,20 +2189,20 @@ class LotteryRepo {
                     )
                 }
             }
-    
+
             transaction.update(
                 lotteryDocument,
                 mapOf(
                     "campsiteIds" to
-                        (lottery.campsiteIds + campsiteIds).distinct(),
+                            (lottery.campsiteIds + campsiteIds).distinct(),
                     "participatingOwnerIds" to
-                        (lottery.participatingOwnerIds +
-                            lottery.campOwnerId + ownerId)
-                            .filter { it.isNotBlank() }
-                            .distinct()
+                            (lottery.participatingOwnerIds +
+                                    lottery.campOwnerId + ownerId)
+                                .filter { it.isNotBlank() }
+                                .distinct()
                 )
             )
-    
+
             true
         }.addOnSuccessListener {
             onComplete(null)
@@ -2169,7 +2211,7 @@ class LotteryRepo {
         }
     }
 
-    
+
     /**
      * Updates a lottery only before registration closes.
      *
@@ -2181,34 +2223,34 @@ class LotteryRepo {
             onComplete(IllegalArgumentException("Invalid lottery settings."))
             return
         }
-    
+
         val record = withRelationshipIds(lottery)
         val lotteryDocument = lotteryRef.document(record.id)
-    
+
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-    
+
             if (!snapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-    
+
             val existing = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
-    
+
             if (existing.drawCompleted) {
                 throw IllegalStateException("Cannot edit a completed lottery.")
             }
-    
+
             val registrationEndDate = snapshot.getString("registrationEndDate")
                 ?: throw IllegalStateException("Registration end date is missing.")
-    
+
             val closingDate = LocalDate.parse(registrationEndDate)
             val today = LocalDate.now()
-    
+
             if (!today.isBefore(closingDate)) {
                 throw IllegalStateException("Registration has already ended.")
             }
-    
+
             transaction.update(
                 lotteryDocument,
                 mapOf(
@@ -2224,7 +2266,7 @@ class LotteryRepo {
                     "allowOtherOwners" to record.allowOtherOwners
                 )
             )
-    
+
             true
         }.addOnSuccessListener {
             onComplete(null)
@@ -2311,61 +2353,61 @@ class LotteryRepo {
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    
+
     fun joinWaitlist(
         lotteryId: String,
         entrantId: String,
         onComplete: (Exception?) -> Unit = {}
     ) {
         val lotteryDocument = lotteryRef.document(lotteryId)
-    
+
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-    
+
             if (!snapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-    
+
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
-    
+
             val entrants = lottery.waitlistEntrantIds
             val capacity = lottery.waitlistCapacity
-    
+
             // Prevent joining after the draw.
             if (lottery.drawCompleted) {
                 throw IllegalStateException("Lottery has already been drawn.")
             }
-    
+
             // Make sure registration is currently open.
             val today = LocalDate.now()
             val start = LocalDate.parse(lottery.registrationStartDate)
             val end = LocalDate.parse(lottery.registrationEndDate)
-    
+
             if (today.isBefore(start) || today.isAfter(end)) {
                 throw IllegalStateException("Registration is not open.")
             }
-    
+
             // Prevent duplicate entries.
             if (entrantId in entrants) {
                 throw IllegalStateException("You already joined this lottery.")
             }
-    
+
             // Check maximum capacity.
             if (capacity != null && entrants.size >= capacity) {
                 throw IllegalStateException("The lottery waitlist is full.")
             }
-    
+
             // Add entrant and save joining date together.
             transaction.update(
                 lotteryDocument,
                 mapOf(
                     "waitlistEntrantIds" to FieldValue.arrayUnion(entrantId),
                     "waitlistJoinedDates" to
-                        (lottery.waitlistJoinedDates + (entrantId to today.toString()))
+                            (lottery.waitlistJoinedDates + (entrantId to today.toString()))
                 )
             )
-    
+
             true
         }.addOnSuccessListener {
             onComplete(null)
@@ -2382,37 +2424,37 @@ class LotteryRepo {
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
-    
+
     fun leaveWaitlist(
         lotteryId: String,
         entrantId: String,
         onComplete: (Exception?) -> Unit = {}
     ) {
         val lotteryDocument = lotteryRef.document(lotteryId)
-    
+
         db.runTransaction { transaction ->
             val snapshot = transaction.get(lotteryDocument)
-    
+
             if (!snapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-    
+
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
-    
+
             if (lottery.drawCompleted) {
                 throw IllegalStateException("Cannot leave after winners are drawn.")
             }
-    
+
             transaction.update(
                 lotteryDocument,
                 mapOf(
                     "waitlistEntrantIds" to FieldValue.arrayRemove(entrantId),
                     "waitlistJoinedDates" to
-                        (lottery.waitlistJoinedDates - entrantId)
+                            (lottery.waitlistJoinedDates - entrantId)
                 )
             )
-    
+
             true
         }.addOnSuccessListener {
             onComplete(null)
@@ -2422,7 +2464,7 @@ class LotteryRepo {
     }
 
 
-    
+
     /**
      * Randomly selects winners after lottery registration closes.
      */
@@ -2432,52 +2474,59 @@ class LotteryRepo {
         onComplete: (Exception?) -> Unit = {}
     ) {
         val lotteryDocument = lotteryRef.document(lotteryId)
-    
+
         db.runTransaction { transaction ->
-    
+
             // 1. Get the lottery from Firebase.
             val snapshot = transaction.get(lotteryDocument)
-    
+
             if (!snapshot.exists()) {
                 throw IllegalArgumentException("Lottery not found.")
             }
-    
+
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
-    
+
             // 2. Make sure the correct owner is drawing winners.
             if (lottery.campOwnerId != ownerId) {
                 throw IllegalStateException("Only the lottery owner can draw winners.")
             }
-    
+
             // 3. Prevent drawing winners twice.
             if (lottery.drawCompleted) {
                 throw IllegalStateException("Winners have already been drawn.")
             }
-    
+
             // 4. Make sure registration has ended.
             val endDate = LocalDate.parse(lottery.registrationEndDate)
-    
+
             if (!LocalDate.now().isAfter(endDate)) {
                 throw IllegalStateException("Registration has not ended yet.")
             }
-    
+
             // 5. Get all entrants.
-            val entrants = lottery.waitlistEntrantIds.distinct()
-    
+            val entrants = lottery.waitlistEntrantIds
+                .filter(String::isNotBlank)
+                .distinct()
+
             if (entrants.isEmpty()) {
                 throw IllegalStateException("No entrants are on the waitlist.")
             }
-    
+
             if (lottery.winnerCount <= 0) {
                 throw IllegalStateException("Winner count must be positive.")
             }
-    
+
             // 6. Randomly select winners.
             val winners = entrants
                 .shuffled()
                 .take(lottery.winnerCount)
-    
+            if (entrants.size >= 500) {
+                throw IllegalStateException("This waitlist is too large to finalize in one draw.")
+            }
+            val winnerIds = winners.toSet()
+            val notifications = db.collection("notification")
+
             // 7. Save the results to Firebase.
             transaction.update(
                 lotteryDocument,
@@ -2487,9 +2536,32 @@ class LotteryRepo {
                     "status" to CampOwnerLotteryStatus.Drawn.name
                 )
             )
-    
+
+            // Send each entrant their result as part of the same draw transaction.
+            entrants.forEach { entrantId ->
+                val won = entrantId in winnerIds
+                val notificationId = UUID.nameUUIDFromBytes(
+                    "lottery-result:$lotteryId:$entrantId".toByteArray()
+                ).toString()
+                transaction.set(
+                    notifications.document(notificationId),
+                    Notification(
+                        title = if (won) "Lottery Won!" else "Lottery Result",
+                        content = if (won) {
+                            "You were selected in the campsite lottery. Check your reservations for the pending offer."
+                        } else {
+                            "You were not selected in the campsite lottery. Better luck next time!"
+                        },
+                        date = LocalDate.now().toString(),
+                        id = notificationId,
+                        recipientId = entrantId,
+                        senderId = ownerId
+                    )
+                )
+            }
+
             true
-    
+
         }.addOnSuccessListener {
             onComplete(null)
         }.addOnFailureListener { error ->
@@ -2497,6 +2569,71 @@ class LotteryRepo {
         }
     }
 
+
+    /**
+     * Sends an owner-authored notification to every entrant on one of the owner's lottery waitlists.
+     *
+     * @param ownerId The signed-in campsite owner's profile ID.
+     * @param lotteryId The lottery document ID.
+     * @param title Notification title.
+     * @param content Notification message.
+     * @param onComplete Receives the number of recipients and no error, or `null` and the error.
+     */
+    fun sendWaitlistNotification(
+        ownerId: String,
+        lotteryId: String,
+        title: String,
+        content: String,
+        onComplete: (Int?, Exception?) -> Unit
+    ) {
+        if (ownerId.isBlank() || lotteryId.isBlank() || title.isBlank() || content.isBlank()) {
+            onComplete(null, IllegalArgumentException("Owner, lottery, title, and message are required."))
+            return
+        }
+
+        lotteryRef.document(lotteryId).get()
+            .addOnSuccessListener { snapshot ->
+                val lottery = snapshot.toObject(Lottery::class.java)?.copy(id = snapshot.id)
+                if (lottery == null) {
+                    onComplete(null, IllegalArgumentException("Lottery not found."))
+                    return@addOnSuccessListener
+                }
+                if (lottery.campOwnerId != ownerId) {
+                    onComplete(null, SecurityException("You can only message entrants on your own lotteries."))
+                    return@addOnSuccessListener
+                }
+
+                val entrantIds = lottery.waitlistEntrantIds.filter(String::isNotBlank).distinct()
+                if (entrantIds.size > 500) {
+                    onComplete(null, IllegalStateException("This waitlist is too large to notify in one send."))
+                    return@addOnSuccessListener
+                }
+                if (entrantIds.isEmpty()) {
+                    onComplete(0, null)
+                    return@addOnSuccessListener
+                }
+
+                val batch = db.batch()
+                val notificationCollection = db.collection("notification")
+                val sendGroupId = UUID.randomUUID().toString()
+
+                entrantIds.forEach { entrantId ->
+                    val notification = Notification(
+                        title = title.trim(),
+                        content = content.trim(),
+                        date = java.time.LocalDate.now().toString(),
+                        recipientId = entrantId,
+                        senderId = ownerId,
+                        sendGroupId = sendGroupId
+                    )
+                    batch.set(notificationCollection.document(notification.id), notification)
+                }
+                batch.commit()
+                    .addOnSuccessListener { onComplete(entrantIds.size, null) }
+                    .addOnFailureListener { error -> onComplete(null, error) }
+            }
+            .addOnFailureListener { error -> onComplete(null, error) }
+    }
 
     /**
      * Deletes a lottery by ID.
@@ -2555,9 +2692,26 @@ class ReservationRepo {
         onComplete: (Exception?) -> Unit = {}
     ) {
         val record = withRelationshipIds(reservation)
+        val batch = db.batch()
+        batch.set(reservationRef.document(record.id), record)
+        val notificationRef = db.collection("notification")
+        val sendGroupId = UUID.randomUUID().toString()
+        record.entrantIds.forEach { entrantId ->
+            if (entrantId.isNotBlank()) {
+                val notification = Notification(
+                    title = "Reservation Received",
+                    content = "A reservation is available for ${record.campsite.name.ifBlank { "the campsite" }} (${record.dates}).",
+                    date = java.time.LocalDate.now().toString(),
+                    id = UUID.nameUUIDFromBytes("${record.id}:$entrantId".toByteArray()).toString(),
+                    recipientId = entrantId,
+                    senderId = record.campOwnerId,
+                    sendGroupId = sendGroupId
+                )
+                batch.set(notificationRef.document(notification.id), notification)
+            }
+        }
 
-        reservationRef.document(record.id)
-            .set(record)
+        batch.commit()
             .addOnSuccessListener {
                 ConversationRepo().createConversationsForReservation(record)
                 onComplete(null)
@@ -2591,10 +2745,15 @@ class ReservationRepo {
     fun updateReservationStatus(
         reservationId: String,
         status: ReservationStatus,
+        notification: Notification? = null,
         onComplete: (Exception?) -> Unit = {}
     ) {
-        reservationRef.document(reservationId)
-            .update("status", status.name)
+        val batch = db.batch()
+        batch.update(reservationRef.document(reservationId), "status", status.name)
+        notification?.let {
+            batch.set(db.collection("notification").document(it.id), it)
+        }
+        batch.commit()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }
     }

@@ -27,7 +27,7 @@ import org.junit.Test
  */
 class CampsiteTest {
 
-    private lateinit var owner: CampOwner
+    private lateinit var owner: Profile
 
     /**
      * Creates a sample campsite owner before each test.
@@ -37,7 +37,7 @@ class CampsiteTest {
      */
     @Before
     fun setUp() {
-        owner = CampOwner(
+        owner = Profile(
             name = "Owner Mark",
             email = "mark@test.com",
             phone = "123",
@@ -45,7 +45,7 @@ class CampsiteTest {
             lotteries = emptyList(),
             reservations = emptyList(),
             notificationsSent = emptyList(),
-            notificationsReceived = emptyList()
+            notifications = emptyList()
         )
     }
 

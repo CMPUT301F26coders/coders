@@ -29,21 +29,22 @@ import org.junit.Test
  */
 class RepositorySearchTest {
 
-    private val entrant = Entrant(
+    private val entrant = Profile(
         name = "Alice Smith",
         email = "alice@test.com",
         phone = "111"
     )
-    private val owner = CampOwner(
+    private val owner = Profile(
         name = "Bob Owner",
         email = "bob@test.com",
         phone = "222"
     )
 
-    private val admin = Admin(
+    private val admin = Profile(
         name = "Admin Sarah",
         email = "admin@test.com",
-        phone = "333"
+        phone = "333",
+        type = "Admin"
     )
 
     private val profiles: List<Profile> =
@@ -85,24 +86,22 @@ class RepositorySearchTest {
     }
 
     /**
-     * Tests searching for profiles by user type.
+     * Tests filtering profiles by the normal user role.
      *
-     * Filters profiles by CampOwner and verifies that:
-     * - Exactly one profile is found.
-     * - The matching profile belongs to Bob Owner.
+     * Verifies that both normal users are returned
+     * and that the administrator is excluded.
      */
     @Test
-    fun searchProfiles_byType() {
-        val results = filterProfiles(profiles, type = "CampOwner")
+    fun searchProfiles_byRole() {
+        val results = filterProfiles(profiles, type = "Normal")
 
-        assertEquals(1, results.size)
-        assertEquals("Bob Owner", results[0].name)
+        assertEquals(2, results.size)
+        assertEquals(listOf(entrant, owner), results)
     }
 
     /**
-     * Tests searching for profiles using multiple filters.
+     * Tests searching for profiles by name and account role.
      *
-     * Searches by name and user type together.
      * Verifies that only Admin Sarah matches both filters.
      */
     @Test

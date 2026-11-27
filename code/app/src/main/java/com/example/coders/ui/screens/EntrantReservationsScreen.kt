@@ -14,7 +14,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.coders.Entrant
 import com.example.coders.ProfileRepo
 import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
@@ -23,8 +22,7 @@ import com.example.coders.ReservationRepo
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Profile
-import androidx.compose.foundation.layout.statusBarsPadding
-
+import com.example.coders.Notification
 
 private enum class EntrantReservationTab(
     val label: String,
@@ -176,7 +174,7 @@ fun EntrantReservationsScreen(navController: NavController) {
             return
         }
 
-        val currentEntrant = profile as? Entrant
+        val currentEntrant = profile
 
         if (currentEntrant != null) {
             val updatedEntrant = currentEntrant.copy(
@@ -198,17 +196,31 @@ fun EntrantReservationsScreen(navController: NavController) {
                     return@updateProfile
                 }
 
+                val confirmation = if (status == ReservationStatus.Cancelled) {
+                    Notification(
+                        title = "Cancellation Confirmed",
+                        content = "Your reservation at ${campsiteName(reservation)} for ${reservation.dates} has been cancelled.",
+                        date = java.time.LocalDate.now().toString(),
+                        id = java.util.UUID.nameUUIDFromBytes(
+                            "cancellation:${reservation.id}:${currentEntrant.id}".toByteArray()
+                        ).toString(),
+                        recipientId = currentEntrant.id
+                    )
+                } else {
+                    null
+                }
                 reservationRepo.updateReservationStatus(
-                    reservation.id,
-                    status,
-                    onComplete
+                    reservationId = reservation.id,
+                    status = status,
+                    notification = confirmation,
+                    onComplete = onComplete
                 )
             }
         } else {
             reservationRepo.updateReservationStatus(
                 reservation.id,
                 status,
-                onComplete
+                onComplete = onComplete
             )
         }
     }

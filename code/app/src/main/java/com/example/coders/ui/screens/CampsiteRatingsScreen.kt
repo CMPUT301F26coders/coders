@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import com.example.coders.Admin
+import com.example.coders.UserRole
 import com.example.coders.SignedInProfile
 import androidx.compose.runtime.DisposableEffect
 import android.util.Log
@@ -62,6 +62,7 @@ fun CampsiteRatingsScreen(
     val ratingRepo = remember { ReservationRatingRepo() }
     val profileRepo = remember { ProfileRepo() }
     val campsiteRepo = remember { CampsiteRepo() }
+    val deletionRepo = remember { DeletionRepo() }
 
     var isLoadingRating by remember(campsiteId) {
         mutableStateOf(true)
@@ -86,7 +87,7 @@ fun CampsiteRatingsScreen(
             campsiteRepo.close()
         }
     }
-    
+
     LaunchedEffect(campsiteId) {
 
         campsiteRepo.getCampsiteById(campsiteId) { campsite, error ->
@@ -163,7 +164,7 @@ fun CampsiteRatingsScreen(
                             name = ratingNames[rating.entrantId] ?: "Unknown"
                         )
 
-                        if (profile is Admin) {
+                        if (profile?.role == UserRole.ADMIN) {
                             DeleteButton(
                                 onDelete = {
                                     ratingToDelete = rating
@@ -177,21 +178,37 @@ fun CampsiteRatingsScreen(
             }
         }
         ratingToDelete?.let { rating ->
-            DeleteConfirmationDialog(
+            DeleteConfirmationDialogAdmin(
                 itemName = "this rating",
 
-                onConfirm = {
+                onConfirm = { reason ->
                     ratingToDelete = null
 
+                    val currentProfile = profile
+
+                    if (currentProfile?.role == UserRole.ADMIN) { //stupid check because apparently it cant be sure its still an admin???
                     ratingRepo.deleteRating(rating.reservationId) { error ->
                         if (error == null) {
                             ratings = ratings.orEmpty().filterNot {
                                 it.reservationId == rating.reservationId
                             }
+
+
+                            val deletion = Deletion(
+                                deletedObjectId = rating.reservationId,
+                                collectionName = "reservationRatings",
+                                reason = reason,
+                                objectDeletedBy = currentProfile.id,
+                                objectCreatedBy = rating.entrantId
+                            )
+
+                            deletionRepo.addDeletion(deletion)
                         } else {
                             deleteError = error.message ?: "Failed to delete rating."
                         }
                     }
+                    }
+
                 },
 
                 onDismiss = {

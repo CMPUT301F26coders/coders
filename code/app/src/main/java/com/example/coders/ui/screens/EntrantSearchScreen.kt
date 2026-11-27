@@ -21,6 +21,8 @@ import androidx.navigation.NavController
 import com.example.coders.CampsiteRepo
 import com.example.coders.filterCampsites
 import com.example.coders.SignedInProfile
+import com.example.coders.Reservation
+import com.example.coders.ReservationRepo
 
 /**
  * Displays searchable and filterable list of all available campsites for entrants
@@ -39,6 +41,25 @@ fun EntrantSearchScreen(navController: NavController) {
 
     val campsiteRepo = remember { CampsiteRepo() }
     val campsites = campsiteRepo.getAllCampsites()
+    val reservationRepo = remember { ReservationRepo() }
+    var reservations by remember { mutableStateOf<List<Reservation>>(emptyList()) }
+    var reservationsLoaded by remember { mutableStateOf(false) }
+    var reservationsError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(reservationRepo) {
+        val registration = reservationRepo.listenForAllReservations(
+            onUpdate = { currentReservations ->
+                reservations = currentReservations
+                reservationsLoaded = true
+                reservationsError = null
+            },
+            onError = { error ->
+                reservationsError = error.message ?: "Unable to check reservation availability."
+                reservationsLoaded = true
+            }
+        )
+        onDispose { registration.remove() }
+    }
 
     var searchText by remember { mutableStateOf("") }
 
@@ -50,24 +71,29 @@ fun EntrantSearchScreen(navController: NavController) {
 
     // Apply location, date, and guest filters,
     // then search by campsite name or location.
-    val filteredCampsites = filterCampsites(
+    val hasAvailabilityDates = selectedStartDate.isNotBlank() || selectedEndDate.isNotBlank()
+    val availabilityMessage = when {
+        hasAvailabilityDates && reservationsError != null -> reservationsError
+        hasAvailabilityDates && !reservationsLoaded -> "Checking reservation availability..."
+        else -> null
+    }
+    val filteredCampsites = if (availabilityMessage == null) filterCampsites(
         campsites = campsites,
         location = selectedLocation,
         guests = selectedGuests,
         startDate = selectedStartDate,
-        endDate = selectedEndDate
+        endDate = selectedEndDate,
+        reservations = reservations
     ).filter { campsite ->
         signedInProfile?.id != campsite.campOwnerId &&
-                searchText.isBlank() ||
-                campsite.name.contains(
+            (searchText.isBlank() || campsite.name.contains(
                     searchText.trim(),
                     ignoreCase = true
-                ) ||
-                campsite.location.contains(
+                ) || campsite.location.contains(
                     searchText.trim(),
                     ignoreCase = true
-                )
-    }
+                ))
+    } else emptyList()
 
     Scaffold(
         bottomBar = {
@@ -122,7 +148,16 @@ fun EntrantSearchScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (filteredCampsites.isEmpty()) {
+            if (availabilityMessage != null) {
+                Text(
+                    text = availabilityMessage,
+                    color = if (reservationsError != null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            } else if (filteredCampsites.isEmpty()) {
 
                 Text(
                     text = "No campsites available.",
@@ -148,30 +183,32 @@ fun EntrantSearchScreen(navController: NavController) {
                                 )
                             }
                         ) {
-
-                            Column(
-                                modifier = Modifier.padding(16.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = campsite.name,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
 
-                                Text(
-                                    text = campsite.name,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
+                                    Spacer(modifier = Modifier.height(6.dp))
 
-                                Spacer(
-                                    modifier = Modifier.height(6.dp)
-                                )
+                                    Text(text = "Location: ${campsite.location}")
+                                    Text(text = "Maximum Occupancy: ${campsite.capacity} guests")
+                                    Text(text = "Rating: ${campsite.rating ?: "Not rated"}")
+                                }
 
-                                Text(
-                                    text = "Location: ${campsite.location}"
-                                )
+                                Spacer(modifier = Modifier.width(12.dp))
 
-                                Text(
-                                    text = "Maximum Occupancy: ${campsite.capacity} guests"
-                                )
-
-                                Text(
-                                    text = "Rating: ${campsite.rating ?: "Not rated"}"
+                                CampsiteQrCodeImage(
+                                    campsite = campsite,
+                                    size = 72.dp
                                 )
                             }
                         }
