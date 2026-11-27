@@ -1,4 +1,3 @@
-
 package com.example.coders.ui.screens
 
 import android.net.Uri
@@ -108,19 +107,6 @@ fun CampsiteDetailsScreen(
                 Text("Edit Campsite")
             }
             Spacer(modifier = Modifier.height(12.dp))
-        }
-        /**
-         * US 02.06.01: View Booked Dates
-         *
-         * Opens the booked dates calendar for this campsite.
-         * Passes the campsite ID so the correct bookings can be loaded.
-         */
-        Button(
-            onClick = {
-                navController.navigate("booked_dates/${campsite.id}")
-            }
-        ) {
-            Text("View Booked Dates")
         }
 
 
