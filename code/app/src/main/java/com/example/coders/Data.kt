@@ -255,6 +255,77 @@ fun Lottery.isRegistrationOpen(now: LocalDateTime = LocalDateTime.now()): Boolea
     return !now.isBefore(registrationStart) && now.isBefore(registrationEnd)
 }
 
+// The following messages and function were added using Anthropic, Claude Code, "Implement
+// US 01.02.01: allow an entrant to join the waiting list for an active campsite lottery",
+// 2026-11-27.
+/** Reasons an entrant cannot join a lottery's waiting list, shown to the entrant as-is. */
+object WaitlistJoinErrors {
+    const val MISSING_ENTRANT = "Sign in to join the waiting list."
+    const val LOTTERY_MANAGER = "You cannot join the waiting list for a lottery you manage."
+    const val INACTIVE = "This lottery is not active or registration is closed."
+    const val ALREADY_JOINED = "You are already on this lottery's waiting list."
+    const val FULL = "The lottery waitlist is full."
+}
+
+/**
+ * Returns why [entrantId] cannot join this lottery's waiting list, or `null` when they can.
+ *
+ * Shared by [LotteryRepo.joinWaitlist], which enforces it inside a transaction, and the
+ * campsite details screen, which uses it to decide whether the join button is enabled.
+ *
+ * @param entrantId The profile ID of the entrant trying to join.
+ * @param now The time to check the registration period against.
+ * @return One of the [WaitlistJoinErrors] messages, or `null` if joining is allowed.
+ */
+fun Lottery.waitlistJoinError(
+    entrantId: String,
+    now: LocalDateTime = LocalDateTime.now()
+): String? = when {
+    entrantId.isBlank() -> WaitlistJoinErrors.MISSING_ENTRANT
+    entrantId == campOwnerId || entrantId in participatingOwnerIds ->
+        WaitlistJoinErrors.LOTTERY_MANAGER
+    !isRegistrationOpen(now) -> WaitlistJoinErrors.INACTIVE
+    entrantId in waitlistEntrantIds -> WaitlistJoinErrors.ALREADY_JOINED
+    waitlistCapacity != null && waitlistEntrantIds.distinct().size >= waitlistCapacity ->
+        WaitlistJoinErrors.FULL
+    else -> null
+}
+
+// The following enum and function were added using Anthropic, Claude Code, "Implement
+// US 01.02.01: allow an entrant to join the waiting list for an active campsite lottery",
+// 2026-11-27.
+/** Where an entrant stands on a lottery waiting list they have joined. */
+enum class EntrantWaitlistStatus {
+    /** Registration is still open, so the waiting list can still grow. */
+    RegistrationOpen,
+    /** Registration has closed and the owner has not drawn winners yet. */
+    AwaitingDraw,
+    /** Winners were drawn and the entrant is one of them. */
+    Selected,
+    /** Winners were drawn and the entrant is not one of them. */
+    NotSelected
+}
+
+/**
+ * Returns where [entrantId] stands on this lottery's waiting list.
+ *
+ * @param entrantId The profile ID of an entrant on the waiting list.
+ * @param now The time to check the registration period against.
+ */
+fun Lottery.entrantWaitlistStatus(
+    entrantId: String,
+    now: LocalDateTime = LocalDateTime.now()
+): EntrantWaitlistStatus = when {
+    drawCompleted || status == CampOwnerLotteryStatus.Drawn ->
+        if (entrantId in winnerEntrantIds) {
+            EntrantWaitlistStatus.Selected
+        } else {
+            EntrantWaitlistStatus.NotSelected
+        }
+    isRegistrationOpen(now) -> EntrantWaitlistStatus.RegistrationOpen
+    else -> EntrantWaitlistStatus.AwaitingDraw
+}
+
 /**
  * Represents a reservation for a campsite.
  *
@@ -2455,7 +2526,10 @@ class ConversationRepo {
         .listenForDecodedDocuments(::lotteryFromDocument, onUpdate, onError)
 
     /**
-     * Adds an entrant to a lottery waitlist, enforcing a configured capacity.
+     * Adds an entrant to a lottery waitlist.
+     *
+     * Fails with a [WaitlistJoinErrors] message when the lottery is inactive, the entrant is
+     * already on the waitlist, the entrant manages the lottery, or the waitlist is full.
      *
      * @param lotteryId The lottery document ID.
      * @param entrantId The entrant profile ID.
@@ -2486,24 +2560,14 @@ class ConversationRepo {
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
 
+            // The following check was modified using Anthropic, Claude Code, "Implement
+            // US 01.02.01: allow an entrant to join the waiting list for an active campsite
+            // lottery", 2026-11-27.
+            // Rejects inactive lotteries, duplicate joins, lottery managers, and full
+            // waitlists. The transaction re-reads the document, so double taps can't add twice.
             val now = LocalDateTime.now()
-            if (!lottery.isRegistrationOpen(now)) {
-                throw IllegalStateException(
-                    "This lottery is not active or registration is closed."
-                )
-            }
-
-            val entrants = lottery.waitlistEntrantIds
-            val capacity = lottery.waitlistCapacity
-
-            // Prevent duplicate entries.
-            if (entrantId in entrants) {
-                throw IllegalStateException("You already joined this lottery.")
-            }
-
-            // Check maximum capacity.
-            if (capacity != null && entrants.size >= capacity) {
-                throw IllegalStateException("The lottery waitlist is full.")
+            lottery.waitlistJoinError(entrantId, now)?.let { message ->
+                throw IllegalStateException(message)
             }
 
             // Add entrant and save joining date together.

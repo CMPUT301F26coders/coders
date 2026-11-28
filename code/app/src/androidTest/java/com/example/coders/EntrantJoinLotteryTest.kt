@@ -188,8 +188,11 @@ class EntrantJoinLotteryTest {
         composeTestRule.onNodeWithText("Joined Lottery").assertExists()
         composeTestRule.onNodeWithText("OK").performClick()
 
+        // The following assertion was modified using Anthropic, Claude Code, "Implement
+        // US 01.02.01: allow an entrant to join the waiting list for an active campsite
+        // lottery", 2026-11-27, after the joined label became "On Waiting List".
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithText("Joined")
+            composeTestRule.onAllNodesWithText("On Waiting List")
                 .fetchSemanticsNodes().isNotEmpty()
         }
 
