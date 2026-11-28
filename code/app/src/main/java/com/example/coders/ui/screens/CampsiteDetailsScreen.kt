@@ -13,7 +13,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
+import com.example.coders.Lottery
+import com.example.coders.LotteryRepo
 import com.example.coders.SignedInProfile
+import com.example.coders.UserSession
+import com.example.coders.ViewMode
+import com.example.coders.isRegistrationOpen
 
 /**
  * Displays detailed information about a selected campsite.
@@ -29,8 +34,8 @@ import com.example.coders.SignedInProfile
  * The Back button prevents repeated navigation requests,
  * and the layout includes safe screen padding.
  *
- * This composable only handles the user interface and does
- * not perform database operations or modify campsite data.
+ * For entrants, it observes lotteries associated with the campsite and
+ * lets them join lotteries whose registration is currently open.
  *
  * @param navController Handles navigation to the previous screen.
  * @param campsite The selected Campsite object containing
@@ -43,6 +48,66 @@ fun CampsiteDetailsScreen(
 ) {
 
     val signedInProfile by SignedInProfile().rememberSignedInProfile()
+
+    // The following lottery listener and join state were added using OpenAI, Codex, "Implement
+    // US 01.01.06: allow an entrant to join an active lottery from campsite details", 2026-11-27.
+    val lotteryRepo = remember { LotteryRepo() }
+    var campsiteLotteries by remember(campsite.id) {
+        mutableStateOf<List<Lottery>>(emptyList())
+    }
+    var joiningLotteryId by remember(campsite.id) { mutableStateOf<String?>(null) }
+    var joinedLotteryIds by remember(campsite.id) { mutableStateOf(setOf<String>()) }
+    var joinedLotteryId by remember(campsite.id) { mutableStateOf<String?>(null) }
+    var joinError by remember(campsite.id) { mutableStateOf<String?>(null) }
+
+    DisposableEffect(lotteryRepo, campsite.id) {
+        val registration = lotteryRepo.listenForCampsiteLotteries(
+            campsiteId = campsite.id,
+            onUpdate = { lotteries ->
+                campsiteLotteries = lotteries
+            }
+        )
+        onDispose { registration.remove() }
+    }
+
+    val activeLotteries = campsiteLotteries
+        .filter { lottery -> lottery.isRegistrationOpen() }
+        .sortedWith(compareBy<Lottery> { it.registrationEndDate }.thenBy { it.id })
+    val entrantId = signedInProfile?.id.orEmpty()
+    val canJoinLotteries =
+        UserSession.viewMode == ViewMode.ENTRANT &&
+            entrantId.isNotBlank() &&
+            entrantId != campsite.campOwnerId
+
+    // The following join result dialogs were added using OpenAI, Codex, "Implement US 01.01.06:
+    // allow an entrant to join an active lottery from campsite details", 2026-11-27.
+    joinedLotteryId?.let {
+        AlertDialog(
+            onDismissRequest = { joinedLotteryId = null },
+            title = { Text("Joined Lottery") },
+            text = {
+                Text("You have joined the lottery for ${campsite.name}.")
+            },
+            confirmButton = {
+                TextButton(onClick = { joinedLotteryId = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    joinError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { joinError = null },
+            title = { Text("Unable to Join Lottery") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { joinError = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     val coordinates = remember(campsite.mapLocation) {
         val parts = campsite.mapLocation.split(",")
@@ -107,6 +172,52 @@ fun CampsiteDetailsScreen(
                 Text("Edit Campsite")
             }
             Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // The following entrant lottery actions were added using OpenAI, Codex, "Implement
+        // US 01.01.06: allow an entrant to join an active lottery from campsite details", 2026-11-27.
+        if (canJoinLotteries) {
+            activeLotteries.forEach { lottery ->
+                val hasJoined =
+                    lottery.id in joinedLotteryIds || entrantId in lottery.waitlistEntrantIds
+                val isJoiningThisLottery = joiningLotteryId == lottery.id
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        joiningLotteryId = lottery.id
+                        lotteryRepo.joinWaitlist(lottery.id, entrantId) { error ->
+                            joiningLotteryId = null
+
+                            if (error == null) {
+                                joinedLotteryIds = joinedLotteryIds + lottery.id
+                                joinedLotteryId = lottery.id
+                            } else {
+                                joinError = error.message
+                                    ?: "Unable to join the lottery. Please try again."
+                            }
+                        }
+                    },
+                    enabled = joiningLotteryId == null && !hasJoined,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        when {
+                            isJoiningThisLottery -> "Joining..."
+                            hasJoined -> "Joined"
+                            else -> "Join Lottery"
+                        }
+                    )
+                }
+
+                if (activeLotteries.size > 1) {
+                    Text(
+                        text = "Registration ends: ${lottery.registrationEndDate}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
         }
 
 

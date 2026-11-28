@@ -20,3 +20,7 @@ with deterministic campsite-image persistence, owner-list image controls, and re
 
 OpenAI, Codex, "Enable image selection while creating a campsite", 2026-11-26, was used to assist
 with connecting the creation-form image picker to campsite-image persistence.
+
+OpenAI, Codex, "Implement US 01.01.06: allow an entrant to join an active lottery from campsite
+details", 2026-11-27, was used to assist with active-lottery validation, the campsite-details
+joining controls, and related unit and instrumented tests.
