@@ -57,14 +57,14 @@ class ProfileImageUiTest {
         ).documents
         profileDocuments.forEach { document ->
             await(
-                firestore.collection("image")
+                firestore.collection("images")
                     .document(ProfileImageRepo.profileImageId(document.id))
                     .delete()
             )
             await(document.reference.delete())
         }
         profileId?.let { id ->
-            await(firestore.collection("image").document(ProfileImageRepo.profileImageId(id)).delete())
+            await(firestore.collection("images").document(ProfileImageRepo.profileImageId(id)).delete())
         }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking { AuthManager(context).clearUserId() }
@@ -83,9 +83,9 @@ class ProfileImageUiTest {
     // The following function was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
     // and remove profile images stored as Firestore data URLs", 2026-11-22.
     /**
-     * Creates and signs in a new entrant, stopping on the Home screen.
+     * Creates and signs in a new normal profile, stopping on the Home screen.
      *
-     * @return The newly created entrant's profile ID.
+     * @return The newly created profile's ID.
      */
     private fun signUpEntrant(): String {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
@@ -96,7 +96,7 @@ class ProfileImageUiTest {
         composeTestRule.onNodeWithTag("lastNameInput").performTextInput("Image")
         composeTestRule.onNodeWithTag("emailInput").performTextInput(testEmail)
         composeTestRule.onNodeWithTag("phoneInput").performTextInput("7801234567")
-        composeTestRule.onNodeWithText("Entrant").performClick()
+        composeTestRule.onNodeWithText(UserRole.NORMAL.name).performClick()
         composeTestRule.onNodeWithText("Sign Up").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
@@ -141,7 +141,7 @@ class ProfileImageUiTest {
     @Test
     fun removingProfileImage_restoresDefaultAvatarAndDeletesDocument() {
         val entrantId = signUpEntrant()
-        val imageDocument = firestore.collection("image")
+        val imageDocument = firestore.collection("images")
             .document(ProfileImageRepo.profileImageId(entrantId))
         await(
             imageDocument.set(

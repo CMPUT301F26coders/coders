@@ -77,8 +77,8 @@ class NotificationFlowsTest {
         return error.get()
     }
 
-    /** Signs up a fresh entrant and waits until its profile-scoped notification listener is ready. */
-    private fun openHomeAndGetProfileId(profileType: String = "Entrant"): String {
+    /** Signs up a fresh normal profile and waits until its notification listener is ready. */
+    private fun openHomeAndGetProfileId(): String {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithText("New User:")
                 .fetchSemanticsNodes().isNotEmpty()
@@ -87,7 +87,7 @@ class NotificationFlowsTest {
         composeTestRule.onNodeWithTag("lastNameInput").performTextInput("Test")
         composeTestRule.onNodeWithTag("emailInput").performTextInput(testEmail)
         composeTestRule.onNodeWithTag("phoneInput").performTextInput("7801234567")
-        composeTestRule.onNodeWithText(profileType).performClick()
+        composeTestRule.onNodeWithText(UserRole.NORMAL.name).performClick()
         composeTestRule.onNodeWithText("Sign Up").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
@@ -97,7 +97,7 @@ class NotificationFlowsTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         return runBlocking { AuthManager(context).getCurrentUserId() }
-            ?: error("Sign-up did not save the entrant profile ID")
+            ?: error("Sign-up did not save the profile ID")
     }
 
     @Test
@@ -198,7 +198,7 @@ class NotificationFlowsTest {
 
     @Test
     fun ownerWaitlistMessageIsDeliveredToEveryEntrant() {
-        val ownerId = openHomeAndGetProfileId("Campsite owner")
+        val ownerId = openHomeAndGetProfileId()
         val lotteryId = UUID.randomUUID().toString()
         val entrantIds = listOf(UUID.randomUUID().toString(), UUID.randomUUID().toString())
         val lotteryDocument = firestore.collection("lottery").document(lotteryId)

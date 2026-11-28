@@ -30,7 +30,7 @@ class EntrantPastReservationsTest {
             status = ReservationStatus.Past
         )
 
-        val testEntrant = Entrant(
+        val testProfile = Profile(
             name = "John Doe",
             reservations = listOf(pastReservation)
         )
@@ -39,7 +39,7 @@ class EntrantPastReservationsTest {
         composeTestRule.setContent {
             EntrantPastReservationsScreen(
                 navController = rememberNavController(),
-                testEntrant = testEntrant
+                testEntrant = testProfile
             )
         }
 
@@ -52,12 +52,12 @@ class EntrantPastReservationsTest {
     @Test
     fun testEmptyPastReservationsShowsPlaceholder() {
 
-        val emptyEntrant = Entrant(name = "Jane Doe", reservations = emptyList())
+        val emptyProfile = Profile(name = "Jane Doe", reservations = emptyList())
 
         composeTestRule.setContent {
             EntrantPastReservationsScreen(
                 navController = rememberNavController(),
-                testEntrant = emptyEntrant
+                testEntrant = emptyProfile
             )
         }
 

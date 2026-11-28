@@ -98,14 +98,14 @@ class CreateCampsiteTest {
     }
 
     // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
-    /** Creates and signs in a role selected by the test, returning its persisted profile ID. */
-    private fun signUpAs(accountType: String): String {
+    /** Creates and signs in a profile with [role], returning its persisted profile ID. */
+    private fun signUpAs(role: UserRole): String {
         waitForSignUpScreen()
         composeTestRule.onNodeWithTag("firstNameInput").performTextInput("Campsite")
         composeTestRule.onNodeWithTag("lastNameInput").performTextInput("Test")
         composeTestRule.onNodeWithTag("emailInput").performTextInput(testEmail)
         composeTestRule.onNodeWithTag("phoneInput").performTextInput("7801234567")
-        composeTestRule.onNodeWithText(accountType).performClick()
+        composeTestRule.onNodeWithText(role.name).performClick()
         composeTestRule.onNodeWithText("Sign Up").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
@@ -119,9 +119,20 @@ class CreateCampsiteTest {
     }
 
     // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
-    /** Opens the owner registration form from the campsite owner's My Stuff area. */
+    /** Switches the current profile to the campsite-owner view. */
+    private fun switchToCampsiteOwnerView() {
+        composeTestRule.onNodeWithContentDescription("Profile").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 10_000) {
+            composeTestRule.onAllNodesWithText("Switch View").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Switch View").performClick()
+        composeTestRule.onNodeWithText("Campsite Owner").performClick()
+    }
+
+    /** Opens the owner registration form from the campsite-owner view's My Stuff area. */
     private fun navigateToRegistrationForm() {
-        signUpAs("Campsite owner")
+        signUpAs(UserRole.NORMAL)
+        switchToCampsiteOwnerView()
         composeTestRule.onNodeWithContentDescription("My Stuff").performClick()
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithText("My Campsites").fetchSemanticsNodes().isNotEmpty()
@@ -203,29 +214,21 @@ class CreateCampsiteTest {
     }
 
     // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
-    /** Covers AC2 and AC3: an admin in owner view is rejected and returns to My Campsites. */
+    /** Covers unified-profile access: an admin in owner view can open the registration form. */
     @Test
-    fun nonCampOwner_isRejectedAndOkReturnsToMyCampsites() {
-        signUpAs("Admin")
-        composeTestRule.onNodeWithContentDescription("Profile").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithText("Switch View").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeTestRule.onNodeWithText("Switch View").performClick()
-        composeTestRule.onNodeWithText("Campsite Owner").performClick()
+    fun adminProfile_canOpenRegistrationForm() {
+        signUpAs(UserRole.ADMIN)
+        switchToCampsiteOwnerView()
         composeTestRule.onNodeWithContentDescription("My Stuff").performClick()
         composeTestRule.onNodeWithText("My Campsites").performClick()
         composeTestRule.onNodeWithTag("registerCampsiteButton").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithTag("registrationRejectedDialog")
+            composeTestRule.onAllNodesWithTag("input_Name")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithTag("registrationRejectedDialog").assertIsDisplayed()
-        composeTestRule.onNodeWithText(ONLY_REGISTERED_USERS_MESSAGE).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Ok").performClick()
-        composeTestRule.onNodeWithText("My Campsites:").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("input_Name").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("input_Name").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("registrationRejectedDialog").assertDoesNotExist()
     }
 
     // The following function was added using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
