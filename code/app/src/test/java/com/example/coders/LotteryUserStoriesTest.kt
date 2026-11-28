@@ -3,6 +3,7 @@ package com.example.coders
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.LocalDate
 
 class LotteryUserStoriesTest {
 
@@ -85,6 +86,50 @@ class LotteryUserStoriesTest {
         val lottery = Lottery()
     
         assertTrue(lottery.waitlistEntrantIds.isEmpty())
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.01.06: allow an
+    // entrant to join an active lottery from campsite details", 2026-11-27.
+    @Test
+    fun registrationOpen_acceptsAnActiveUndrawnLotteryWithinItsInclusivePeriod() {
+        val today = LocalDate.of(2026, 11, 27)
+        val lottery = Lottery(
+            status = CampOwnerLotteryStatus.Active,
+            registrationStartDate = today.toString(),
+            registrationEndDate = today.toString()
+        )
+
+        assertTrue(lottery.isRegistrationOpen(today))
+    }
+
+    // The following function was added using OpenAI, Codex, "Implement US 01.01.06: allow an
+    // entrant to join an active lottery from campsite details", 2026-11-27.
+    @Test
+    fun registrationOpen_rejectsInactiveDrawnClosedAndInvalidLotteries() {
+        val today = LocalDate.of(2026, 11, 27)
+        val baseLottery = Lottery(
+            status = CampOwnerLotteryStatus.Active,
+            registrationStartDate = "2026-11-26",
+            registrationEndDate = "2026-11-28"
+        )
+
+        assertFalse(
+            baseLottery.copy(status = CampOwnerLotteryStatus.BookingPeriod)
+                .isRegistrationOpen(today)
+        )
+        assertFalse(baseLottery.copy(drawCompleted = true).isRegistrationOpen(today))
+        assertFalse(
+            baseLottery.copy(registrationStartDate = "2026-11-28")
+                .isRegistrationOpen(today)
+        )
+        assertFalse(
+            baseLottery.copy(registrationEndDate = "2026-11-26")
+                .isRegistrationOpen(today)
+        )
+        assertFalse(
+            baseLottery.copy(registrationStartDate = "not-a-date")
+                .isRegistrationOpen(today)
+        )
     }
 
     @Test

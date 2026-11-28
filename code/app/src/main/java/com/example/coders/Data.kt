@@ -209,6 +209,30 @@ data class Lottery (
 
 )
 
+// The following function was added using OpenAI, Codex, "Implement US 01.01.06: allow an
+// entrant to join an active lottery from campsite details", 2026-11-27.
+/**
+ * Returns whether entrants can currently register for this lottery.
+ *
+ * A lottery is open only while it has [CampOwnerLotteryStatus.Active] status, has not been
+ * drawn, and the supplied date is within its inclusive registration period. Invalid or missing
+ * dates are treated as closed so older incomplete records cannot accept entries.
+ */
+fun Lottery.isRegistrationOpen(today: LocalDate = LocalDate.now()): Boolean {
+    if (status != CampOwnerLotteryStatus.Active || drawCompleted) {
+        return false
+    }
+
+    val registrationStart = runCatching {
+        LocalDate.parse(registrationStartDate)
+    }.getOrNull() ?: return false
+    val registrationEnd = runCatching {
+        LocalDate.parse(registrationEndDate)
+    }.getOrNull() ?: return false
+
+    return !today.isBefore(registrationStart) && !today.isAfter(registrationEnd)
+}
+
 /**
  * Represents a reservation for a campsite.
  *
@@ -2354,11 +2378,18 @@ class LotteryRepo {
      * @param onComplete Called with `null` on success or the error on failure.
      */
 
+    // The following function was modified using OpenAI, Codex, "Implement US 01.01.06: allow an
+    // entrant to join an active lottery from campsite details", 2026-11-27.
     fun joinWaitlist(
         lotteryId: String,
         entrantId: String,
         onComplete: (Exception?) -> Unit = {}
     ) {
+        if (lotteryId.isBlank() || entrantId.isBlank()) {
+            onComplete(IllegalArgumentException("Lottery and entrant IDs are required."))
+            return
+        }
+
         val lotteryDocument = lotteryRef.document(lotteryId)
 
         db.runTransaction { transaction ->
@@ -2371,22 +2402,15 @@ class LotteryRepo {
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
 
+            val today = LocalDate.now()
+            if (!lottery.isRegistrationOpen(today)) {
+                throw IllegalStateException(
+                    "This lottery is not active or registration is closed."
+                )
+            }
+
             val entrants = lottery.waitlistEntrantIds
             val capacity = lottery.waitlistCapacity
-
-            // Prevent joining after the draw.
-            if (lottery.drawCompleted) {
-                throw IllegalStateException("Lottery has already been drawn.")
-            }
-
-            // Make sure registration is currently open.
-            val today = LocalDate.now()
-            val start = LocalDate.parse(lottery.registrationStartDate)
-            val end = LocalDate.parse(lottery.registrationEndDate)
-
-            if (today.isBefore(start) || today.isAfter(end)) {
-                throw IllegalStateException("Registration is not open.")
-            }
 
             // Prevent duplicate entries.
             if (entrantId in entrants) {
