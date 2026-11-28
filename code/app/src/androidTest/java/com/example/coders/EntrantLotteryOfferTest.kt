@@ -177,19 +177,20 @@ class EntrantLotteryOfferTest {
                 .fetchSemanticsNodes().isNotEmpty()
         }
 
-        composeTestRule.onNodeWithText("Accept Offer").performClick()
+        composeTestRule.onNodeWithTag("rulesCheckbox").performClick()
+        composeTestRule.onNodeWithText("Confirm Reservation").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             reservationStatusOnSignedInEntrant(reservationId) == ReservationStatus.Active &&
                 reservationStatusInFirestore(reservationId) == ReservationStatus.Active &&
                 composeTestRule.onAllNodesWithText(campsiteName)
                     .fetchSemanticsNodes().isNotEmpty() &&
-                composeTestRule.onAllNodesWithText("Accept Offer")
+                composeTestRule.onAllNodesWithText("Confirm Reservation")
                     .fetchSemanticsNodes().isEmpty()
         }
 
         composeTestRule.onNodeWithText(campsiteName).assertExists()
-        composeTestRule.onNodeWithText("Accept Offer").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Confirm Reservation").assertDoesNotExist()
     }
 
     /** Confirms declining a Pending offer persists Rejected and removes it from Pending. */

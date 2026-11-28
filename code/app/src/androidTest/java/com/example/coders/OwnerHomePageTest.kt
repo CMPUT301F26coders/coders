@@ -445,6 +445,50 @@ class OwnerHomePageTest {
         ).assertExists()
     }
 
+    // The following test was added using Anthropic, Claude Code, "Implement US 02.11.01: require
+    // entrants to acknowledge campsite rules and policies before confirming a reservation",
+    // 2026-11-28.
+    // AC: The owner can see that the entrant confirmed the rules and policies.
+    @Test
+    fun test6b_ShowsEntrantRulesAcknowledgement() {
+        val acknowledgedCampsiteId = seedCampsite("Acknowledged Camp", "Jasper", 4)
+        val legacyCampsiteId = seedCampsite("Legacy Camp", "Banff", 4)
+
+        listOf(
+            Triple(acknowledgedCampsiteId, true, "2026-11-28T14:03:12"),
+            Triple(legacyCampsiteId, false, "")
+        ).forEach { (campsiteId, acknowledged, acknowledgedAt) ->
+            val reservationId = UUID.randomUUID().toString()
+            createdReservationIds.add(reservationId)
+            await(
+                firestore.collection("reservation")
+                    .document(reservationId)
+                    .set(
+                        mapOf(
+                            "id" to reservationId,
+                            "campsiteId" to campsiteId,
+                            "campOwnerId" to ownerId,
+                            "dates" to "2026-12-10 - 2026-12-12",
+                            "guestNumber" to 2,
+                            "status" to ReservationStatus.Active.name,
+                            "rulesAcknowledged" to acknowledged,
+                            "rulesAcknowledgedAt" to acknowledgedAt
+                        )
+                    )
+            )
+        }
+
+        openReservations()
+        waitForReservation("Rules & Policies: Acknowledged on 2026-11-28 14:03")
+
+        composeTestRule.onNodeWithText(
+            "Rules & Policies: Acknowledged on 2026-11-28 14:03"
+        ).assertExists()
+        composeTestRule.onNodeWithText(
+            "Rules & Policies: Not acknowledged"
+        ).assertExists()
+    }
+
     @Test
     fun test7_ShowsOwnerCampsites() {
 

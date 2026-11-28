@@ -33,3 +33,9 @@ screen in My Stuff, and related unit and instrumented tests.
 Anthropic, Claude Code, "Implement US 01.02.02: allow an entrant to leave a campsite lottery
 waiting list", 2026-11-28, was used to assist with the shared waiting-list leave rule, the Leave
 Lottery control and confirmation on the Waitlists screen, and related unit and instrumented tests.
+
+Anthropic, Claude Code, "Implement US 02.11.01: require entrants to acknowledge campsite rules and
+policies before confirming a reservation", 2026-11-28, was used to assist with the shared
+reservation-confirmation rule, rules extraction from campsite descriptions, the rules checkbox and
+Confirm Reservation gating on the entrant reservations screen, the owner-facing acknowledgement
+label, and related unit and instrumented tests.
