@@ -1,4 +1,3 @@
-
 package com.example.coders.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -45,6 +44,11 @@ fun OwnerLotteriesScreen(navController: NavController) {
     var lotteries by remember { mutableStateOf<List<Lottery>>(emptyList()) }
     var campsites by remember { mutableStateOf<List<Campsite>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+
+    // NEW: Stores lotteries that the current owner is invited to.
+    var invitedLotteries by remember {
+        mutableStateOf<List<Lottery>>(emptyList())
+    }
 
     /**
      * Gets the currently signed-in campsite owner's ID.
@@ -106,6 +110,46 @@ fun OwnerLotteriesScreen(navController: NavController) {
                     campsites = it
                 }
             )
+        } else {
+            null
+        }
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    /**
+     * NEW: Loads lotteries that the current owner is invited to.
+     *
+     * Only includes lotteries that allow other owners,
+     * have invited the current owner, and have not been drawn.
+     *
+     * Owners cannot join their own lottery or a lottery
+     * that they have already joined.
+     */
+    DisposableEffect(ownerId) {
+
+        invitedLotteries = emptyList()
+
+        val listener = if (ownerId.isNotEmpty()) {
+
+            lotteryRepo.listenForAllLotteries(
+                onUpdate = { allLotteries ->
+
+                    invitedLotteries = allLotteries.filter {
+                        it.allowOtherOwners &&
+                                ownerId in it.invitedOwnerIds &&
+                                it.campOwnerId != ownerId &&
+                                ownerId !in it.participatingOwnerIds &&
+                                !it.drawCompleted
+                    }
+                },
+                onError = {
+                    invitedLotteries = emptyList()
+                }
+            )
+
         } else {
             null
         }
@@ -243,6 +287,21 @@ fun OwnerLotteriesScreen(navController: NavController) {
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
             Text("+ Add Lottery")
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // NEW: Opens the screen for joining another owner's lottery.
+        // Only enabled when the current owner has an invitation.
+        Button(
+            onClick = {
+                navController.navigate("joinMultiOwnerLottery")
+            },
+            enabled = ownerId.isNotEmpty() &&
+                    invitedLotteries.isNotEmpty(),
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text("Join Lottery")
         }
 
         Spacer(modifier = Modifier.height(20.dp))
