@@ -364,6 +364,9 @@ fun Lottery.waitlistLeaveError(entrantId: String): String? = when {
  * @property campsiteId The id of the campsite being reserved.
  * @property campOwnerId The id of the camp owner of the reservation.
  * @property entrantIds The ids of the entrants for the reservation.
+ * @property rulesAcknowledged Whether the entrant agreed to the campsite rules and policies
+ * when confirming the reservation.
+ * @property rulesAcknowledgedAt ISO local date-time the entrant gave that agreement, or blank.
  */
 data class Reservation (
     val campsite : Campsite = Campsite(),
@@ -378,8 +381,63 @@ data class Reservation (
     val entrantIds: List<String> = emptyList(),
     val lotteryId: String = "",
     val startDate: String = "",
-    val endDate: String = ""
+    val endDate: String = "",
+    val rulesAcknowledged: Boolean = false,
+    val rulesAcknowledgedAt: String = ""
+)
 
+// The following messages and functions were added using Anthropic, Claude Code, "Implement
+// US 02.11.01: require entrants to acknowledge campsite rules and policies before confirming a
+// reservation", 2026-11-28.
+/**
+ * Returns the rules and policies section of this campsite, or an empty string if it has none.
+ *
+ * Registration and editing store rules inside [Campsite.description] after a `"Rules: "`
+ * marker, so the last such section is the current one.
+ */
+fun Campsite.rulesAndPolicies(): String =
+    description.substringAfterLast(CAMPSITE_RULES_MARKER, "").trim()
+
+/** Separator used to append rules to a campsite description. */
+const val CAMPSITE_RULES_MARKER = "\n\nRules: "
+
+/** Reasons an entrant cannot confirm a reservation, shown to the entrant as-is. */
+object ReservationConfirmationErrors {
+    const val NOT_OWNER = "You do not own this reservation."
+    const val NOT_PENDING = "This reservation is not awaiting confirmation."
+    const val RULES_NOT_ACKNOWLEDGED =
+        "You must read and agree to the campsite rules and policies before confirming."
+}
+
+/**
+ * Returns why [entrantId] cannot confirm this reservation, or `null` when they can.
+ *
+ * Shared by [ReservationRepo.confirmReservation], which enforces it before writing, and the
+ * entrant reservations screen, which uses it to decide whether Confirm Reservation is enabled.
+ *
+ * @param entrantId The profile ID of the entrant confirming.
+ * @param rulesAccepted Whether the entrant checked the rules and policies box.
+ * @return One of the [ReservationConfirmationErrors] messages, or `null` if confirming is allowed.
+ */
+fun Reservation.confirmationError(entrantId: String, rulesAccepted: Boolean): String? = when {
+    entrantId.isBlank() || entrantId !in entrantIds -> ReservationConfirmationErrors.NOT_OWNER
+    status != ReservationStatus.Pending -> ReservationConfirmationErrors.NOT_PENDING
+    !rulesAccepted -> ReservationConfirmationErrors.RULES_NOT_ACKNOWLEDGED
+    else -> null
+}
+
+/**
+ * Returns this reservation confirmed as [ReservationStatus.Active] with the entrant's rules
+ * acknowledgement and the time it was given.
+ *
+ * @param at The time the entrant agreed to the rules and policies.
+ */
+fun Reservation.confirmedWithRulesAcknowledgement(
+    at: LocalDateTime = LocalDateTime.now()
+): Reservation = copy(
+    status = ReservationStatus.Active,
+    rulesAcknowledged = true,
+    rulesAcknowledgedAt = at.withNano(0).toString()
 )
 
 /**
@@ -940,6 +998,11 @@ class ProfileRepo : AutoCloseable {
         put("dates", reservation.dates)
         put("guestNumber", reservation.guestNumber)
         put("status", reservation.status.name)
+        // The following two fields were added using Anthropic, Claude Code, "Implement
+        // US 02.11.01: require entrants to acknowledge campsite rules and policies before
+        // confirming a reservation", 2026-11-28.
+        put("rulesAcknowledged", reservation.rulesAcknowledged)
+        put("rulesAcknowledgedAt", reservation.rulesAcknowledgedAt)
     }
 
 
@@ -2970,6 +3033,47 @@ class ReservationRepo {
         notification?.let {
             batch.set(db.collection("notification").document(it.id), it)
         }
+        batch.commit()
+            .addOnSuccessListener { onComplete(null) }
+            .addOnFailureListener { error -> onComplete(error) }
+    }
+
+    // The following function was added using Anthropic, Claude Code, "Implement US 02.11.01:
+    // require entrants to acknowledge campsite rules and policies before confirming a
+    // reservation", 2026-11-28.
+    /**
+     * Confirms a pending reservation once the entrant has agreed to the campsite rules and
+     * policies. The Active status, the acknowledgement, and its time are written in one batch,
+     * so a confirmed reservation is never saved without its acknowledgement.
+     *
+     * @param reservation The pending reservation being confirmed.
+     * @param entrantId The signed-in entrant's profile ID.
+     * @param rulesAccepted Whether the entrant checked the rules and policies box.
+     * @param acknowledgedAt The time the entrant agreed to the rules and policies.
+     * @param onComplete Called with `null` on success or the error on failure.
+     */
+    fun confirmReservation(
+        reservation: Reservation,
+        entrantId: String,
+        rulesAccepted: Boolean,
+        acknowledgedAt: LocalDateTime = LocalDateTime.now(),
+        onComplete: (Exception?) -> Unit = {}
+    ) {
+        reservation.confirmationError(entrantId, rulesAccepted)?.let { message ->
+            onComplete(IllegalStateException(message))
+            return
+        }
+
+        val confirmed = reservation.confirmedWithRulesAcknowledgement(acknowledgedAt)
+        val batch = db.batch()
+        batch.update(
+            reservationRef.document(reservation.id),
+            mapOf(
+                "status" to confirmed.status.name,
+                "rulesAcknowledged" to confirmed.rulesAcknowledged,
+                "rulesAcknowledgedAt" to confirmed.rulesAcknowledgedAt
+            )
+        )
         batch.commit()
             .addOnSuccessListener { onComplete(null) }
             .addOnFailureListener { error -> onComplete(error) }

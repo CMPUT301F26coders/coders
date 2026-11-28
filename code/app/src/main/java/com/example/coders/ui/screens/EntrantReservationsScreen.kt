@@ -6,8 +6,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +25,10 @@ import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
 import com.example.coders.Profile
 import com.example.coders.Notification
+import com.example.coders.confirmationError
+import com.example.coders.confirmedWithRulesAcknowledgement
+import com.example.coders.rulesAndPolicies
+import java.time.LocalDateTime
 
 private enum class EntrantReservationTab(
     val label: String,
@@ -45,6 +51,8 @@ fun EntrantReservationsScreen(navController: NavController) {
     var reservationToDecline by remember { mutableStateOf<Reservation?>(null) }
     var isUpdatingOffer by remember { mutableStateOf(false) }
     var offerUpdateError by remember { mutableStateOf<String?>(null) }
+    // IDs of pending reservations whose rules and policies box is checked (US 02.11.01).
+    var rulesAcceptedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     val profileRepo = remember { ProfileRepo() }
 
@@ -225,6 +233,61 @@ fun EntrantReservationsScreen(navController: NavController) {
         }
     }
 
+    // The following function was added using Anthropic, Claude Code, "Implement US 02.11.01:
+    // require entrants to acknowledge campsite rules and policies before confirming a
+    // reservation", 2026-11-28.
+    /**
+     * Confirms a pending reservation with the entrant's rules and policies acknowledgement,
+     * saving it to both the entrant profile and the reservation document.
+     *
+     * @param reservation Pending reservation being confirmed.
+     * @param onComplete Receives `null` when both updates succeed, or the first error.
+     */
+    fun confirmReservation(
+        reservation: Reservation,
+        onComplete: (Exception?) -> Unit
+    ) {
+        val rulesAccepted = reservation.id in rulesAcceptedIds
+        reservation.confirmationError(entrantId.orEmpty(), rulesAccepted)?.let { message ->
+            onComplete(IllegalStateException(message))
+            return
+        }
+
+        val acknowledgedAt = LocalDateTime.now()
+        val saveReservation = {
+            reservationRepo.confirmReservation(
+                reservation = reservation,
+                entrantId = entrantId.orEmpty(),
+                rulesAccepted = rulesAccepted,
+                acknowledgedAt = acknowledgedAt,
+                onComplete = onComplete
+            )
+        }
+
+        val currentEntrant = profile
+        if (currentEntrant == null) {
+            saveReservation()
+            return
+        }
+
+        val updatedEntrant = currentEntrant.copy(
+            reservations = currentEntrant.reservations.map {
+                if (it.id == reservation.id) {
+                    it.confirmedWithRulesAcknowledgement(acknowledgedAt)
+                } else {
+                    it
+                }
+            }
+        )
+        profileRepo.updateProfile(currentEntrant, updatedEntrant) { profileError ->
+            if (profileError != null) {
+                onComplete(profileError)
+            } else {
+                saveReservation()
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -333,17 +396,62 @@ fun EntrantReservationsScreen(navController: NavController) {
                         Spacer(modifier = Modifier.height(20.dp))
 
                         if (summary.status == ReservationStatus.Pending) {
+                            // The following rules and policies section, checkbox, and Confirm
+                            // Reservation gating were added using Anthropic, Claude Code,
+                            // "Implement US 02.11.01: require entrants to acknowledge campsite
+                            // rules and policies before confirming a reservation", 2026-11-28.
+                            val rules = campsite?.rulesAndPolicies().orEmpty()
+                            val rulesAccepted = summary.id in rulesAcceptedIds
+
+                            Text("Campsite Rules & Policies", fontWeight = FontWeight.Bold)
+                            Text(
+                                when {
+                                    campsite == null -> "Loading..."
+                                    rules.isNotBlank() -> rules
+                                    else -> "This campsite has not listed additional rules. " +
+                                            "The app's Policies & Guidelines still apply."
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Checkbox(
+                                    checked = rulesAccepted,
+                                    enabled = !isUpdatingOffer && campsite != null,
+                                    onCheckedChange = { checked ->
+                                        rulesAcceptedIds = if (checked) {
+                                            rulesAcceptedIds + summary.id
+                                        } else {
+                                            rulesAcceptedIds - summary.id
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .testTag("rulesCheckbox")
+                                        .semantics {
+                                            contentDescription =
+                                                "Agree to rules for ${campsiteName(summary)}"
+                                        }
+                                )
+                                Text("I have read and agree to the campsite rules and policies")
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
                             Button(
-                                enabled = !isUpdatingOffer,
+                                enabled = !isUpdatingOffer && rulesAccepted,
                                 onClick = {
                                     offerUpdateError = null
                                     isUpdatingOffer = true
-                                    updateReservationStatus(
+                                    confirmReservation(
                                         reservation = summary,
-                                        status = ReservationStatus.Active,
                                         onComplete = { error ->
                                             isUpdatingOffer = false
                                             if (error == null) {
+                                                rulesAcceptedIds = rulesAcceptedIds - summary.id
                                                 selectedTab = EntrantReservationTab.Active
                                             } else {
                                                 offerUpdateError =
@@ -356,10 +464,10 @@ fun EntrantReservationsScreen(navController: NavController) {
                                     .fillMaxWidth()
                                     .semantics {
                                         contentDescription =
-                                            "Accept offer for ${campsiteName(summary)}"
+                                            "Confirm reservation for ${campsiteName(summary)}"
                                     }
                             ) {
-                                Text(if (isUpdatingOffer) "Accepting…" else "Accept Offer")
+                                Text(if (isUpdatingOffer) "Confirming…" else "Confirm Reservation")
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))

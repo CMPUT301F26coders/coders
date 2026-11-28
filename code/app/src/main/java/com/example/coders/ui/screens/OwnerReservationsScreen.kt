@@ -27,6 +27,8 @@ import com.example.coders.ReservationStatus
 import com.example.coders.SignedInProfile
 import com.example.coders.Campsite
 import com.example.coders.CampsiteRepo
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Displays the campsite owner's reservations grouped by status.
@@ -227,6 +229,9 @@ fun OwnerReservationsScreen(navController: NavController) {
                     Text("Guests: ${reservation.guestNumber}")
                     Text("Status: ${reservation.status}")
 
+
+                    Text(rulesAcknowledgementLabel(reservation))
+
                     // Owners can reject active reservations
                     if (
                         selectedTab == "Present" &&
@@ -341,5 +346,29 @@ fun OwnerReservationsScreen(navController: NavController) {
                 }
             }
         )
+    }
+}
+
+// The following function was added using Anthropic, Claude Code, "Implement US 02.11.01: require
+// entrants to acknowledge campsite rules and policies before confirming a reservation",
+// 2026-11-28.
+/**
+ * Describes whether the entrant agreed to the campsite rules and policies, and when.
+ *
+ * @param reservation The reservation being shown to the owner.
+ * @return A label such as "Rules & Policies: Acknowledged on 2026-11-28 14:03".
+ */
+internal fun rulesAcknowledgementLabel(reservation: Reservation): String {
+    if (!reservation.rulesAcknowledged) {
+        return "Rules & Policies: Not acknowledged"
+    }
+    val acknowledgedAt = runCatching {
+        LocalDateTime.parse(reservation.rulesAcknowledgedAt)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+    }.getOrNull()
+    return if (acknowledgedAt == null) {
+        "Rules & Policies: Acknowledged"
+    } else {
+        "Rules & Policies: Acknowledged on $acknowledgedAt"
     }
 }
