@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -251,5 +252,25 @@ class EntrantJoinWaitlistTest {
         composeTestRule.onNodeWithText("Join Lottery").assertDoesNotExist()
         composeTestRule.onNodeWithTag("joinWaitlistButton_${fixture.lottery.id}")
             .assertDoesNotExist()
+    }
+
+    /** Covers: a joined waiting list shows up on My Stuff → Waitlists, and others don't. */
+    @Test
+    fun joinedWaitingListAppearsOnMyStuffWaitlistsScreen() {
+        val entrantId = signUpEntrant()
+        val joined = seedLottery("Waitlist Screen Camp")
+        val notJoined = seedLottery("Waitlist Unjoined Camp")
+        assertNull(joinWaitlist(joined.lottery.id, entrantId))
+
+        composeTestRule.onNodeWithContentDescription("My Stuff").performClick()
+        composeTestRule.onNodeWithText("Waitlists").performClick()
+
+        waitForText("Waitlist Screen Camp")
+        composeTestRule.onNodeWithTag("waitlistCard_${joined.lottery.id}").assertExists()
+        composeTestRule.onNodeWithText("On waiting list", substring = true).assertExists()
+        composeTestRule.onNodeWithText("Joined: ${LocalDate.now()}").assertExists()
+        composeTestRule.onNodeWithText("Waiting list: 1 entrant").assertExists()
+        composeTestRule.onNodeWithTag("waitlistCard_${notJoined.lottery.id}").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Waitlist Unjoined Camp").assertDoesNotExist()
     }
 }

@@ -291,6 +291,41 @@ fun Lottery.waitlistJoinError(
     else -> null
 }
 
+// The following enum and function were added using Anthropic, Claude Code, "Implement
+// US 01.02.01: allow an entrant to join the waiting list for an active campsite lottery",
+// 2026-11-27.
+/** Where an entrant stands on a lottery waiting list they have joined. */
+enum class EntrantWaitlistStatus {
+    /** Registration is still open, so the waiting list can still grow. */
+    RegistrationOpen,
+    /** Registration has closed and the owner has not drawn winners yet. */
+    AwaitingDraw,
+    /** Winners were drawn and the entrant is one of them. */
+    Selected,
+    /** Winners were drawn and the entrant is not one of them. */
+    NotSelected
+}
+
+/**
+ * Returns where [entrantId] stands on this lottery's waiting list.
+ *
+ * @param entrantId The profile ID of an entrant on the waiting list.
+ * @param now The time to check the registration period against.
+ */
+fun Lottery.entrantWaitlistStatus(
+    entrantId: String,
+    now: LocalDateTime = LocalDateTime.now()
+): EntrantWaitlistStatus = when {
+    drawCompleted || status == CampOwnerLotteryStatus.Drawn ->
+        if (entrantId in winnerEntrantIds) {
+            EntrantWaitlistStatus.Selected
+        } else {
+            EntrantWaitlistStatus.NotSelected
+        }
+    isRegistrationOpen(now) -> EntrantWaitlistStatus.RegistrationOpen
+    else -> EntrantWaitlistStatus.AwaitingDraw
+}
+
 /**
  * Represents a reservation for a campsite.
  *

@@ -147,4 +147,48 @@ class JoinWaitlistTest {
             activeLottery().waitlistJoinError("", now)
         )
     }
+
+    // Waitlists screen: where the entrant stands on a waiting list they joined.
+    @Test
+    fun joinedWaitlistWhileRegistrationOpen_showsRegistrationOpen() {
+        val lottery = activeLottery().copy(waitlistEntrantIds = listOf(entrantId))
+
+        assertEquals(
+            EntrantWaitlistStatus.RegistrationOpen,
+            lottery.entrantWaitlistStatus(entrantId, now)
+        )
+    }
+
+    @Test
+    fun joinedWaitlistAfterRegistrationCloses_showsAwaitingDraw() {
+        val lottery = activeLottery().copy(
+            registrationStartDate = "2026-11-20",
+            registrationEndDate = "2026-11-30",
+            waitlistEntrantIds = listOf(entrantId)
+        )
+
+        assertEquals(
+            EntrantWaitlistStatus.AwaitingDraw,
+            lottery.entrantWaitlistStatus(entrantId, now)
+        )
+    }
+
+    @Test
+    fun drawnLottery_showsSelectedForWinnersAndNotSelectedForOthers() {
+        val lottery = activeLottery().copy(
+            status = CampOwnerLotteryStatus.Drawn,
+            drawCompleted = true,
+            waitlistEntrantIds = listOf(entrantId, "entrant2"),
+            winnerEntrantIds = listOf(entrantId)
+        )
+
+        assertEquals(
+            EntrantWaitlistStatus.Selected,
+            lottery.entrantWaitlistStatus(entrantId, now)
+        )
+        assertEquals(
+            EntrantWaitlistStatus.NotSelected,
+            lottery.entrantWaitlistStatus("entrant2", now)
+        )
+    }
 }

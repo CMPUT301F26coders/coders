@@ -36,6 +36,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.coders.ui.screens.ProfileScreen
 import com.example.coders.ui.screens.ChatScreen
 import com.example.coders.ui.screens.EntrantReservationsScreen
+import com.example.coders.ui.screens.EntrantWaitlistsScreen
 import com.example.coders.ui.screens.HomeScreen
 import com.example.coders.ui.screens.MessagesScreen
 import com.example.coders.ui.screens.MiniMapScreen
@@ -525,6 +526,13 @@ class MainActivity : ComponentActivity() {
 
                     composable("entrantreservations") {
                         EntrantReservationsScreen(navController)
+                    }
+
+                    // The following route was added using Anthropic, Claude Code, "Implement
+                    // US 01.02.01: allow an entrant to join the waiting list for an active
+                    // campsite lottery", 2026-11-27.
+                    composable("waitlists") {
+                        EntrantWaitlistsScreen(navController)
                     }
 
                     composable(

@@ -4,8 +4,7 @@
  * Displays role-specific navigation options
  * for managing campsites, bookings, and reservations.
  *
- * Outstanding issues: Entrant waitlist navigation is currently
- * commented out cuz its not implemented.
+ * Outstanding issues: None known.
  */
 
 package com.example.coders.ui.screens
@@ -144,19 +143,19 @@ fun MyStuffScreen(navController: NavController) {
                         }
                     )
 
-                    //Spacer(modifier = Modifier.height(20.dp))
+                    // The following Waitlists button was enabled using Anthropic, Claude Code,
+                    // "Implement US 01.02.01: allow an entrant to join the waiting list for an
+                    // active campsite lottery", 2026-11-27.
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    /*MyStuffMenuButton(
-                    title = "Waitlists",
-                    subtitle = "Active lotteries",
-                    icon = Icons.Default.List,
-                    onClick = {
-                        navController.navigate("waitlists")
-                    }
-                )*/
-
-                    //Spacer(modifier = Modifier.height(20.dp))
-
+                    MyStuffMenuButton(
+                        title = "Waitlists",
+                        subtitle = "Lotteries you've joined",
+                        icon = Icons.Default.List,
+                        onClick = {
+                            navController.navigate("waitlists")
+                        }
+                    )
                 }
                 ViewMode.ADMIN -> {
                     MyStuffMenuButton(

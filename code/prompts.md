@@ -27,5 +27,5 @@ joining controls, and related unit and instrumented tests.
 
 Anthropic, Claude Code, "Implement US 01.02.01: allow an entrant to join the waiting list for an
 active campsite lottery", 2026-11-27, was used to assist with the shared waiting-list join rule,
-duplicate-join and lottery-manager handling on the campsite details screen, and related unit and
-instrumented tests.
+duplicate-join and lottery-manager handling on the campsite details screen, the entrant Waitlists
+screen in My Stuff, and related unit and instrumented tests.
