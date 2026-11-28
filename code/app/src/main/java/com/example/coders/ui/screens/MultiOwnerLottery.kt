@@ -14,10 +14,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
-import com.example.coders.CampOwner
 import com.example.coders.ProfileRepo
 import java.util.Calendar
 import java.util.Locale
+import com.example.coders.Profile
+import com.example.coders.UserRole
 
 /**
  * Displays the multi-owner lottery creation screen.
@@ -36,6 +37,7 @@ import java.util.Locale
 fun MultiOwnerLotteryScreen(
     navController: NavController,
     campsites: List<Campsite>,
+    currentOwnerId: String,
     onCreateLottery: (
         List<String>,
         List<String>,
@@ -65,7 +67,7 @@ fun MultiOwnerLotteryScreen(
     val profileRepo = remember { ProfileRepo() }
 
     var owners by remember {
-        mutableStateOf<List<CampOwner>>(emptyList())
+        mutableStateOf<List<Profile>>(emptyList())
     }
 
     var ownersLoading by remember {
@@ -94,8 +96,6 @@ fun MultiOwnerLotteryScreen(
         )
     }
 
-    val currentOwnerId = campsites.firstOrNull()?.campOwnerId.orEmpty()
-
     LaunchedEffect(currentOwnerId) {
         ownersLoading = true
 
@@ -105,8 +105,10 @@ fun MultiOwnerLotteryScreen(
 
             if (error == null) {
                 owners = profiles.orEmpty()
-                    .filterIsInstance<CampOwner>()
-                    .filter { it.id != currentOwnerId }
+                    .filter {
+                        it.role == UserRole.NORMAL &&
+                                it.id != currentOwnerId
+                    }
             }
         }
     }
