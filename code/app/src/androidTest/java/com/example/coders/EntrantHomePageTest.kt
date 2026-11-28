@@ -79,12 +79,12 @@ class EntrantHomePageTest {
             .performTextInput("7801234567")
     }
 
-    /** Signs up as an entrant and waits for the asynchronous Firestore result. */
+    /** Signs up as a normal profile and waits for the asynchronous Firestore result. */
     private fun openHome() {
 
         enterInformation()
 
-        composeTestRule.onNodeWithText("Entrant")
+        composeTestRule.onNodeWithText(UserRole.NORMAL.name)
             .performClick()
 
         composeTestRule.onNodeWithText("Sign Up")
@@ -140,10 +140,10 @@ class EntrantHomePageTest {
             ?: error("The sign-up flow did not save the entrant profile ID")
 
         val entrantDocument = firestore.collection("profiles").document(entrantId)
-        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
+        val entrant = await(entrantDocument.get()).toObject(Profile::class.java)
+            ?: error("The signed-in profile was not saved to Firestore")
 
-        val owner = CampOwner(
+        val owner = Profile(
             name = "John Smith",
             email = "owner-test-${UUID.randomUUID()}@example.com",
             phone = "7805550100"
@@ -180,14 +180,14 @@ class EntrantHomePageTest {
         val entrantId = runBlocking { AuthManager(context).getCurrentUserId() }
             ?: error("The sign-up flow did not save the entrant profile ID")
         val entrantDocument = firestore.collection("profiles").document(entrantId)
-        val entrant = await(entrantDocument.get()).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
+        val entrant = await(entrantDocument.get()).toObject(Profile::class.java)
+            ?: error("The signed-in profile was not saved to Firestore")
 
         val reservations = listOf(
             Triple("North Lake Reservation", "Jasper, Alberta", "2026-09-10 - 2026-09-12"),
             Triple("South Ridge Reservation", "Banff, Alberta", "2026-10-05 - 2026-10-07")
         ).mapIndexed { index, (campsiteName, location, dates) ->
-            val owner = CampOwner(
+            val owner = Profile(
                 name = if (index == 0) "Owner North" else "Owner South",
                 email = "reservation-owner-${UUID.randomUUID()}@example.com",
                 phone = "78055501${index}"
@@ -262,9 +262,9 @@ class EntrantHomePageTest {
             .assertTextContains("7801234567")
     }
 
-    // TEST 2: Sign up as Entrant
+    // TEST 2: Sign up as a normal profile
     @Test
-    fun test2_SignUpAsEntrant() {
+    fun test2_SignUpAsNormalProfile() {
 
         openHome()
 
@@ -326,7 +326,7 @@ class EntrantHomePageTest {
         }
         composeTestRule.onNodeWithText("Pine Lake Campsite")
             .performClick()
-        composeTestRule.onNodeWithText("John Smith (Campsite Owner)")
+        composeTestRule.onNodeWithText("John Smith")
             .assertExists()
 
         sendMessage("Hello John, I am excited!")
@@ -402,10 +402,10 @@ class EntrantHomePageTest {
             .performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
-            composeTestRule.onAllNodesWithText("Owner South (Campsite Owner)")
+            composeTestRule.onAllNodesWithText("Owner South")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithText("Owner South (Campsite Owner)").assertExists()
+        composeTestRule.onNodeWithText("Owner South").assertExists()
     }
 
     // The following test was modified using OpenAI, Codex, "Align the entrant reservations empty-

@@ -68,7 +68,7 @@ class OwnerHomePageTest {
                         "name" to "Test Camp Owner",
                         "email" to "owner@test.com",
                         "phone" to "7801234567",
-                        "type" to "CampOwner"
+                        "type" to "User"
                     )
                 )
         )
@@ -130,7 +130,7 @@ class OwnerHomePageTest {
     private fun seedConversationForSignedInOwner() {
 
 
-        val entrant = Entrant(
+        val entrant = Profile(
             name = "Alice Smith",
             email = "test-entrant-${UUID.randomUUID()}@example.com",
             phone = "7805550100"
@@ -138,7 +138,7 @@ class OwnerHomePageTest {
 
         createdEntrantIds.add(entrant.id)
 
-        val owner = CampOwner(
+        val owner = Profile(
             id = ownerId,
             name = "Test Camp Owner",
             email = "owner@test.com",
@@ -617,12 +617,12 @@ class OwnerHomePageTest {
     @Test
     fun test9_ReservationCreatesEmptyConversation() {
 
-        val owner = CampOwner(
+        val owner = Profile(
             id = ownerId,
             name = "Test Camp Owner"
         )
 
-        val entrant = Entrant(
+        val entrant = Profile(
             name = "New Test Entrant"
         )
 

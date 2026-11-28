@@ -59,7 +59,7 @@ class EntrantReservationCancellationTest {
     /** Waits for a Firebase task or fails after the test timeout. */
     private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
 
-    /** Signs up a fresh entrant and waits until the Home screen is visible. */
+    /** Signs up a fresh normal profile and waits until the Home screen is visible. */
     private fun openHome() {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithTag("firstNameInput")
@@ -69,7 +69,7 @@ class EntrantReservationCancellationTest {
         composeTestRule.onNodeWithTag("lastNameInput").performTextInput("Test")
         composeTestRule.onNodeWithTag("emailInput").performTextInput(testEmail)
         composeTestRule.onNodeWithTag("phoneInput").performTextInput("7801234567")
-        composeTestRule.onNodeWithText("Entrant").performClick()
+        composeTestRule.onNodeWithText(UserRole.NORMAL.name).performClick()
         composeTestRule.onNodeWithText("Sign Up").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
@@ -105,7 +105,7 @@ class EntrantReservationCancellationTest {
                     "name" to "Cancellation Camp Owner",
                     "email" to "cancellation-owner-${UUID.randomUUID()}@example.com",
                     "phone" to "7805550199",
-                    "type" to "CampOwner"
+                    "type" to "User"
                 )
             )
         )
@@ -149,8 +149,8 @@ class EntrantReservationCancellationTest {
             ?: error("The sign-up flow did not save the entrant profile ID")
         val entrant = await(
             firestore.collection("profiles").document(entrantId).get()
-        ).toObject(Entrant::class.java)
-            ?: error("The signed-in entrant profile was not saved to Firestore")
+        ).toObject(Profile::class.java)
+            ?: error("The signed-in profile was not saved to Firestore")
 
         return entrant.reservations.first { it.id == reservationId }.status
     }

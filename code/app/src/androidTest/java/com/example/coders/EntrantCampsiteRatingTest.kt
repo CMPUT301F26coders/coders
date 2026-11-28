@@ -70,7 +70,7 @@ class EntrantCampsiteRatingTest {
     /** Waits for a Firebase task or fails after the test timeout. */
     private fun <T> await(task: Task<T>): T = Tasks.await(task, 20, TimeUnit.SECONDS)
 
-    /** Signs up a fresh entrant and waits until the Home screen is visible. */
+    /** Signs up a fresh normal profile and waits until the Home screen is visible. */
     private fun openHome() {
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
             composeTestRule.onAllNodesWithTag("firstNameInput").fetchSemanticsNodes().isNotEmpty()
@@ -79,7 +79,7 @@ class EntrantCampsiteRatingTest {
         composeTestRule.onNodeWithTag("lastNameInput").performTextInput("Test")
         composeTestRule.onNodeWithTag("emailInput").performTextInput(testEmail)
         composeTestRule.onNodeWithTag("phoneInput").performTextInput("7801234567")
-        composeTestRule.onNodeWithText("Entrant").performClick()
+        composeTestRule.onNodeWithText(UserRole.NORMAL.name).performClick()
         composeTestRule.onNodeWithText("Sign Up").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 10_000) {
@@ -106,7 +106,7 @@ class EntrantCampsiteRatingTest {
                     "name" to "Rating Camp Owner",
                     "email" to "rating-owner-${UUID.randomUUID()}@example.com",
                     "phone" to "7805550199",
-                    "type" to "CampOwner"
+                    "type" to "User"
                 )
             )
         )
@@ -163,7 +163,7 @@ class EntrantCampsiteRatingTest {
                         composable("entrantpastreservations") {
                             EntrantPastReservationsScreen(
                                 navController = navController,
-                                testEntrant = Entrant(reservations = listOf(reservation))
+                                testEntrant = Profile(reservations = listOf(reservation))
                             )
                         }
                         composable(
