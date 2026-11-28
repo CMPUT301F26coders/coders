@@ -71,6 +71,7 @@ import com.example.coders.ui.screens.OwnerJoinLotteryScreen
 import com.example.coders.ui.screens.MultiOwnerLotteryScreen
 import com.example.coders.ui.screens.EditLotteryScreen
 import com.example.coders.ui.screens.ViewBookedDatesScreen
+import com.example.coders.ui.screens.LotteryAvailableDatesScreen
 
 //Qr Code imports:
 import android.content.Intent
@@ -533,6 +534,22 @@ class MainActivity : ComponentActivity() {
                     // campsite lottery", 2026-11-27.
                     composable("waitlists") {
                         EntrantWaitlistsScreen(navController)
+                    }
+
+                    composable(
+                        route = "lotteryavailabledates/{lotteryId}",
+                        arguments = listOf(
+                            navArgument("lotteryId") {
+                                type = NavType.StringType
+                            }
+                        )
+                    ) { backStackEntry ->
+                        LotteryAvailableDatesScreen(
+                            navController = navController,
+                            lotteryId = backStackEntry.arguments
+                                ?.getString("lotteryId")
+                                .orEmpty()
+                        )
                     }
 
                     composable(

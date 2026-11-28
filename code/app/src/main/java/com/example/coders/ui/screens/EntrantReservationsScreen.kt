@@ -383,6 +383,22 @@ fun EntrantReservationsScreen(navController: NavController) {
                             Text("View on Map")
                         }
 
+                        if (
+                            summary.status == ReservationStatus.Pending &&
+                            summary.lotteryId.isNotBlank()
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    navController.navigate(
+                                        "lotteryavailabledates/${android.net.Uri.encode(summary.lotteryId)}"
+                                    )
+                                },
+                                modifier = Modifier.align(androidx.compose.ui.Alignment.End)
+                            ) {
+                                Text("View Available Dates")
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Text("Dates", fontWeight = FontWeight.Bold)
