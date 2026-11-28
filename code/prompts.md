@@ -39,3 +39,8 @@ policies before confirming a reservation", 2026-11-28, was used to assist with t
 reservation-confirmation rule, rules extraction from campsite descriptions, the rules checkbox and
 Confirm Reservation gating on the entrant reservations screen, the owner-facing acknowledgement
 label, and related unit and instrumented tests.
+
+Anthropic, Claude Code, "Implement US 01.04.01: show lottery winners the available dates for the
+campsite they won", 2026-11-28, was used to assist with the available-date rules for a lottery's
+availability window and reservations, the winner-only available dates calendar, its entry points
+from Waitlists and My Bookings, and related unit and instrumented tests.

@@ -258,6 +258,11 @@ fun EntrantWaitlistsScreen(navController: NavController) {
                                         )
                                     }
                                 },
+                                onViewAvailableDates = {
+                                    navController.navigate(
+                                        "lotteryavailabledates/${Uri.encode(lottery.id)}"
+                                    )
+                                },
                                 isLeaving = leavingLotteryId == lottery.id,
                                 leaveEnabled = leavingLotteryId == null,
                                 onLeave = if (lottery.waitlistLeaveError(id) == null) {
@@ -281,6 +286,7 @@ fun EntrantWaitlistsScreen(navController: NavController) {
  * @param entrantId The signed-in entrant's profile ID.
  * @param campsiteNames Names of the lottery's campsites that have loaded so far.
  * @param onClick Opens the lottery's campsite, or `null` if it has no campsite.
+ * @param onViewAvailableDates Opens the available-dates calendar, shown only to winners.
  * @param isLeaving Whether a leave request for this lottery is in progress.
  * @param leaveEnabled Whether the Leave Lottery button can be pressed right now.
  * @param onLeave Starts leaving this waiting list, or `null` if leaving isn't allowed.
@@ -291,6 +297,7 @@ private fun WaitlistCard(
     entrantId: String,
     campsiteNames: List<String>,
     onClick: (() -> Unit)?,
+    onViewAvailableDates: () -> Unit = {},
     isLeaving: Boolean = false,
     leaveEnabled: Boolean = true,
     onLeave: (() -> Unit)? = null
@@ -306,7 +313,7 @@ private fun WaitlistCard(
             "Registration closed · waiting for the draw" to
                 MaterialTheme.colorScheme.onSurfaceVariant
         EntrantWaitlistStatus.Selected ->
-            "Selected! Check My Bookings for your offer." to Color(0xFF2E7D32)
+            "Selected! View your available dates below." to Color(0xFF2E7D32)
         EntrantWaitlistStatus.NotSelected ->
             "Not selected this time" to MaterialTheme.colorScheme.error
     }
@@ -346,6 +353,21 @@ private fun WaitlistCard(
                 text = "Waiting list: $waitlistSize$capacityText $entrantNoun",
                 style = MaterialTheme.typography.bodySmall
             )
+
+            // The following button was added using Anthropic, Claude Code, "Implement
+            // US 01.04.01: show lottery winners the available dates for the campsite they won",
+            // 2026-11-28.
+            if (status == EntrantWaitlistStatus.Selected) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = onViewAvailableDates,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("viewAvailableDates_${lottery.id}")
+                ) {
+                    Text("View Available Dates")
+                }
+            }
 
             // The following button was added using Anthropic, Claude Code, "Implement
             // US 01.02.02: allow an entrant to leave a campsite lottery waiting list", 2026-11-28.
