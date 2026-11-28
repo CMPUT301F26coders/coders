@@ -1,11 +1,3 @@
-/*
- * Purpose/Role:
- * UI layer displays a filtered list of past reservations
- *
- * Outstanding Issues:
- * - The "CSV" download button is a placeholder (the asCsv helper functions exist but dont have a file exporter).
- */
-
 package com.example.coders.ui.screens
 
 import android.net.Uri
@@ -48,8 +40,6 @@ import com.example.coders.ReservationRatingRepo
 import com.example.coders.ReservationRepo
 import android.util.Log
 
-//The code for filtering past reservations is from Google, Gemini, "How can I make sure this code only displays past reservations and not all reservations"
-//2026-11-06
 
 /**
  * displays a list of past reservations for entrant
@@ -251,6 +241,13 @@ fun EntrantPastReservationsScreen(
                         onExportCsv = {
                             reservationToExport = reservation
                             csvExportLauncher.launch("reservation-${reservation.id}.csv")
+                        },
+                        onViewOnMap = {
+                            if (reservation.campsiteId.isNotBlank()) {
+                                navController.navigate(
+                                    "reservationmap/${Uri.encode(reservation.campsiteId)}"
+                                )
+                            }
                         }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -285,7 +282,8 @@ fun PastReservationCard(
     campsite: Campsite?,
     onRate: () -> Unit,
     onReview: () -> Unit,
-    onExportCsv: () -> Unit
+    onExportCsv: () -> Unit,
+    onViewOnMap: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -362,6 +360,16 @@ fun PastReservationCard(
                     Icon(Icons.Default.Download, contentDescription = "CSV", modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("CSV", fontSize = 10.sp)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = onViewOnMap,
+                    enabled = reservation.campsiteId.isNotBlank(),
+                    modifier = Modifier.height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text("View on Map", fontSize = 10.sp)
                 }
             }
         }

@@ -31,6 +31,8 @@ import com.example.coders.SignedInProfile
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.coders.UserSession
+import com.example.coders.ViewMode
 
 /**
  * An object acting as a temporary holder for chat routing
@@ -59,6 +61,8 @@ fun ChatScreen(navController: NavController) {
 
     val conversationRepo = remember { ConversationRepo() }
     val profile by SignedInProfile().rememberSignedInProfile()
+
+    val isAdminView = UserSession.viewMode == ViewMode.ADMIN
 
     var isSending by remember { mutableStateOf(false) }
     var sendError by remember { mutableStateOf<String?>(null) }
@@ -154,52 +158,79 @@ fun ChatScreen(navController: NavController) {
         ) {
 
             for (chatMessage in messages) {
-                if (chatMessage.senderId == profile?.id) {
 
-                    // Your message on the right
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                val isOwnMessage = chatMessage.senderId == profile?.id
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        if (isOwnMessage && !isAdminView) {
+                            Arrangement.End
+                        } else {
+                            Arrangement.Start
+                        }
+                ) {
+                    Column(
+                        horizontalAlignment =
+                            if (isOwnMessage && !isAdminView) {
+                                Alignment.End
+                            } else {
+                                Alignment.Start
+                            },
+
+                        modifier = Modifier.padding(bottom = 12.dp)
                     ) {
+
+                        // Display sender name in admin view
+                        if (isAdminView) {
+                            Text(
+                                text = chatMessage.senderName.ifBlank {
+                                    "Unknown sender"
+                                },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+
+                        // Message content
                         Card(
-                            modifier = Modifier
-                                .widthIn(max = 280.dp)
-                                .padding(bottom = 12.dp),
+                            modifier = Modifier.widthIn(max = 280.dp),
+
                             shape = RoundedCornerShape(20.dp),
+
                             colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF625B71)
+                                containerColor =
+                                    if (isOwnMessage && !isAdminView) {
+                                        Color(0xFF625B71)
+                                    } else {
+                                        Color(0xFFECECEC)
+                                    }
                             )
                         ) {
                             Text(
                                 text = chatMessage.content,
-                                color = Color.White,
+
+                                color =
+                                    if (isOwnMessage && !isAdminView) {
+                                        Color.White
+                                    } else {
+                                        Color.Black
+                                    },
+
                                 modifier = Modifier.padding(14.dp)
                             )
                         }
-                    }
 
-                } else {
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    // Owner message on the left
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .widthIn(max = 280.dp)
-                                .padding(bottom = 12.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFECECEC)
-                            )
-                        ) {
-                            Text(
-                                text = chatMessage.content,
-                                color = Color.Black,
-                                modifier = Modifier.padding(14.dp)
-                            )
-                        }
+                        // Display the date and time
+                        Text(
+                            text = chatMessage.date,
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
                     }
                 }
             }
@@ -209,84 +240,86 @@ fun ChatScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Type and send a message
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            OutlinedTextField(
-                value = message,
-                onValueChange = {
-                    message = it
-                },
-                placeholder = {
-                    Text("Type a message...")
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(20.dp)
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-
-            Button(
-                enabled = !isSending &&
-                        profile != null &&
-                        conversationExists &&
-                        ChatData.conversationId.isNotBlank(),
-                onClick = {
-                    val sender = profile
-                    val messageText = message.trim()
-
-                    if (messageText.isNotEmpty() &&
-                        sender != null &&
-                        ChatData.conversationId.isNotBlank()
-                    ) {
-                        val newMessage = Message(
-                            sender = sender,
-                            content = messageText,
-                            date = SimpleDateFormat(
-                                "yyyy-MM-dd HH:mm:ss",
-                                Locale.getDefault()
-                            ).format(Date())
-                        )
-
-                        isSending = true
-                        sendError = null
-
-                        conversationRepo.addMessage(
-                            conversationId = ChatData.conversationId,
-                            message = newMessage,
-                            onComplete = { error ->
-                                isSending = false
-
-                                if (error == null) {
-                                    message = ""
-                                } else {
-                                    Log.e(
-                                        "ChatScreen",
-                                        "Failed to send message",
-                                        error
-                                    )
-                                    sendError = "Failed to send message."
-                                }
-                            }
-                        )
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF625B71)
-                )
+        if(!isAdminView) { //admins cant send in conversation
+            // Type and send a message
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(if (isSending) "Sending..." else "➜")
-            }
 
-        }
-        sendError?.let { error ->
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error
-            )
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = {
+                        message = it
+                    },
+                    placeholder = {
+                        Text("Type a message...")
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(20.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+
+                Button(
+                    enabled = !isSending &&
+                            profile != null &&
+                            conversationExists &&
+                            ChatData.conversationId.isNotBlank(),
+                    onClick = {
+                        val sender = profile
+                        val messageText = message.trim()
+
+                        if (messageText.isNotEmpty() &&
+                            sender != null &&
+                            ChatData.conversationId.isNotBlank()
+                        ) {
+                            val newMessage = Message(
+                                sender = sender,
+                                content = messageText,
+                                date = SimpleDateFormat(
+                                    "yyyy-MM-dd HH:mm:ss",
+                                    Locale.getDefault()
+                                ).format(Date())
+                            )
+
+                            isSending = true
+                            sendError = null
+
+                            conversationRepo.addMessage(
+                                conversationId = ChatData.conversationId,
+                                message = newMessage,
+                                onComplete = { error ->
+                                    isSending = false
+
+                                    if (error == null) {
+                                        message = ""
+                                    } else {
+                                        Log.e(
+                                            "ChatScreen",
+                                            "Failed to send message",
+                                            error
+                                        )
+                                        sendError = "Failed to send message."
+                                    }
+                                }
+                            )
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF625B71)
+                    )
+                ) {
+                    Text(if (isSending) "Sending..." else "➜")
+                }
+
+            }
+            sendError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

@@ -1,4 +1,3 @@
-
 /**
  * Main entry point for the application.
  *
@@ -64,21 +63,20 @@ import com.example.coders.ui.screens.ReservationMapScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.coders.ui.screens.ReviewCampsiteScreen
+import com.example.coders.ui.screens.CampsiteMemoriesMapScreen
+import com.example.coders.ui.screens.OwnerJoinLotteryScreen
 
 // Lottery screen imports.
-import com.example.coders.ui.screens.OwnerLotteriesScreen
-import com.example.coders.ui.screens.OwnerLotteryDetailsScreen
 import com.example.coders.ui.screens.MultiOwnerLotteryScreen
-import com.example.coders.ui.screens.OwnerLotteryWaitlistScreen
 import com.example.coders.ui.screens.EditLotteryScreen
 import com.example.coders.ui.screens.ViewBookedDatesScreen
 
 //Qr Code imports:
 import android.content.Intent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.navigation.navDeepLink
+
+import com.example.coders.ui.screens.AdminNotificationLogs
+import com.example.coders.ui.screens.AdminMessageLogs
 
 /** Starts the app by restoring the profile associated with the locally saved ID. */
 class MainActivity : ComponentActivity() {
@@ -91,6 +89,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         appNavController?.handleDeepLink(intent)
     }
+
     /**
      * Initializes the application's UI and navigation system.
      *
@@ -122,6 +121,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable("profile") {
                         ProfileScreen(navController)
+                    }
+
+                    composable("campsite_memories") {
+                        CampsiteMemoriesMapScreen(navController)
                     }
 
                     composable("startup") {
@@ -181,6 +184,10 @@ class MainActivity : ComponentActivity() {
 
                     composable("ownerLotteries") {
                         OwnerLotteriesScreen(navController)
+                    }
+
+                    composable("joinMultiOwnerLottery") {
+                        OwnerJoinLotteryScreen(navController)
                     }
 
                     /**
@@ -319,7 +326,13 @@ class MainActivity : ComponentActivity() {
                                         bookingStartDate,
                                         bookingEndDate,
                                         winnerCount,
-                                        capacity ->
+                                        capacity,
+                                        availabilityStartTime,
+                                        availabilityEndTime,
+                                        registrationStartTime,
+                                        registrationEndTime,
+                                        bookingStartTime,
+                                        bookingEndTime ->
 
                                     val lottery = Lottery(
                                         campOwnerId = ownerId,
@@ -335,6 +348,12 @@ class MainActivity : ComponentActivity() {
                                         invitedOwnerIds = invitedOwnerIds,
                                         participatingOwnerIds = listOf(ownerId),
                                         allowOtherOwners = invitedOwnerIds.isNotEmpty(),
+                                        availabilityStartTime = availabilityStartTime,
+                                        availabilityEndTime = availabilityEndTime,
+                                        registrationStartTime = registrationStartTime,
+                                        registrationEndTime = registrationEndTime,
+                                        bookingStartTime = bookingStartTime,
+                                        bookingEndTime = bookingEndTime
                                     )
 
                                     lotteryRepo.addLottery(lottery) { error ->
@@ -480,6 +499,7 @@ class MainActivity : ComponentActivity() {
                             savedStateHandle = backStackEntry.savedStateHandle
                         )
                     }
+
                     composable("create_campsite") {
                         CreateCampsiteScreen(
                             navController = navController,
@@ -593,9 +613,11 @@ class MainActivity : ComponentActivity() {
                     composable("ownerreservations") {
                         OwnerReservationsScreen(navController)
                     }
+
                     composable("ownerSentNotifications") {
                         OwnerSentNotificationsScreen(navController)
-                        }
+                    }
+
                     composable("minimap") {
                         MiniMapScreen(navController)
                     }
@@ -672,6 +694,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
                     composable(
                         route = "edit_campsite/{campsiteId}",
                         arguments = listOf(
@@ -698,6 +721,19 @@ class MainActivity : ComponentActivity() {
                                 Text("Campsite not found")
                             }
                         }
+                    }
+
+                    // The following block was modified using OpenAI, Codex, "Implement US 02.01.01: register campsites with required details, an optional encoded image, and tags", 2026-11-25.
+                    composable("messagelogs")  {
+                        AdminMessageLogs(
+                            navController = navController
+                        )
+                    }
+
+                    composable("notificationlogs") {
+                        AdminNotificationLogs(
+                            navController = navController
+                        )
                     }
                 }
             }

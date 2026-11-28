@@ -1,18 +1,3 @@
-/**
- * Displays and manages profile information for all user types.
- *
- * Allows users to view and update their personal information
- * and delete their profiles.
- *
- * Entrant view provides notification preferences.
- * Administrators can switch between entrant, campsite owner,
- * and administrator interfaces.
- *
- * Outstanding issues:
- * Deleting a profile does not automatically remove associated
- * reservations, conversations, or notifications.
- */
-
 package com.example.coders.ui.screens
 
 import android.app.NotificationManager
@@ -58,17 +43,8 @@ import com.example.coders.UserSession
 import com.example.coders.ViewMode
 import com.example.coders.UserRole
 
-/**
- * Displays the user's profile and account management options.
- *
- * Loads profile information from Firestore and allows the user to edit
- * personal details, toggle notification preferences, or delete their profile.
- *
- * @param navController Used to navigate between screens.
- */
-// The following composable was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
-// and remove profile images stored as Firestore data URLs", 2026-11-22.
-@OptIn(ExperimentalMaterial3Api::class) //needed for dropdown menu
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavController) {
     val context = LocalContext.current
@@ -94,8 +70,7 @@ fun ProfileScreen(navController: NavController) {
     var profileImage by remember { mutableStateOf<ImageRecord?>(null) }
     var profileImageMenuExpanded by remember { mutableStateOf(false) }
 
-    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
-    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+
     val profileImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -161,8 +136,7 @@ fun ProfileScreen(navController: NavController) {
         }
     }
 
-    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
-    // and remove profile images stored as Firestore data URLs", 2026-11-22.
+
     DisposableEffect(user?.id) {
         val profileId = user?.id
         if (profileId == null) {
@@ -217,12 +191,8 @@ fun ProfileScreen(navController: NavController) {
                     Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
-                    // and remove profile images stored as Firestore data URLs", 2026-11-22.
                     ProfileAvatar(profileImage?.url)
 
-                    // The following block was modified using OpenAI, Codex, "Implement US 01.08.02: add, update,
-                    // and remove profile images stored as Firestore data URLs", 2026-11-22.
                     if (profileImage == null) {
                         TextButton(
                             onClick = {
@@ -328,7 +298,7 @@ fun ProfileScreen(navController: NavController) {
 
                         Text("Account Type: ${UserSession.userRole.name}")
                     }
-            }
+                }
 
                 var expanded by remember { mutableStateOf(false) }
 
@@ -411,6 +381,19 @@ fun ProfileScreen(navController: NavController) {
                                 )
                             }
                             HorizontalDivider()
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                    .clickable {
+                                        navController.navigate("campsite_memories")
+                                    },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Place, null)
+                                Spacer(Modifier.width(12.dp))
+                                Text("Campsite Memories", Modifier.weight(1f))
+                                Icon(Icons.Default.ChevronRight, null)
+                            }
+                            HorizontalDivider()
                         }
                         Row(
                             Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -436,7 +419,6 @@ fun ProfileScreen(navController: NavController) {
         }
     }
 
-    // Edit an individual field
     editField?.let { field ->
         val value = editValue.trim()
         val valid = if (field == "Email") {
@@ -499,7 +481,6 @@ fun ProfileScreen(navController: NavController) {
         )
     }
 
-    // Notification confirmation
     pendingDnd?.let { requested ->
         AlertDialog(
             onDismissRequest = { if (!busy) pendingDnd = null },
@@ -555,7 +536,6 @@ fun ProfileScreen(navController: NavController) {
         )
     }
 
-    // Notification success
     notificationSuccess?.let { off ->
         AlertDialog(
             onDismissRequest = { notificationSuccess = null },
@@ -578,7 +558,6 @@ fun ProfileScreen(navController: NavController) {
         )
     }
 
-    // Delete confirmation
     if (deleteConfirm) {
         AlertDialog(
             onDismissRequest = { if (!busy) deleteConfirm = false },
@@ -662,13 +641,7 @@ fun ProfileScreen(navController: NavController) {
     }
 }
 
-// The following composable was added using OpenAI, Codex, "Implement US 01.08.02: add, update,
-// and remove profile images stored as Firestore data URLs", 2026-11-22.
-/**
- * Renders a circular profile image or the shared default avatar when no decodable image exists.
- *
- * @param dataUrl The selected profile image stored as a data URL, if any.
- */
+
 @Composable
 private fun ProfileAvatar(dataUrl: String?) {
     val bitmap = remember(dataUrl) { dataUrl?.let(::dataUrlToImageBitmap) }
@@ -692,13 +665,7 @@ private fun ProfileAvatar(dataUrl: String?) {
     }
 }
 
-/**
- * Displays a profile field with its current value and an edit button.
- *
- * @param label The name of the profile field.
- * @param value The current value of the field.
- * @param onEdit Callback invoked when the edit button is pressed.
- */
+
 @Composable
 private fun ProfileItem(
     label: String,

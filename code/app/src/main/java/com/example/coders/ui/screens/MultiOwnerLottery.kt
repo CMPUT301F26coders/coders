@@ -1,7 +1,7 @@
-
 package com.example.coders.ui.screens
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,10 +14,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.coders.Campsite
-import com.example.coders.Profile
 import com.example.coders.ProfileRepo
 import java.util.Calendar
-import com.example.coders.CampsiteRepo
+import java.util.Locale
+import com.example.coders.Profile
+import com.example.coders.UserRole
 
 /**
  * Displays the multi-owner lottery creation screen.
@@ -30,7 +31,6 @@ import com.example.coders.CampsiteRepo
  * @param navController Handles navigation.
  * @param campsites Campsites belonging to the signed-in owner.
  * @param onCreateLottery Sends the selected information
- * @param currentOwnerId The signed-in user's profile ID.
  * to the code responsible for creating the lottery.
  */
 @Composable
@@ -48,7 +48,13 @@ fun MultiOwnerLotteryScreen(
         String,
         String,
         Int,
-        Int?
+        Int?,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String
     ) -> Unit
 ) {
     val context = LocalContext.current
@@ -59,7 +65,6 @@ fun MultiOwnerLotteryScreen(
 
     // Load campsite owners from Firebase.
     val profileRepo = remember { ProfileRepo() }
-    val campsiteRepo = remember { CampsiteRepo() }
 
     var owners by remember {
         mutableStateOf<List<Profile>>(emptyList())
@@ -77,36 +82,34 @@ fun MultiOwnerLotteryScreen(
         mutableStateListOf<String>()
     }
 
+    // NEW: Owner search
+    // Stores the name entered in the search field.
+    var ownerSearch by remember {
+        mutableStateOf("")
+    }
+
+    // Filters campsite owners based on the entered name.
+    val filteredOwners = owners.filter { owner ->
+        owner.name.contains(
+            ownerSearch.trim(),
+            ignoreCase = true
+        )
+    }
 
     LaunchedEffect(currentOwnerId) {
         ownersLoading = true
-        ownersError = false
 
-        campsiteRepo.getAllCampsites { allCampsites, campsiteError ->
-            if (campsiteError != null) {
-                ownersLoading = false
-                ownersError = true
-            } else {
-                val ownerIds = allCampsites.orEmpty()
-                    .map { it.campOwnerId }
-                    .filter { it.isNotBlank() }
-                    .toSet()
+        profileRepo.getAllProfiles { profiles, error ->
+            ownersLoading = false
+            ownersError = error != null
 
-                profileRepo.getAllProfiles { profiles, error ->
-                    ownersLoading = false
-                    ownersError = error != null
-
-                    owners = profiles.orEmpty().filter {
-                        it.id in ownerIds && it.id != currentOwnerId
+            if (error == null) {
+                owners = profiles.orEmpty()
+                    .filter {
+                        it.role == UserRole.NORMAL &&
+                                it.id != currentOwnerId
                     }
-                }
             }
-        }
-    }
-    DisposableEffect(profileRepo, campsiteRepo) {
-        onDispose {
-            profileRepo.close()
-            campsiteRepo.close()
         }
     }
 
@@ -134,6 +137,33 @@ fun MultiOwnerLotteryScreen(
     }
 
     var bookingEndDate by remember {
+        mutableStateOf("")
+    }
+
+    // NEW: Stores the availability start and end times.
+    var availabilityStartTime by remember {
+        mutableStateOf("")
+    }
+
+    var availabilityEndTime by remember {
+        mutableStateOf("")
+    }
+
+    // NEW: Stores the registration start and end times.
+    var registrationStartTime by remember {
+        mutableStateOf("")
+    }
+
+    var registrationEndTime by remember {
+        mutableStateOf("")
+    }
+
+    // NEW: Stores the booking start and end times.
+    var bookingStartTime by remember {
+        mutableStateOf("")
+    }
+
+    var bookingEndTime by remember {
         mutableStateOf("")
     }
 
@@ -180,27 +210,71 @@ fun MultiOwnerLotteryScreen(
         ).show()
     }
 
-    // Checks whether the selected dates are valid.
-    val validAvailabilityDates =
-        availabilityStartDate.isNotEmpty() &&
-                availabilityEndDate.isNotEmpty() &&
-                availabilityEndDate > availabilityStartDate
+    // NEW: Opens the clock to select a time.
+    fun openTimePicker(saveTime: (String) -> Unit) {
+        val calendar = Calendar.getInstance()
 
-    val validRegistrationDates =
-        registrationStartDate.isNotEmpty() &&
-                registrationEndDate.isNotEmpty() &&
-                registrationEndDate > registrationStartDate
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                val time = String.format(
+                    Locale.US,
+                    "%02d:%02d",
+                    hour,
+                    minute
+                )
 
-    val validBookingDates =
-        bookingStartDate.isNotEmpty() &&
-                bookingEndDate.isNotEmpty() &&
-                bookingEndDate > bookingStartDate
+                saveTime(time)
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            false
+        ).show()
+    }
+
+    // NEW: Checks whether an end date and time
+    // occur after a start date and time.
+    fun validDateTime(
+        startDate: String,
+        startTime: String,
+        endDate: String,
+        endTime: String
+    ): Boolean {
+        return startDate.isNotEmpty() &&
+                startTime.isNotEmpty() &&
+                endDate.isNotEmpty() &&
+                endTime.isNotEmpty() &&
+                "$endDate $endTime" > "$startDate $startTime"
+    }
+
+    // Checks whether the selected dates and times are valid.
+    val validAvailabilityDates = validDateTime(
+        availabilityStartDate,
+        availabilityStartTime,
+        availabilityEndDate,
+        availabilityEndTime
+    )
+
+    val validRegistrationDates = validDateTime(
+        registrationStartDate,
+        registrationStartTime,
+        registrationEndDate,
+        registrationEndTime
+    )
+
+    val validBookingDates = validDateTime(
+        bookingStartDate,
+        bookingStartTime,
+        bookingEndDate,
+        bookingEndTime
+    )
 
     // Booking starts after registration closes.
     val validPeriodOrder =
         validRegistrationDates &&
                 validBookingDates &&
-                bookingStartDate > registrationEndDate
+                "$bookingStartDate $bookingStartTime" >
+                "$registrationEndDate $registrationEndTime"
 
     // Converts the number of winners into an integer.
     val winnerCount = numberOfWinners.toIntOrNull()
@@ -336,6 +410,23 @@ fun MultiOwnerLotteryScreen(
             }
         }
 
+        // NEW: Availability start time.
+        Text("Availability Start Time:")
+
+        Button(
+            onClick = {
+                openTimePicker { time ->
+                    availabilityStartTime = time
+                }
+            }
+        ) {
+            if (availabilityStartTime.isEmpty()) {
+                Text("Start Time")
+            } else {
+                Text(availabilityStartTime)
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
         Text("Availability End Date:")
@@ -354,11 +445,30 @@ fun MultiOwnerLotteryScreen(
             }
         }
 
-        if (availabilityStartDate.isNotEmpty() &&
-            availabilityEndDate.isNotEmpty()
+        // NEW: Availability end time.
+        Text("Availability End Time:")
+
+        Button(
+            onClick = {
+                openTimePicker { time ->
+                    availabilityEndTime = time
+                }
+            }
         ) {
-            if (availabilityEndDate <= availabilityStartDate) {
-                Text("Invalid availability dates")
+            if (availabilityEndTime.isEmpty()) {
+                Text("End Time")
+            } else {
+                Text(availabilityEndTime)
+            }
+        }
+
+        if (availabilityStartDate.isNotEmpty() &&
+            availabilityEndDate.isNotEmpty() &&
+            availabilityStartTime.isNotEmpty() &&
+            availabilityEndTime.isNotEmpty()
+        ) {
+            if (!validAvailabilityDates) {
+                Text("Invalid availability dates or times")
             }
         }
 
@@ -399,6 +509,23 @@ fun MultiOwnerLotteryScreen(
             }
         }
 
+        // NEW: Registration start time.
+        Text("Registration Start Time:")
+
+        Button(
+            onClick = {
+                openTimePicker { time ->
+                    registrationStartTime = time
+                }
+            }
+        ) {
+            if (registrationStartTime.isEmpty()) {
+                Text("Start Time")
+            } else {
+                Text(registrationStartTime)
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
         Text("Registration End Date:")
@@ -417,11 +544,30 @@ fun MultiOwnerLotteryScreen(
             }
         }
 
-        if (registrationStartDate.isNotEmpty() &&
-            registrationEndDate.isNotEmpty()
+        // NEW: Registration end time.
+        Text("Registration End Time:")
+
+        Button(
+            onClick = {
+                openTimePicker { time ->
+                    registrationEndTime = time
+                }
+            }
         ) {
-            if (registrationEndDate <= registrationStartDate) {
-                Text("Invalid registration dates")
+            if (registrationEndTime.isEmpty()) {
+                Text("End Time")
+            } else {
+                Text(registrationEndTime)
+            }
+        }
+
+        if (registrationStartDate.isNotEmpty() &&
+            registrationEndDate.isNotEmpty() &&
+            registrationStartTime.isNotEmpty() &&
+            registrationEndTime.isNotEmpty()
+        ) {
+            if (!validRegistrationDates) {
+                Text("Invalid registration dates or times")
             }
         }
 
@@ -472,6 +618,23 @@ fun MultiOwnerLotteryScreen(
             }
         }
 
+        // NEW: Booking start time.
+        Text("Booking Start Time:")
+
+        Button(
+            onClick = {
+                openTimePicker { time ->
+                    bookingStartTime = time
+                }
+            }
+        ) {
+            if (bookingStartTime.isEmpty()) {
+                Text("Start Time")
+            } else {
+                Text(bookingStartTime)
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
         Text("Booking End Date:")
@@ -500,18 +663,41 @@ fun MultiOwnerLotteryScreen(
             }
         }
 
-        if (bookingStartDate.isNotEmpty() &&
-            bookingEndDate.isNotEmpty()
+        // NEW: Booking end time.
+        Text("Booking End Time:")
+
+        Button(
+            onClick = {
+                openTimePicker { time ->
+                    bookingEndTime = time
+                }
+            }
         ) {
-            if (bookingEndDate <= bookingStartDate) {
-                Text("Invalid dates")
+            if (bookingEndTime.isEmpty()) {
+                Text("End Time")
+            } else {
+                Text(bookingEndTime)
+            }
+        }
+
+        if (bookingStartDate.isNotEmpty() &&
+            bookingEndDate.isNotEmpty() &&
+            bookingStartTime.isNotEmpty() &&
+            bookingEndTime.isNotEmpty()
+        ) {
+            if (!validBookingDates) {
+                Text("Invalid dates or times")
             }
         }
 
         if (registrationEndDate.isNotEmpty() &&
-            bookingStartDate.isNotEmpty()
+            registrationEndTime.isNotEmpty() &&
+            bookingStartDate.isNotEmpty() &&
+            bookingStartTime.isNotEmpty()
         ) {
-            if (bookingStartDate <= registrationEndDate) {
+            if ("$bookingStartDate $bookingStartTime" <=
+                "$registrationEndDate $registrationEndTime"
+            ) {
                 Text("Booking must start after registration ends.")
             }
         }
@@ -613,12 +799,33 @@ fun MultiOwnerLotteryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // NEW: Owner search
+        // Allows the user to search for campsite owners by name.
+        OutlinedTextField(
+            value = ownerSearch,
+            onValueChange = {
+                ownerSearch = it
+            },
+            label = {
+                Text("Search Campsite Owner")
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         when {
             ownersLoading -> Text("Loading campsite owners...")
             ownersError -> Text("Could not load campsite owners.")
             owners.isEmpty() -> Text("No campsite owners found.")
 
-            else -> owners.forEach { owner ->
+            // NEW: Owner search
+            filteredOwners.isEmpty() ->
+                Text("No matching campsite owners found.")
+
+            // Displays only the owners matching the search.
+            else -> filteredOwners.forEach { owner ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -659,7 +866,13 @@ fun MultiOwnerLotteryScreen(
                         bookingStartDate,
                         bookingEndDate,
                         count,
-                        capacity
+                        capacity,
+                        availabilityStartTime,
+                        availabilityEndTime,
+                        registrationStartTime,
+                        registrationEndTime,
+                        bookingStartTime,
+                        bookingEndTime
                     )
                 }
             },

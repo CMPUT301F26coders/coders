@@ -71,11 +71,7 @@ object UserSession {
 
         currentUserId = profile.id
 
-        userRole = if (profile.type == "Admin") {
-            UserRole.ADMIN
-        } else {
-            UserRole.NORMAL
-        }
+        userRole = profile.role
 
         viewMode = when (userRole) {
             UserRole.ADMIN -> ViewMode.ADMIN
