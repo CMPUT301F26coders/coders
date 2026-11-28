@@ -326,6 +326,31 @@ fun Lottery.entrantWaitlistStatus(
     else -> EntrantWaitlistStatus.AwaitingDraw
 }
 
+// The following messages and function were added using Anthropic, Claude Code, "Implement
+// US 01.02.02: allow an entrant to leave a campsite lottery waiting list", 2026-11-28.
+/** Reasons an entrant cannot leave a lottery's waiting list, shown to the entrant as-is. */
+object WaitlistLeaveErrors {
+    const val MISSING_ENTRANT = "Sign in to leave the waiting list."
+    const val NOT_ON_WAITLIST = "You are not on this lottery's waiting list."
+    const val ALREADY_DRAWN = "You cannot leave after winners have been drawn."
+}
+
+/**
+ * Returns why [entrantId] cannot leave this lottery's waiting list, or `null` when they can.
+ *
+ * Entrants can leave any time before winners are drawn, but only a waiting list they are on.
+ * Shared by [LotteryRepo.leaveWaitlist] and the Waitlists screen.
+ *
+ * @param entrantId The profile ID of the entrant trying to leave.
+ * @return One of the [WaitlistLeaveErrors] messages, or `null` if leaving is allowed.
+ */
+fun Lottery.waitlistLeaveError(entrantId: String): String? = when {
+    entrantId.isBlank() -> WaitlistLeaveErrors.MISSING_ENTRANT
+    entrantId !in waitlistEntrantIds -> WaitlistLeaveErrors.NOT_ON_WAITLIST
+    drawCompleted || status == CampOwnerLotteryStatus.Drawn -> WaitlistLeaveErrors.ALREADY_DRAWN
+    else -> null
+}
+
 /**
  * Represents a reservation for a campsite.
  *
@@ -2592,16 +2617,26 @@ class ConversationRepo {
     /**
      * Removes an entrant from a lottery waitlist.
      *
+     * Fails with a [WaitlistLeaveErrors] message when the entrant is not on the waitlist or
+     * winners have already been drawn.
+     *
      * @param lotteryId The lottery document ID.
      * @param entrantId The entrant profile ID.
      * @param onComplete Called with `null` on success or the error on failure.
      */
 
+    // The following function was modified using Anthropic, Claude Code, "Implement US 01.02.02:
+    // allow an entrant to leave a campsite lottery waiting list", 2026-11-28.
     fun leaveWaitlist(
         lotteryId: String,
         entrantId: String,
         onComplete: (Exception?) -> Unit = {}
     ) {
+        if (lotteryId.isBlank() || entrantId.isBlank()) {
+            onComplete(IllegalArgumentException("Lottery and entrant IDs are required."))
+            return
+        }
+
         val lotteryDocument = lotteryRef.document(lotteryId)
 
         db.runTransaction { transaction ->
@@ -2614,8 +2649,9 @@ class ConversationRepo {
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
 
-            if (lottery.drawCompleted) {
-                throw IllegalStateException("Cannot leave after winners are drawn.")
+            // Rejects entrants who aren't on this waitlist and leaving after the draw.
+            lottery.waitlistLeaveError(entrantId)?.let { message ->
+                throw IllegalStateException(message)
             }
 
             transaction.update(
