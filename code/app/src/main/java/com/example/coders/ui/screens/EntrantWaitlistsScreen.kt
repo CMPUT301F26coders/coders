@@ -3,9 +3,10 @@
  *
  * Lists every lottery waiting list the signed-in entrant has joined and shows
  * where they stand on each one: registration still open, waiting for the draw,
- * selected, or not selected.
+ * selected, or not selected. Entrants can leave a waiting list until winners
+ * are drawn.
  *
- * Outstanding issues: Entrants cannot leave a waiting list from this screen yet.
+ * Outstanding issues: None known.
  */
 
 package com.example.coders.ui.screens
@@ -33,6 +34,7 @@ import com.example.coders.EntrantWaitlistStatus
 import com.example.coders.Lottery
 import com.example.coders.LotteryRepo
 import com.example.coders.entrantWaitlistStatus
+import com.example.coders.waitlistLeaveError
 
 // The following screen was added using Anthropic, Claude Code, "Implement US 01.02.01: allow an
 // entrant to join the waiting list for an active campsite lottery", 2026-11-27.
@@ -40,7 +42,8 @@ import com.example.coders.entrantWaitlistStatus
  * Displays the waiting lists the signed-in entrant has joined.
  *
  * Listens for lotteries whose waitlist contains the entrant, so a lottery joined from the
- * campsite details screen appears here right away. Tapping a card opens its campsite.
+ * campsite details screen appears here right away. Tapping a card opens its campsite, and
+ * its Leave Lottery button removes the entrant from that waiting list after they confirm.
  *
  * @param navController Used to go back and to open a lottery's campsite details.
  */
@@ -100,6 +103,83 @@ fun EntrantWaitlistsScreen(navController: NavController) {
             .thenBy { it.registrationEndDate }
             .thenBy { it.id }
     )
+
+    // The following leave state and dialogs were added using Anthropic, Claude Code, "Implement
+    // US 01.02.02: allow an entrant to leave a campsite lottery waiting list", 2026-11-28.
+    var lotteryToLeave by remember { mutableStateOf<Lottery?>(null) }
+    var leavingLotteryId by remember { mutableStateOf<String?>(null) }
+    var leftLotteryName by remember { mutableStateOf<String?>(null) }
+    var leaveError by remember { mutableStateOf<String?>(null) }
+
+    fun displayName(lottery: Lottery): String =
+        lottery.campsiteIds.mapNotNull { campsiteNames[it] }
+            .joinToString(", ")
+            .ifBlank { "this campsite lottery" }
+
+    lotteryToLeave?.let { lottery ->
+        val name = displayName(lottery)
+        AlertDialog(
+            onDismissRequest = { lotteryToLeave = null },
+            title = { Text("Leave waiting list?") },
+            text = {
+                Text(
+                    "You'll be removed from the waiting list for $name. " +
+                        "You can rejoin while registration is still open."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        lotteryToLeave = null
+                        leavingLotteryId = lottery.id
+                        lotteryRepo.leaveWaitlist(lottery.id, id) { error ->
+                            leavingLotteryId = null
+                            if (error == null) {
+                                leftLotteryName = name
+                            } else {
+                                leaveError = error.message
+                                    ?: "Unable to leave the waiting list. Please try again."
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("confirmLeaveLottery")
+                ) {
+                    Text("Leave")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { lotteryToLeave = null }) {
+                    Text("Stay")
+                }
+            }
+        )
+    }
+
+    leftLotteryName?.let { name ->
+        AlertDialog(
+            onDismissRequest = { leftLotteryName = null },
+            title = { Text("Left Lottery") },
+            text = { Text("You have left the waiting list for $name.") },
+            confirmButton = {
+                TextButton(onClick = { leftLotteryName = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    leaveError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { leaveError = null },
+            title = { Text("Unable to Leave Lottery") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { leaveError = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -177,6 +257,13 @@ fun EntrantWaitlistsScreen(navController: NavController) {
                                             "campsiteDetails/${Uri.encode(campsiteId)}"
                                         )
                                     }
+                                },
+                                isLeaving = leavingLotteryId == lottery.id,
+                                leaveEnabled = leavingLotteryId == null,
+                                onLeave = if (lottery.waitlistLeaveError(id) == null) {
+                                    { lotteryToLeave = lottery }
+                                } else {
+                                    null
                                 }
                             )
                         }
@@ -194,13 +281,19 @@ fun EntrantWaitlistsScreen(navController: NavController) {
  * @param entrantId The signed-in entrant's profile ID.
  * @param campsiteNames Names of the lottery's campsites that have loaded so far.
  * @param onClick Opens the lottery's campsite, or `null` if it has no campsite.
+ * @param isLeaving Whether a leave request for this lottery is in progress.
+ * @param leaveEnabled Whether the Leave Lottery button can be pressed right now.
+ * @param onLeave Starts leaving this waiting list, or `null` if leaving isn't allowed.
  */
 @Composable
 private fun WaitlistCard(
     lottery: Lottery,
     entrantId: String,
     campsiteNames: List<String>,
-    onClick: (() -> Unit)?
+    onClick: (() -> Unit)?,
+    isLeaving: Boolean = false,
+    leaveEnabled: Boolean = true,
+    onLeave: (() -> Unit)? = null
 ) {
     val status = lottery.entrantWaitlistStatus(entrantId)
     val registrationCloses =
@@ -253,6 +346,24 @@ private fun WaitlistCard(
                 text = "Waiting list: $waitlistSize$capacityText $entrantNoun",
                 style = MaterialTheme.typography.bodySmall
             )
+
+            // The following button was added using Anthropic, Claude Code, "Implement
+            // US 01.02.02: allow an entrant to leave a campsite lottery waiting list", 2026-11-28.
+            if (onLeave != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = onLeave,
+                    enabled = leaveEnabled,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("leaveLotteryButton_${lottery.id}")
+                ) {
+                    Text(if (isLeaving) "Leaving..." else "Leave Lottery")
+                }
+            }
         }
     }
 }

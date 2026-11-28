@@ -29,3 +29,7 @@ Anthropic, Claude Code, "Implement US 01.02.01: allow an entrant to join the wai
 active campsite lottery", 2026-11-27, was used to assist with the shared waiting-list join rule,
 duplicate-join and lottery-manager handling on the campsite details screen, the entrant Waitlists
 screen in My Stuff, and related unit and instrumented tests.
+
+Anthropic, Claude Code, "Implement US 01.02.02: allow an entrant to leave a campsite lottery
+waiting list", 2026-11-28, was used to assist with the shared waiting-list leave rule, the Leave
+Lottery control and confirmation on the Waitlists screen, and related unit and instrumented tests.
