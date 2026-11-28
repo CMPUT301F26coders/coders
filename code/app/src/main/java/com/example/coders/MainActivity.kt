@@ -64,6 +64,7 @@ import com.example.coders.ui.screens.ReservationMapScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.coders.ui.screens.ReviewCampsiteScreen
+import com.example.coders.ui.screens.CampsiteMemoriesMapScreen
 
 // Lottery screen imports.
 import com.example.coders.ui.screens.OwnerLotteriesScreen
@@ -125,6 +126,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable("profile") {
                         ProfileScreen(navController)
+                    }
+                    composable("campsite_memories") {
+                        CampsiteMemoriesMapScreen(navController)
                     }
 
                     composable("startup") {
