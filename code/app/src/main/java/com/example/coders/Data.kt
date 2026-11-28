@@ -224,22 +224,35 @@ data class Lottery (
  * Returns whether entrants can currently register for this lottery.
  *
  * A lottery is open only while it has [CampOwnerLotteryStatus.Active] status, has not been
- * drawn, and the supplied date is within its inclusive registration period. Invalid or missing
- * dates are treated as closed so older incomplete records cannot accept entries.
+ * drawn, and the supplied time is within its registration period. Invalid or missing
+ * dates or times are treated as closed so older incomplete records cannot accept entries.
  */
-fun Lottery.isRegistrationOpen(today: LocalDate = LocalDate.now()): Boolean {
+fun Lottery.isRegistrationOpen(now: LocalDateTime = LocalDateTime.now()): Boolean {
     if (status != CampOwnerLotteryStatus.Active || drawCompleted) {
         return false
     }
 
-    val registrationStart = runCatching {
+    val registrationStartDate = runCatching {
         LocalDate.parse(registrationStartDate)
     }.getOrNull() ?: return false
-    val registrationEnd = runCatching {
+    val registrationEndDate = runCatching {
         LocalDate.parse(registrationEndDate)
     }.getOrNull() ?: return false
 
-    return !today.isBefore(registrationStart) && !today.isAfter(registrationEnd)
+    val registrationStartTime = if (registrationStartTime.isBlank()) {
+        LocalTime.MIDNIGHT
+    } else {
+        runCatching { LocalTime.parse(registrationStartTime) }.getOrNull() ?: return false
+    }
+    val registrationEndTime = if (registrationEndTime.isBlank()) {
+        LocalTime.MAX
+    } else {
+        runCatching { LocalTime.parse(registrationEndTime) }.getOrNull() ?: return false
+    }
+
+    val registrationStart = LocalDateTime.of(registrationStartDate, registrationStartTime)
+    val registrationEnd = LocalDateTime.of(registrationEndDate, registrationEndTime)
+    return !now.isBefore(registrationStart) && now.isBefore(registrationEnd)
 }
 
 /**
@@ -2473,8 +2486,8 @@ class ConversationRepo {
             val lottery = snapshot.toObject(Lottery::class.java)
                 ?: throw IllegalArgumentException("Invalid lottery.")
 
-            val today = LocalDate.now()
-            if (!lottery.isRegistrationOpen(today)) {
+            val now = LocalDateTime.now()
+            if (!lottery.isRegistrationOpen(now)) {
                 throw IllegalStateException(
                     "This lottery is not active or registration is closed."
                 )
@@ -2483,40 +2496,6 @@ class ConversationRepo {
             val entrants = lottery.waitlistEntrantIds
             val capacity = lottery.waitlistCapacity
 
-<<<<<<< HEAD
-=======
-            // Prevent joining after the draw.
-            if (lottery.drawCompleted) {
-                throw IllegalStateException("Lottery has already been drawn.")
-            }
-
-            // Make sure registration is currently open.
-            val now = LocalDateTime.now()
-            val today = now.toLocalDate()
-            
-            val start = LocalDate.parse(lottery.registrationStartDate)
-            val end = LocalDate.parse(lottery.registrationEndDate)
-            
-            val startTime = if (lottery.registrationStartTime.isBlank()) {
-                LocalTime.MIDNIGHT
-            } else {
-                LocalTime.parse(lottery.registrationStartTime)
-            }
-            
-            val endTime = if (lottery.registrationEndTime.isBlank()) {
-                LocalTime.MAX
-            } else {
-                LocalTime.parse(lottery.registrationEndTime)
-            }
-            
-            val startDateTime = LocalDateTime.of(start, startTime)
-            val endDateTime = LocalDateTime.of(end, endTime)
-            
-            if (now.isBefore(startDateTime) || !now.isBefore(endDateTime)) {
-                throw IllegalStateException("Registration is not open.")
-            }
-
->>>>>>> origin/Test
             // Prevent duplicate entries.
             if (entrantId in entrants) {
                 throw IllegalStateException("You already joined this lottery.")
@@ -2533,7 +2512,7 @@ class ConversationRepo {
                 mapOf(
                     "waitlistEntrantIds" to FieldValue.arrayUnion(entrantId),
                     "waitlistJoinedDates" to
-                            (lottery.waitlistJoinedDates + (entrantId to today.toString()))
+                            (lottery.waitlistJoinedDates + (entrantId to now.toLocalDate().toString()))
                 )
             )
 

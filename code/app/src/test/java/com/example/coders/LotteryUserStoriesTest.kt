@@ -93,13 +93,14 @@ class LotteryUserStoriesTest {
     @Test
     fun registrationOpen_acceptsAnActiveUndrawnLotteryWithinItsInclusivePeriod() {
         val today = LocalDate.of(2026, 11, 27)
+        val now = today.atTime(12, 0)
         val lottery = Lottery(
             status = CampOwnerLotteryStatus.Active,
             registrationStartDate = today.toString(),
             registrationEndDate = today.toString()
         )
 
-        assertTrue(lottery.isRegistrationOpen(today))
+        assertTrue(lottery.isRegistrationOpen(now))
     }
 
     // The following function was added using OpenAI, Codex, "Implement US 01.01.06: allow an
@@ -107,6 +108,7 @@ class LotteryUserStoriesTest {
     @Test
     fun registrationOpen_rejectsInactiveDrawnClosedAndInvalidLotteries() {
         val today = LocalDate.of(2026, 11, 27)
+        val now = today.atTime(12, 0)
         val baseLottery = Lottery(
             status = CampOwnerLotteryStatus.Active,
             registrationStartDate = "2026-11-26",
@@ -115,20 +117,20 @@ class LotteryUserStoriesTest {
 
         assertFalse(
             baseLottery.copy(status = CampOwnerLotteryStatus.BookingPeriod)
-                .isRegistrationOpen(today)
+                .isRegistrationOpen(now)
         )
-        assertFalse(baseLottery.copy(drawCompleted = true).isRegistrationOpen(today))
+        assertFalse(baseLottery.copy(drawCompleted = true).isRegistrationOpen(now))
         assertFalse(
             baseLottery.copy(registrationStartDate = "2026-11-28")
-                .isRegistrationOpen(today)
+                .isRegistrationOpen(now)
         )
         assertFalse(
             baseLottery.copy(registrationEndDate = "2026-11-26")
-                .isRegistrationOpen(today)
+                .isRegistrationOpen(now)
         )
         assertFalse(
             baseLottery.copy(registrationStartDate = "not-a-date")
-                .isRegistrationOpen(today)
+                .isRegistrationOpen(now)
         )
     }
 
