@@ -24,3 +24,8 @@ with connecting the creation-form image picker to campsite-image persistence.
 OpenAI, Codex, "Implement US 01.01.06: allow an entrant to join an active lottery from campsite
 details", 2026-11-27, was used to assist with active-lottery validation, the campsite-details
 joining controls, and related unit and instrumented tests.
+
+Anthropic, Claude Code, "Implement US 01.02.01: allow an entrant to join the waiting list for an
+active campsite lottery", 2026-11-27, was used to assist with the shared waiting-list join rule,
+duplicate-join and lottery-manager handling on the campsite details screen, and related unit and
+instrumented tests.

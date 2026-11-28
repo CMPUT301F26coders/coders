@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,6 +20,7 @@ import com.example.coders.SignedInProfile
 import com.example.coders.UserSession
 import com.example.coders.ViewMode
 import com.example.coders.isRegistrationOpen
+import com.example.coders.waitlistJoinError
 
 /**
  * Displays detailed information about a selected campsite.
@@ -35,7 +37,9 @@ import com.example.coders.isRegistrationOpen
  * and the layout includes safe screen padding.
  *
  * For entrants, it observes lotteries associated with the campsite and
- * lets them join lotteries whose registration is currently open.
+ * lets them join the waiting list of lotteries whose registration is currently
+ * open. It shows each waiting list's size, disables joining once the entrant is
+ * already on the list, and hides joining for owners who manage the lottery.
  *
  * @param navController Handles navigation to the previous screen.
  * @param campsite The selected Campsite object containing
@@ -86,7 +90,10 @@ fun CampsiteDetailsScreen(
             onDismissRequest = { joinedLotteryId = null },
             title = { Text("Joined Lottery") },
             text = {
-                Text("You have joined the lottery for ${campsite.name}.")
+                // The following confirmation text was modified using Anthropic, Claude Code,
+                // "Implement US 01.02.01: allow an entrant to join the waiting list for an
+                // active campsite lottery", 2026-11-27.
+                Text("You have joined the waiting list for ${campsite.name}.")
             },
             confirmButton = {
                 TextButton(onClick = { joinedLotteryId = null }) {
@@ -176,11 +183,20 @@ fun CampsiteDetailsScreen(
 
         // The following entrant lottery actions were added using OpenAI, Codex, "Implement
         // US 01.01.06: allow an entrant to join an active lottery from campsite details", 2026-11-27.
+        // The following waiting-list status, duplicate-join, and lottery-manager handling were
+        // added using Anthropic, Claude Code, "Implement US 01.02.01: allow an entrant to join
+        // the waiting list for an active campsite lottery", 2026-11-27.
         if (canJoinLotteries) {
             activeLotteries.forEach { lottery ->
+                val managesLottery =
+                    entrantId == lottery.campOwnerId || entrantId in lottery.participatingOwnerIds
+                if (managesLottery) return@forEach
+
                 val hasJoined =
                     lottery.id in joinedLotteryIds || entrantId in lottery.waitlistEntrantIds
                 val isJoiningThisLottery = joiningLotteryId == lottery.id
+                val joinBlockedReason = lottery.waitlistJoinError(entrantId)
+                val waitlistSize = lottery.waitlistEntrantIds.distinct().size
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -199,15 +215,33 @@ fun CampsiteDetailsScreen(
                             }
                         }
                     },
-                    enabled = joiningLotteryId == null && !hasJoined,
-                    modifier = Modifier.fillMaxWidth()
+                    enabled = joiningLotteryId == null && !hasJoined && joinBlockedReason == null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("joinWaitlistButton_${lottery.id}")
                 ) {
                     Text(
                         when {
                             isJoiningThisLottery -> "Joining..."
-                            hasJoined -> "Joined"
+                            hasJoined -> "On Waiting List"
                             else -> "Join Lottery"
                         }
+                    )
+                }
+
+                val capacityText = lottery.waitlistCapacity?.let { " / $it" }.orEmpty()
+                val entrantNoun = if (waitlistSize == 1) "entrant" else "entrants"
+                Text(
+                    text = "Waiting list: $waitlistSize$capacityText $entrantNoun",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("waitlistStatus_${lottery.id}")
+                )
+
+                if (!hasJoined && joinBlockedReason != null) {
+                    Text(
+                        text = joinBlockedReason,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
 
